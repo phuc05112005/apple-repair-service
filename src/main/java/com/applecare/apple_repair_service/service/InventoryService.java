@@ -1,0 +1,202 @@
+package com.applecare.apple_repair_service.service;
+
+import com.applecare.apple_repair_service.dto.request.ReversePartUsageRequest;
+import com.applecare.apple_repair_service.dto.request.StockAdjustmentRequest;
+import com.applecare.apple_repair_service.dto.request.TransferStockRequest;
+import com.applecare.apple_repair_service.dto.request.UsePartRequest;
+import com.applecare.apple_repair_service.dto.response.BranchInventoryResponse;
+import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
+import com.applecare.apple_repair_service.dto.response.PartUsageResponse;
+import com.applecare.apple_repair_service.entity.Branch;
+import com.applecare.apple_repair_service.entity.BranchInventory;
+import com.applecare.apple_repair_service.entity.InventoryTransaction;
+import com.applecare.apple_repair_service.entity.Part;
+import com.applecare.apple_repair_service.entity.PartUsage;
+import com.applecare.apple_repair_service.entity.RepairItem;
+import com.applecare.apple_repair_service.entity.ServiceTicket;
+import com.applecare.apple_repair_service.entity.User;
+import com.applecare.apple_repair_service.enums.ActiveStatus;
+import com.applecare.apple_repair_service.enums.ApprovalStatus;
+import com.applecare.apple_repair_service.enums.InventoryTransactionType;
+import com.applecare.apple_repair_service.enums.PartUsageStatus;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
+import com.applecare.apple_repair_service.exception.ConflictException;
+import com.applecare.apple_repair_service.exception.InsufficientStockException;
+import com.applecare.apple_repair_service.mapper.EntityResponses;
+import com.applecare.apple_repair_service.repository.BranchInventoryRepository;
+import com.applecare.apple_repair_service.repository.InventoryTransactionRepository;
+import com.applecare.apple_repair_service.repository.PartUsageRepository;
+
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class InventoryService {
+    private final BranchInventoryRepository inventory;
+    private final PartUsageRepository usages;
+    private final InventoryTransactionRepository transactions;
+    private final DomainAccess access;
+    private final BusinessRules rules;
+    private final EntityResponses mapper;
+    private final Clock clock;
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
+        rules.validate(r);
+        var part = lockPart(r.partId());
+        var branch = branch(r.branchId());
+        var actor = access.get(User.class, r.recordedByUserId());
+        var stock = lockedStock(branch, part);
+        increase(stock, r.quantity());
+        movement(part, InventoryTransactionType.STOCK_IN, null, branch, r.quantity(), null, actor, r.note());
+        return mapper.map(stock);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public BranchInventoryResponse stockOut(StockAdjustmentRequest r) {
+        rules.validate(r);
+        var part = lockPart(r.partId());
+        var branch = branch(r.branchId());
+        var actor = access.get(User.class, r.recordedByUserId());
+        var stock = lockedStock(branch, part);
+        decrease(stock, r.quantity());
+        movement(part, InventoryTransactionType.STOCK_OUT, branch, null, r.quantity(), null, actor, r.note());
+        return mapper.map(stock);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public PartUsageResponse usePart(UsePartRequest r) {
+        rules.validate(r);
+        var item = access.get(RepairItem.class, r.repairItemId());
+        var ticket = access.lock(ServiceTicket.class, item.getServiceTicket().getId());
+        item = access.lock(RepairItem.class, r.repairItemId());
+        BusinessRules.require(item.getApprovalStatus() == ApprovalStatus.APPROVED, "Part usage requires approved repair item");
+        BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.REPAIRING || ticket.getStatus() == ServiceTicketStatus.WAITING_PART, "Part usage requires an ongoing repair");
+        var part = lockPart(r.partId());
+        var branch = branch(ticket.getBranch().getId());
+        var actor = access.get(User.class, r.recordedByUserId());
+        var stock = lockedStock(branch, part);
+        decrease(stock, r.quantity());
+        var usage = new PartUsage();
+        usage.setRepairItem(item);
+        usage.setPart(part);
+        usage.setQuantity(r.quantity());
+        usage.setRecordedBy(actor);
+        usage.setUsedAt(LocalDateTime.now(clock));
+        usages.saveAndFlush(usage);
+        movement(part, InventoryTransactionType.USAGE_OUT, branch, null, r.quantity(), usage, actor, null);
+        return mapper.map(usage);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public PartUsageResponse reversePartUsage(ReversePartUsageRequest r) {
+        rules.validate(r);
+        var initial = access.get(PartUsage.class, r.partUsageId());
+        access.lock(ServiceTicket.class, initial.getRepairItem().getServiceTicket().getId());
+        var usage = access.lock(PartUsage.class, r.partUsageId());
+        if (usage.getStatus() != PartUsageStatus.ACTIVE) throw new ConflictException("Part usage already reversed");
+        // Returns remain possible when a catalog part has subsequently been deactivated.
+        var part = access.lock(Part.class, usage.getPart().getId());
+        var branch = access.get(Branch.class, usage.getRepairItem().getServiceTicket().getBranch().getId());
+        var actor = access.get(User.class, r.reversedByUserId());
+        var stock = lockedStock(branch, part);
+        increase(stock, usage.getQuantity());
+        usage.setStatus(PartUsageStatus.REVERSED);
+        usage.setReversedBy(actor);
+        usage.setReversedAt(LocalDateTime.now(clock));
+        usage.setReversalNote(BusinessRules.text(r.reversalNote()));
+        movement(part, InventoryTransactionType.USAGE_RETURN, null, branch, usage.getQuantity(), usage, actor, r.reversalNote());
+        return mapper.map(usage);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public InventoryTransactionResponse transferStock(TransferStockRequest r) {
+        rules.validate(r);
+        BusinessRules.require(!r.sourceBranchId().equals(r.destinationBranchId()), "Source and destination must differ");
+        var part = lockPart(r.partId());
+        var source = branch(r.sourceBranchId());
+        var destination = branch(r.destinationBranchId());
+        var actor = access.get(User.class, r.recordedByUserId());
+        // A stable Part lock protects creation of missing inventory rows. Existing rows also get FOR UPDATE.
+        BranchInventory from, to;
+        if (source.getId() < destination.getId()) {
+            from = lockedStock(source, part);
+            to = lockedStock(destination, part);
+        } else {
+            to = lockedStock(destination, part);
+            from = lockedStock(source, part);
+        }
+        decrease(from, r.quantity());
+        increase(to, r.quantity());
+        return mapper.map(movement(part, InventoryTransactionType.TRANSFER, source, destination, r.quantity(), null, actor, r.note()));
+    }
+
+    public BranchInventoryResponse getInventory(Long branchId, Long partId) {
+        access.get(Branch.class, branchId);
+        access.get(Part.class, partId);
+        return inventory.findByBranch_IdAndPart_Id(branchId, partId).map(mapper::map)
+                .orElseGet(() -> new BranchInventoryResponse(null, branchId, partId, 0, null, null));
+    }
+
+    public List<InventoryTransactionResponse> getTransactionHistory(Long partId) {
+        access.get(Part.class, partId);
+        return transactions.findAllByPart_IdOrderByCreatedAtDesc(partId).stream().map(mapper::map).toList();
+    }
+
+    private Branch branch(Long id) {
+        var b = access.get(Branch.class, id);
+        BusinessRules.require(b.getStatus() == ActiveStatus.ACTIVE, "Branch is inactive");
+        return b;
+    }
+
+    private Part lockPart(Long id) {
+        var p = access.lock(Part.class, id);
+        BusinessRules.require(p.getStatus() == ActiveStatus.ACTIVE, "Part is inactive");
+        return p;
+    }
+
+    private BranchInventory lockedStock(Branch branch, Part part) {
+        return inventory.findByBranchPartForUpdate(branch.getId(), part.getId()).orElseGet(() -> {
+            var stock = new BranchInventory();
+            stock.setBranch(branch);
+            stock.setPart(part);
+            return inventory.saveAndFlush(stock);
+        });
+    }
+
+    private void increase(BranchInventory stock, int amount) {
+        try {
+            stock.setQuantity(Math.addExact(stock.getQuantity(), amount));
+        } catch (ArithmeticException ex) {
+            throw new BusinessRuleViolationException("Stock quantity exceeds integer range");
+        }
+    }
+
+    private void decrease(BranchInventory stock, int amount) {
+        if (stock.getQuantity() < amount) throw new InsufficientStockException("Insufficient stock");
+        stock.setQuantity(stock.getQuantity() - amount);
+    }
+
+    private InventoryTransaction movement(Part part, InventoryTransactionType type, Branch source, Branch destination, int quantity, PartUsage usage, User actor, String note) {
+        var tx = new InventoryTransaction();
+        tx.setPart(part);
+        tx.setTransactionType(type);
+        tx.setSourceBranch(source);
+        tx.setDestinationBranch(destination);
+        tx.setQuantity(quantity);
+        tx.setPartUsage(usage);
+        tx.setRecordedBy(actor);
+        tx.setNote(BusinessRules.text(note));
+        tx.setCreatedAt(LocalDateTime.now(clock));
+        return transactions.saveAndFlush(tx);
+    }
+}

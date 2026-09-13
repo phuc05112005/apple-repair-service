@@ -1,0 +1,287 @@
+*** Begin Patch
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/entity/TechnicianSchedule.java
++package com.applecare.apple_repair_service.entity;
++
++import com.applecare.apple_repair_service.enums.TechnicianScheduleStatus;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.FetchType;
++import jakarta.persistence.ForeignKey;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Index;
++import jakarta.persistence.JoinColumn;
++import jakarta.persistence.ManyToOne;
++import jakarta.persistence.Table;
++import jakarta.persistence.UniqueConstraint;
++import jakarta.validation.constraints.NotNull;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++import org.hibernate.annotations.CreationTimestamp;
++import org.hibernate.annotations.UpdateTimestamp;
++
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.time.LocalTime;
++
++@Entity
++@Table(name = "technician_schedules", uniqueConstraints = {
++        @UniqueConstraint(name = "uk_technician_schedules_shift",
++                columnNames = {"technician_id", "branch_id", "work_date", "start_time", "end_time"})
++}, indexes = {
++        @Index(name = "idx_technician_schedules_branch_date_status",
++                columnList = "branch_id, work_date, status")
++})
++@Getter
++@Setter
++@NoArgsConstructor
++public class TechnicianSchedule {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "technician_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_technician_schedules_technician"))
++    private User technician;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "branch_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_technician_schedules_branch"))
++    private Branch branch;
++
++    @NotNull
++    @Column(name = "work_date", nullable = false)
++    private LocalDate workDate;
++
++    @NotNull
++    @Column(name = "start_time", nullable = false)
++    private LocalTime startTime;
++
++    @NotNull
++    @Column(name = "end_time", nullable = false)
++    private LocalTime endTime;
++
++    @NotNull
++    @Enumerated(EnumType.STRING)
++    @Column(name = "status", nullable = false)
++    private TechnicianScheduleStatus status = TechnicianScheduleStatus.WORKING;
++
++    @CreationTimestamp
++    @Column(name = "created_at", nullable = false, updatable = false)
++    private LocalDateTime createdAt;
++
++    @UpdateTimestamp
++    @Column(name = "updated_at", nullable = false)
++    private LocalDateTime updatedAt;
++}
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/entity/Assignment.java
++package com.applecare.apple_repair_service.entity;
++
++import com.applecare.apple_repair_service.enums.AssignmentSource;
++import com.applecare.apple_repair_service.enums.AssignmentStatus;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.FetchType;
++import jakarta.persistence.ForeignKey;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Index;
++import jakarta.persistence.JoinColumn;
++import jakarta.persistence.ManyToOne;
++import jakarta.persistence.Table;
++import jakarta.validation.constraints.NotNull;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(name = "assignments", indexes = {
++        @Index(name = "idx_assignments_ticket_status", columnList = "service_ticket_id, status"),
++        @Index(name = "idx_assignments_technician_status", columnList = "technician_id, status")
++})
++@Getter
++@Setter
++@NoArgsConstructor
++public class Assignment {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "service_ticket_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_assignments_service_ticket"))
++    private ServiceTicket serviceTicket;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "technician_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_assignments_technician"))
++    private User technician;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "assigned_by", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_assignments_assigned_by"))
++    private User assignedBy;
++
++    @NotNull
++    @Enumerated(EnumType.STRING)
++    @Column(name = "source", nullable = false)
++    private AssignmentSource source;
++
++    @NotNull
++    @Enumerated(EnumType.STRING)
++    @Column(name = "status", nullable = false)
++    private AssignmentStatus status = AssignmentStatus.ACTIVE;
++
++    @NotNull
++    @Column(name = "assigned_at", nullable = false)
++    private LocalDateTime assignedAt;
++
++    @Column(name = "ended_at")
++    private LocalDateTime endedAt;
++
++    @Column(name = "note", columnDefinition = "TEXT")
++    private String note;
++}
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/entity/Transfer.java
++package com.applecare.apple_repair_service.entity;
++
++import com.applecare.apple_repair_service.enums.TransferMode;
++import com.applecare.apple_repair_service.enums.TransferStatus;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.FetchType;
++import jakarta.persistence.ForeignKey;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.JoinColumn;
++import jakarta.persistence.ManyToOne;
++import jakarta.persistence.Table;
++import jakarta.validation.constraints.NotNull;
++import lombok.Getter;
++import lombok.NoArgsConstructor;
++import lombok.Setter;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(name = "transfers")
++@Getter
++@Setter
++@NoArgsConstructor
++public class Transfer {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "from_assignment_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_transfers_from_assignment"))
++    private Assignment fromAssignment;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "target_technician_id", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_transfers_target_technician"))
++    private User targetTechnician;
++
++    @NotNull
++    @Enumerated(EnumType.STRING)
++    @Column(name = "mode", nullable = false)
++    private TransferMode mode;
++
++    @NotNull
++    @Enumerated(EnumType.STRING)
++    @Column(name = "status", nullable = false)
++    private TransferStatus status = TransferStatus.PENDING;
++
++    @NotNull
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "requested_by", nullable = false,
++            foreignKey = @ForeignKey(name = "fk_transfers_requested_by"))
++    private User requestedBy;
++
++    @ManyToOne(fetch = FetchType.LAZY)
++    @JoinColumn(name = "responded_by",
++            foreignKey = @ForeignKey(name = "fk_transfers_responded_by"))
++    private User respondedBy;
++
++    @Column(name = "note", columnDefinition = "TEXT")
++    private String note;
++
++    @NotNull
++    @Column(name = "requested_at", nullable = false)
++    private LocalDateTime requestedAt;
++
++    @Column(name = "responded_at")
++    private LocalDateTime respondedAt;
++}
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/repository/TechnicianScheduleRepository.java
++package com.applecare.apple_repair_service.repository;
++
++import com.applecare.apple_repair_service.entity.TechnicianSchedule;
++import com.applecare.apple_repair_service.enums.TechnicianScheduleStatus;
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.time.LocalDate;
++import java.util.List;
++
++public interface TechnicianScheduleRepository extends JpaRepository<TechnicianSchedule, Long> {
++
++    List<TechnicianSchedule> findAllByWorkDateAndStatus(
++            LocalDate workDate, TechnicianScheduleStatus status);
++}
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/repository/AssignmentRepository.java
++package com.applecare.apple_repair_service.repository;
++
++import com.applecare.apple_repair_service.entity.Assignment;
++import com.applecare.apple_repair_service.enums.AssignmentStatus;
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.List;
++import java.util.Optional;
++
++public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
++
++    Optional<Assignment> findFirstByServiceTicket_IdAndStatus(
++            Long serviceTicketId, AssignmentStatus status);
++
++    List<Assignment> findAllByServiceTicket_IdOrderByAssignedAtAsc(Long serviceTicketId);
++
++    List<Assignment> findAllByTechnician_IdAndStatus(Long technicianId, AssignmentStatus status);
++}
+*** Add File: D:/Class/DOAN/CNPM/apple-repair-service/apple-repair-service/src/main/java/com/applecare/apple_repair_service/repository/TransferRepository.java
++package com.applecare.apple_repair_service.repository;
++
++import com.applecare.apple_repair_service.entity.Transfer;
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.List;
++
++public interface TransferRepository extends JpaRepository<Transfer, Long> {
++
++    List<Transfer> findAllByFromAssignment_ServiceTicket_IdOrderByRequestedAtDesc(
++            Long serviceTicketId);
++}
+*** End Patch

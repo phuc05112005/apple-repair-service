@@ -1,0 +1,746 @@
+﻿[
+    {
+        "file":  "AppointmentService.java",
+        "methods":  [
+                        {
+                            "name":  "createAppointment",
+                            "parameters":  "CreateAppointmentRequest r"
+                        },
+                        {
+                            "name":  "countActiveBookings",
+                            "parameters":  "Long slotId"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "findByPhone",
+                            "parameters":  "String phone"
+                        },
+                        {
+                            "name":  "confirmAppointment",
+                            "parameters":  "Long id, ConfirmAppointmentRequest r"
+                        },
+                        {
+                            "name":  "rescheduleAppointment",
+                            "parameters":  "Long id, RescheduleAppointmentRequest r"
+                        },
+                        {
+                            "name":  "cancelAppointment",
+                            "parameters":  "Long id, CancelAppointmentRequest r"
+                        },
+                        {
+                            "name":  "expireAppointment",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "markArrived",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "AppointmentSlotService.java",
+        "methods":  [
+                        {
+                            "name":  "create",
+                            "parameters":  "SaveAppointmentSlotRequest request"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, SaveAppointmentSlotRequest request"
+                        },
+                        {
+                            "name":  "open",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "close",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  "Long branchId, LocalDate date"
+                        },
+                        {
+                            "name":  "availability",
+                            "parameters":  "Long branchId, LocalDate date"
+                        }
+                    ]
+    },
+    {
+        "file":  "AssignmentService.java",
+        "methods":  [
+                        {
+                            "name":  "assignTechnician",
+                            "parameters":  "Long ticketId, AssignTechnicianRequest r"
+                        },
+                        {
+                            "name":  "getHistory",
+                            "parameters":  "Long ticketId"
+                        }
+                    ]
+    },
+    {
+        "file":  "AuthService.java",
+        "methods":  [
+                        {
+                            "name":  "login",
+                            "parameters":  "LoginRequest request"
+                        }
+                    ]
+    },
+    {
+        "file":  "BranchService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateBranchRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateBranchRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "BusinessRules.java",
+        "methods":  [
+                        {
+                            "name":  "validate",
+                            "parameters":  "T request"
+                        },
+                        {
+                            "name":  "require",
+                            "parameters":  "boolean condition, String message"
+                        },
+                        {
+                            "name":  "text",
+                            "parameters":  "String value"
+                        },
+                        {
+                            "name":  "required",
+                            "parameters":  "String value, String label"
+                        },
+                        {
+                            "name":  "money",
+                            "parameters":  "BigDecimal value"
+                        }
+                    ]
+    },
+    {
+        "file":  "CustomerDeviceService.java",
+        "methods":  [
+                        {
+                            "name":  "findOrCreateDevice",
+                            "parameters":  "Long customerId, CustomerDeviceInfoRequest r"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "listByCustomer",
+                            "parameters":  "Long customerId"
+                        }
+                    ]
+    },
+    {
+        "file":  "CustomerIdentity.java",
+        "methods":  [
+
+                    ]
+    },
+    {
+        "file":  "CustomerService.java",
+        "methods":  [
+                        {
+                            "name":  "findOrCreateByPhone",
+                            "parameters":  "String fullName, String phone"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        }
+                    ]
+    },
+    {
+        "file":  "DeviceModelService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateDeviceModelRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateDeviceModelRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "DeviceTypeService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateDeviceTypeRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateDeviceTypeRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "DomainAccess.java",
+        "methods":  [
+                        {
+                            "name":  "get",
+                            "parameters":  "Class\u003cT\u003e type, Long id"
+                        },
+                        {
+                            "name":  "lock",
+                            "parameters":  "Class\u003cT\u003e type, Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "FeedbackService.java",
+        "methods":  [
+                        {
+                            "name":  "createFeedback",
+                            "parameters":  "CreateServiceFeedbackRequest r"
+                        },
+                        {
+                            "name":  "getByTicket",
+                            "parameters":  "Long ticketId"
+                        }
+                    ]
+    },
+    {
+        "file":  "InventoryService.java",
+        "methods":  [
+                        {
+                            "name":  "stockIn",
+                            "parameters":  "StockAdjustmentRequest r"
+                        },
+                        {
+                            "name":  "stockOut",
+                            "parameters":  "StockAdjustmentRequest r"
+                        },
+                        {
+                            "name":  "usePart",
+                            "parameters":  "UsePartRequest r"
+                        },
+                        {
+                            "name":  "reversePartUsage",
+                            "parameters":  "ReversePartUsageRequest r"
+                        },
+                        {
+                            "name":  "transferStock",
+                            "parameters":  "TransferStockRequest r"
+                        },
+                        {
+                            "name":  "getInventory",
+                            "parameters":  "Long branchId, Long partId"
+                        },
+                        {
+                            "name":  "getTransactionHistory",
+                            "parameters":  "Long partId"
+                        }
+                    ]
+    },
+    {
+        "file":  "MlPredictionService.java",
+        "methods":  [
+                        {
+                            "name":  "savePrediction",
+                            "parameters":  "CreateMlPredictionRequest r"
+                        },
+                        {
+                            "name":  "getLatestPrediction",
+                            "parameters":  "Long id, PredictionType type"
+                        },
+                        {
+                            "name":  "getPredictionHistory",
+                            "parameters":  "Long id, PredictionType type"
+                        }
+                    ]
+    },
+    {
+        "file":  "PartService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreatePartRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdatePartRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "PaymentService.java",
+        "methods":  [
+                        {
+                            "name":  "calculateTicketTotal",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "getSummary",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "recordPayment",
+                            "parameters":  "Long id, RecordPaymentRequest r"
+                        },
+                        {
+                            "name":  "settleZeroAmountTicket",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "PricePolicy.java",
+        "methods":  [
+                        {
+                            "name":  "discounted",
+                            "parameters":  "BigDecimal price, BigDecimal percent"
+                        }
+                    ]
+    },
+    {
+        "file":  "RepairDurationService.java",
+        "methods":  [
+                        {
+                            "name":  "calculateCompletedRepairMinutes",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "calculateCurrentRepairMinutes",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "RepairItemService.java",
+        "methods":  [
+                        {
+                            "name":  "listByTicket",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "recordApprovalDecision",
+                            "parameters":  "Long id, ApprovalDecisionRequest r"
+                        }
+                    ]
+    },
+    {
+        "file":  "RetryingWrites.java",
+        "methods":  [
+                        {
+                            "name":  "execute",
+                            "parameters":  "Supplier\u003cT\u003e action"
+                        }
+                    ]
+    },
+    {
+        "file":  "ServiceCatalogService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateServiceCatalogItemRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateServiceCatalogItemRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "ServiceIssueService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateServiceIssueRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateServiceIssueRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "ServiceStatusService.java",
+        "methods":  [
+
+                    ]
+    },
+    {
+        "file":  "ServiceTicketService.java",
+        "methods":  [
+                        {
+                            "name":  "handover",
+                            "parameters":  "Long id, HandoverRequest r"
+                        },
+                        {
+                            "name":  "intakeAppointmentDevice",
+                            "parameters":  "IntakeAppointmentDeviceRequest r"
+                        },
+                        {
+                            "name":  "createWalkInTicket",
+                            "parameters":  "WalkInIntakeRequest r, Long createdByUserId"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "findByPhone",
+                            "parameters":  "String phone"
+                        },
+                        {
+                            "name":  "startInspection",
+                            "parameters":  "Long id, Long userId"
+                        },
+                        {
+                            "name":  "waitForPart",
+                            "parameters":  "Long id, Long userId, String note"
+                        },
+                        {
+                            "name":  "resumeRepair",
+                            "parameters":  "Long id, Long userId"
+                        },
+                        {
+                            "name":  "cancelTicket",
+                            "parameters":  "Long id, Long userId, String reason"
+                        },
+                        {
+                            "name":  "recordInspection",
+                            "parameters":  "Long id, RecordInspectionRequest r"
+                        },
+                        {
+                            "name":  "finishRepair",
+                            "parameters":  "Long id, Long userId"
+                        }
+                    ]
+    },
+    {
+        "file":  "ServiceTypeService.java",
+        "methods":  [
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateServiceTypeRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateServiceTypeRequest r"
+                        },
+                        {
+                            "name":  "activate",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "deactivate",
+                            "parameters":  "Long id"
+                        }
+                    ]
+    },
+    {
+        "file":  "StatisticsService.java",
+        "methods":  [
+                        {
+                            "name":  "overview",
+                            "parameters":  "LocalDate from, LocalDate to, Long branchId, Long deviceTypeId"
+                        }
+                    ]
+    },
+    {
+        "file":  "SystemSettingService.java",
+        "methods":  [
+                        {
+                            "name":  "getString",
+                            "parameters":  "String key"
+                        },
+                        {
+                            "name":  "getDecimal",
+                            "parameters":  "String key"
+                        },
+                        {
+                            "name":  "getDecimal",
+                            "parameters":  "String key, BigDecimal fallback"
+                        },
+                        {
+                            "name":  "getInteger",
+                            "parameters":  "String key"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "String key, UpdateSystemSettingRequest r"
+                        }
+                    ]
+    },
+    {
+        "file":  "TechnicianEligibility.java",
+        "methods":  [
+
+                    ]
+    },
+    {
+        "file":  "TechnicianRecommendationService.java",
+        "methods":  [
+                        {
+                            "name":  "recommend",
+                            "parameters":  "Long ticketId"
+                        }
+                    ]
+    },
+    {
+        "file":  "TechnicianScheduleService.java",
+        "methods":  [
+                        {
+                            "name":  "create",
+                            "parameters":  "CreateTechnicianScheduleRequest r"
+                        },
+                        {
+                            "name":  "update",
+                            "parameters":  "Long id, UpdateTechnicianScheduleRequest r"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "listByTechnicianAndDate",
+                            "parameters":  "Long technicianId, LocalDate date"
+                        }
+                    ]
+    },
+    {
+        "file":  "TicketCodeGenerator.java",
+        "methods":  [
+                        {
+                            "name":  "next",
+                            "parameters":  ""
+                        }
+                    ]
+    },
+    {
+        "file":  "TransferService.java",
+        "methods":  [
+                        {
+                            "name":  "requestTransfer",
+                            "parameters":  "CreateTransferRequest r"
+                        },
+                        {
+                            "name":  "directTransfer",
+                            "parameters":  "CreateTransferRequest r"
+                        },
+                        {
+                            "name":  "acceptTransfer",
+                            "parameters":  "Long id, TransferDecisionRequest r"
+                        },
+                        {
+                            "name":  "rejectTransfer",
+                            "parameters":  "Long id, TransferDecisionRequest r"
+                        },
+                        {
+                            "name":  "cancelTransfer",
+                            "parameters":  "Long id, TransferDecisionRequest r"
+                        },
+                        {
+                            "name":  "getHistory",
+                            "parameters":  "Long ticketId"
+                        }
+                    ]
+    },
+    {
+        "file":  "UserService.java",
+        "methods":  [
+                        {
+                            "name":  "create",
+                            "parameters":  "com.applecare.apple_repair_service.dto.request.CreateUserRequest request"
+                        },
+                        {
+                            "name":  "getById",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "list",
+                            "parameters":  ""
+                        },
+                        {
+                            "name":  "updateProfile",
+                            "parameters":  "Long id, UpdateUserProfileRequest r"
+                        },
+                        {
+                            "name":  "updateRole",
+                            "parameters":  "Long id, UpdateUserRoleRequest r"
+                        },
+                        {
+                            "name":  "updateStatus",
+                            "parameters":  "Long id, UpdateUserStatusRequest r"
+                        }
+                    ]
+    },
+    {
+        "file":  "WarrantyPolicy.java",
+        "methods":  [
+                        {
+                            "name":  "eligible",
+                            "parameters":  "RepairItem source, LocalDate date"
+                        },
+                        {
+                            "name":  "checkChain",
+                            "parameters":  "RepairItem item"
+                        },
+                        {
+                            "name":  "validateBooking",
+                            "parameters":  "RepairItem source, Long customerId, ServiceCatalogItem catalog, LocalDate date"
+                        }
+                    ]
+    },
+    {
+        "file":  "WarrantyService.java",
+        "methods":  [
+                        {
+                            "name":  "checkEligibility",
+                            "parameters":  "Long id"
+                        },
+                        {
+                            "name":  "checkEligibility",
+                            "parameters":  "Long id, LocalDate date"
+                        },
+                        {
+                            "name":  "recordWarrantyDecision",
+                            "parameters":  "Long id, WarrantyDecisionRequest r"
+                        }
+                    ]
+    },
+    {
+        "file":  "WriteTransaction.java",
+        "methods":  [
+                        {
+                            "name":  "execute",
+                            "parameters":  "Supplier\u003cT\u003e action"
+                        }
+                    ]
+    }
+]

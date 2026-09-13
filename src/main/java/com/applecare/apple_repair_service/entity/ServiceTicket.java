@@ -1,0 +1,130 @@
+package com.applecare.apple_repair_service.entity;
+
+import com.applecare.apple_repair_service.enums.PaymentMethod;
+import com.applecare.apple_repair_service.enums.PaymentStatus;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "service_tickets", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_service_tickets_ticket_code", columnNames = {"ticket_code"}),
+        @UniqueConstraint(name = "uk_service_tickets_appointment_device", columnNames = {"appointment_device_id"})
+}, indexes = {
+        @Index(name = "idx_service_tickets_status", columnList = "status"),
+        @Index(name = "idx_service_tickets_branch", columnList = "branch_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class ServiceTicket {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank
+    @Column(name = "ticket_code", nullable = false)
+    private String ticketCode;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "appointment_device_id", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_appointment_device"))
+    private AppointmentDevice appointmentDevice;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "customer_device_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_customer_device"))
+    private CustomerDevice customerDevice;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "branch_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_branch"))
+    private Branch branch;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_created_by"))
+    private User createdBy;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private ServiceTicketStatus status = ServiceTicketStatus.WAITING_ASSIGNMENT;
+
+    @NotBlank
+    @Column(name = "received_condition", nullable = false, columnDefinition = "TEXT")
+    private String receivedCondition;
+
+    @Column(name = "inspection_result", columnDefinition = "TEXT")
+    private String inspectionResult;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inspected_by", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_inspected_by"))
+    private User inspectedBy;
+
+    @NotNull
+    @DecimalMin("0.00")
+    @DecimalMax("100.00")
+    @Column(name = "discount_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "handed_over_by", nullable = true,
+            foreignKey = @ForeignKey(name = "fk_service_tickets_handed_over_by"))
+    private User handedOverBy;
+
+    @Column(name = "handed_over_at")
+    private LocalDateTime handedOverAt;
+
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
+    private String cancelReason;
+
+    @NotNull
+    @Column(name = "received_at", nullable = false)
+    private LocalDateTime receivedAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+}
