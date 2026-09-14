@@ -2,6 +2,23 @@
 
 Updated 2026-09-13 (Asia/Saigon). Original spec: attachment 902062f7-85e5-4709-bc9e-acb921f9c760; continuation: dc59e388-ef37-4055-ad32-45cecbe7abe3.
 
+## Continuation 2026-09-14
+
+Latest instructions: attachment 493e51dc-3b01-47b3-a3a9-b8028e2bdc28. Git now exists: dev at 5ba795b (after 7f032c2). Existing untracked .agents/ and skills-lock.json preserved. Commit 5ba795b removed two root reports; no Java delta against 7f032c2. Do not restore those files or merge main.
+
+Resume evidence: continuation-source-baseline.json, continuation-test-baseline.json (110 tests), database-continuation-baseline.json (26 tables, 219 columns, 50 FK, 87 indexes, zero schema diff). Earlier 'No Git repository' notes below describe Sept 12/13 only.
+
+Completed now:
+- TechnicianAuthorizationIntegrationTest: 7/7 PASS, real MySQL, all real services/repositories. Own/foreign assignee, DIRECT revoke/gain, REQUEST pending/accept/reject/cancel, part use/reversal, warranty, role denials.
+- HttpWorkflowIntegrationTest: 2/2 PASS. Full HTTP boundary with committed transactions, payment/handover/history/stock/feedback/actor assertions; concurrent transfer waits behind an authorized mutation ticket lock. Mockito spy only supplies synchronization latches around real TicketAccessPolicy calls. Exact UUID/branch fixture cleanup restores every table count.
+- OpenApiConfig + springdoc 3.1.1; OpenApiIntegrationTest 1/1 PASS. Swagger assets, bearer scheme, public/protected operation metadata, all 111 business endpoints inventoried, role/actor DTO checks.
+- Final compile PASS; mvn clean test PASS 120 tests, 0 failures/errors/skipped. Old 78 and prior 110 unchanged by source hash. No existing Java files modified in this continuation.
+- Final clean package PASS (120 tests, 0 failures/errors/skipped). Executable JAR PASS with runtime-generated JWT secret, local opt-in bootstrap, random port 58586, Hibernate validate. All 15 real HTTP smoke checks PASS; exact owned PID 4396 stopped and port closed.
+- Final schema audit: 26 tables / 219 columns / 50 FK / 87 indexes, zero schema differences, zero per-table row-count differences. Fixture users cleaned; test signing key/classes absent from JAR.
+- MASTER_API_SECURITY_REPORT.md generated with all 111 endpoints, DTO/service/repository changes, test scenarios, A-Z evidence, warnings and deferred scope. Final verdict: MASTER REST API + SECURITY PHASE COMPLETED. Stop for user audit; no commit/merge/push/frontend/Python/deployment.
+
+Read current completion/report evidence before relying on historical in-progress statements below.
+
 No Git repository; direct source/hash audit. Preserve original 78 tests, 26 entities/tables, 19 enums. No agents, frontend, Python HTTP, deployment, schema changes.
 
 Completed Sept 12:
