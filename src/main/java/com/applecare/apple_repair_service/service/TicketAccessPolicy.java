@@ -24,6 +24,14 @@ public class TicketAccessPolicy {
         if (!assignment.getTechnician().getId().equals(actor.id())) denied();
         return assignment;
     }
+    public Assignment requireActiveTechnicianRead(Long ticketId) {
+        if (actor.principal().role()!=UserRole.TECHNICIAN) denied();
+        access.get(ServiceTicket.class,ticketId);
+        var assignment=assignments.findFirstByServiceTicket_IdAndStatus(ticketId,AssignmentStatus.ACTIVE)
+                .orElseThrow(() -> new AccessDeniedException("An active assignment is required"));
+        if (!assignment.getTechnician().getId().equals(actor.id())) denied();
+        return assignment;
+    }
     public Assignment activeAssignment(Long ticketId) {
         access.lock(ServiceTicket.class,ticketId);
         return assignments.findFirstByServiceTicket_IdAndStatus(ticketId,AssignmentStatus.ACTIVE)
@@ -31,9 +39,15 @@ public class TicketAccessPolicy {
     }
     public void requireRead(Long ticketId) {
         var role=actor.principal().role();
-        if (role==UserRole.TECHNICIAN) requireActiveTechnician(ticketId);
+        if (role==UserRole.TECHNICIAN) requireActiveTechnicianRead(ticketId);
         else if (role==UserRole.ADMIN || role==UserRole.RECEPTIONIST) access.get(ServiceTicket.class,ticketId);
         else denied();
+    }
+    public Long requireItemRead(Long itemId) {
+        var item=access.get(RepairItem.class,itemId);
+        Long ticketId=item.getServiceTicket().getId();
+        requireActiveTechnicianRead(ticketId);
+        return ticketId;
     }
     public Long requireItem(Long itemId) {
         var item=access.get(RepairItem.class,itemId);
@@ -62,4 +76,3 @@ public class TicketAccessPolicy {
     }
     private static void denied() { throw new AccessDeniedException("You cannot access this service record"); }
 }
-

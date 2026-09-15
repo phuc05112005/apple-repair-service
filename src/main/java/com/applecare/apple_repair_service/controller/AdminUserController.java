@@ -17,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminUserController {
     private final UserService service;
+    private final com.applecare.apple_repair_service.security.CurrentActor actor;
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse create(@Valid @RequestBody CreateUserRequest request) { return service.create(request); }
@@ -30,11 +31,10 @@ public class AdminUserController {
     }
     @PutMapping("/{id}/role")
     public UserResponse role(@PathVariable @Positive Long id, @Valid @RequestBody UpdateUserRoleRequest request) {
-        return service.updateRole(id, request);
+        return service.updateRole(id, request, actor.id());
     }
     @PutMapping("/{id}/status")
     public UserResponse status(@PathVariable @Positive Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
-        return service.updateStatus(id, request);
+        return service.updateStatus(id, request, actor.id());
     }
 }
-

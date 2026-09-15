@@ -7,12 +7,13 @@ import java.util.List;
 
 public interface ServiceCatalogItemRepository extends JpaRepository<ServiceCatalogItem, Long> {
     @org.springframework.data.jpa.repository.Query("""
-            select c from ServiceCatalogItem c
+            select c from ServiceCatalogItem c left join c.part p
             where c.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.deviceType.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.serviceIssue.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.serviceType.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
+              and (p is null or p.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE)
               and (:deviceModelId is null or c.deviceModel.id = :deviceModelId)
               and (:serviceIssueId is null or c.serviceIssue.id = :serviceIssueId)
               and (:serviceTypeId is null or c.serviceType.id = :serviceTypeId)

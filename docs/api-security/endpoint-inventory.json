@@ -15,6 +15,14 @@
   "request" : "SaveAppointmentSlotRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.SlotAvailabilityResponse"
 }, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/appointment-slots/{id}",
+  "controller" : "AdminConfigurationController",
+  "handler" : "deleteSlot",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
+}, {
   "method" : "GET",
   "path" : "/api/v1/admin/appointment-slots/{id}",
   "controller" : "AdminConfigurationController",
@@ -62,6 +70,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "CreateBranchRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.BranchResponse"
+}, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/branches/{id}",
+  "controller" : "AdminBranchController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/branches/{id}",
@@ -111,6 +127,14 @@
   "request" : "CreateDeviceModelRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.DeviceModelResponse"
 }, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/device-models/{id}",
+  "controller" : "AdminDeviceModelController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
+}, {
   "method" : "GET",
   "path" : "/api/v1/admin/device-models/{id}",
   "controller" : "AdminDeviceModelController",
@@ -158,6 +182,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "CreateDeviceTypeRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.DeviceTypeResponse"
+}, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/device-types/{id}",
+  "controller" : "AdminDeviceTypeController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/device-types/{id}",
@@ -231,6 +263,14 @@
   "request" : "CreatePartRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.PartResponse"
 }, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/parts/{id}",
+  "controller" : "AdminPartController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
+}, {
   "method" : "GET",
   "path" : "/api/v1/admin/parts/{id}",
   "controller" : "AdminPartController",
@@ -278,6 +318,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "CreateServiceCatalogItemRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceCatalogItemResponse"
+}, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/service-catalog-items/{id}",
+  "controller" : "AdminServiceCatalogController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/service-catalog-items/{id}",
@@ -327,6 +375,14 @@
   "request" : "CreateServiceIssueRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceIssueResponse"
 }, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/service-issues/{id}",
+  "controller" : "AdminServiceIssueController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
+}, {
   "method" : "GET",
   "path" : "/api/v1/admin/service-issues/{id}",
   "controller" : "AdminServiceIssueController",
@@ -374,6 +430,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "CreateServiceTypeRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTypeResponse"
+}, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/service-types/{id}",
+  "controller" : "AdminServiceTypeController",
+  "handler" : "delete",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/service-types/{id}",
@@ -446,6 +510,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "CreateTechnicianScheduleRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.TechnicianScheduleResponse"
+}, {
+  "method" : "DELETE",
+  "path" : "/api/v1/admin/technician-schedules/{id}",
+  "controller" : "AdminConfigurationController",
+  "handler" : "deleteSchedule",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "void"
 }, {
   "method" : "PUT",
   "path" : "/api/v1/admin/technician-schedules/{id}",
@@ -655,6 +727,14 @@
   "request" : "ApprovalCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.RepairItemResponse"
 }, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/repair-items/{id}/part-usages",
+  "controller" : "TechnicianController",
+  "handler" : "partUsages",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.PartUsageResponse>"
+}, {
   "method" : "POST",
   "path" : "/api/v1/internal/repair-items/{id}/part-usages",
   "controller" : "TechnicianController",
@@ -670,6 +750,14 @@
   "access" : "hasRole('TECHNICIAN')",
   "request" : "WarrantyDecisionRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.RepairItemResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets",
+  "controller" : "InternalTicketController",
+  "handler" : "tickets",
+  "access" : "hasAnyRole('ADMIN','RECEPTIONIST')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.OperationalTicketResponse>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/internal/service-tickets/walk-in",
@@ -702,6 +790,14 @@
   "access" : "hasRole('RECEPTIONIST')",
   "request" : "AssignTechnicianCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.AssignmentResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets/{id}/available-parts",
+  "controller" : "TechnicianController",
+  "handler" : "availableParts",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.AvailablePartResponse>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/internal/service-tickets/{id}/cancel",
@@ -792,6 +888,14 @@
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.TechnicianRecommendationResponse>"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets/{id}/transfer-candidates",
+  "controller" : "TechnicianController",
+  "handler" : "transferCandidates",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.TechnicianRecommendationResponse>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/internal/service-tickets/{id}/transfers",
   "controller" : "InternalTicketController",
   "handler" : "transfers",
@@ -822,6 +926,22 @@
   "access" : "hasRole('TECHNICIAN')",
   "request" : "TransferCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.TransferResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/technician/work",
+  "controller" : "TechnicianController",
+  "handler" : "work",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.OperationalTicketResponse>"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/transfers/incoming",
+  "controller" : "TransferController",
+  "handler" : "incoming",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.IncomingTransferResponse>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/internal/transfers/{id}/accept",

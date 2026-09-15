@@ -1,4 +1,29 @@
 package com.applecare.apple_repair_service.dto.publicapi;
 
-public record PublicRepairItemResponse(Long repairItemId, String name, com.applecare.apple_repair_service.enums.ApprovalStatus approvalStatus, java.math.BigDecimal finalPrice, java.time.LocalDate warrantyStartDate, java.time.LocalDate warrantyEndDate, com.applecare.apple_repair_service.enums.WarrantyDecision warrantyDecision) {
+import com.applecare.apple_repair_service.enums.ApprovalStatus;
+import com.applecare.apple_repair_service.enums.ServiceTypeCode;
+import com.applecare.apple_repair_service.enums.WarrantyDecision;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public record PublicRepairItemResponse(
+        Long repairItemId,
+        Long deviceTypeId,
+        Long deviceModelId,
+        Long serviceIssueId,
+        Long serviceCatalogItemId,
+        ServiceTypeCode serviceTypeCode,
+        String serviceTypeName,
+        Long partId,
+        String partName,
+        String partBrand,
+        String partVariant,
+        String name,
+        ApprovalStatus approvalStatus,
+        BigDecimal finalPrice,
+        LocalDate warrantyStartDate,
+        LocalDate warrantyEndDate,
+        WarrantyDecision warrantyDecision
+) {
 }

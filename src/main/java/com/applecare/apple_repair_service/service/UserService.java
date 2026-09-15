@@ -64,16 +64,20 @@ public class UserService {
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public UserResponse updateRole(Long id, UpdateUserRoleRequest r) {
+    public UserResponse updateRole(Long id, UpdateUserRoleRequest r, Long actorId) {
         rules.validate(r);
+        BusinessRules.require(!id.equals(actorId) || r.role() == com.applecare.apple_repair_service.enums.UserRole.ADMIN,
+                "You cannot remove your own administrator role");
         var u = access.lock(User.class, id);
         u.setRole(r.role());
         return mapper.map(u);
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public UserResponse updateStatus(Long id, UpdateUserStatusRequest r) {
+    public UserResponse updateStatus(Long id, UpdateUserStatusRequest r, Long actorId) {
         rules.validate(r);
+        BusinessRules.require(!id.equals(actorId) || r.status() == com.applecare.apple_repair_service.enums.UserStatus.ACTIVE,
+                "You cannot deactivate your own account");
         var u = access.lock(User.class, id);
         u.setStatus(r.status());
         return mapper.map(u);

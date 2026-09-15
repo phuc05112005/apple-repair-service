@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 
 @RestController
 @RequestMapping("/api/v1/internal")
@@ -18,6 +19,28 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TechnicianController {
     private final TechnicianOperationsService operations;
+    private final OperationalQueryService queries;
+
+    @GetMapping("/technician/work")
+    public List<OperationalTicketResponse> work(@RequestParam(required=false) ServiceTicketStatus status) {
+        return queries.myWork(status);
+    }
+
+    @GetMapping("/service-tickets/{id}/transfer-candidates")
+    public List<TechnicianRecommendationResponse> transferCandidates(@PathVariable @Positive Long id) {
+        return queries.transferCandidates(id);
+    }
+
+    @GetMapping("/service-tickets/{id}/available-parts")
+    public List<AvailablePartResponse> availableParts(@PathVariable @Positive Long id,
+            @RequestParam(required=false) @jakarta.validation.constraints.Size(max=255) String query) {
+        return queries.availableParts(id, query);
+    }
+
+    @GetMapping("/repair-items/{id}/part-usages")
+    public List<PartUsageResponse> partUsages(@PathVariable @Positive Long id) {
+        return queries.partUsages(id);
+    }
 
     @PostMapping("/service-tickets/{id}/inspection/start")
     public ServiceTicketDetailResponse start(@PathVariable @Positive Long id) { return operations.startInspection(id); }
@@ -49,4 +72,3 @@ public class TechnicianController {
         return operations.warranty(id,request);
     }
 }
-

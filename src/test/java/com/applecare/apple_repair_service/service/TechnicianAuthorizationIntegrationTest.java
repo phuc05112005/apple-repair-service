@@ -142,6 +142,49 @@ class TechnicianAuthorizationIntegrationTest {
         em.flush();assertEquals(5,stock.getQuantity());
         command("part-usages/"+usage+"/reverse",a,new NoteCommand("Again")).andExpect(status().isConflict());
     }
+    @Test void operationalReadModelsAreActorScopedAndExposeRealTicketContext() throws Exception {
+        var part=new Part();part.setPartCode(f.prefix);part.setName("Battery");part.setBrand("Apple");
+        part.setVariant("Original");part.setSalePrice(BigDecimal.TEN);em.persist(part);
+        var stock=new BranchInventory();stock.setBranch(f.branch);stock.setPart(part);stock.setQuantity(5);em.persist(stock);em.flush();
+
+        mvc.perform(get("/api/v1/internal/technician/work").header("Authorization",a))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].ticketId").value(ticket.getId()))
+                .andExpect(jsonPath("$[0].customerFullName").value(ticket.getCustomerDevice().getCustomer().getFullName()))
+                .andExpect(jsonPath("$[0].deviceModelName").value(f.model.getName()))
+                .andExpect(jsonPath("$[0].activeTechnicianId").value(f.technician.getId()));
+        mvc.perform(get("/api/v1/internal/technician/work").header("Authorization",b))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",org.hamcrest.Matchers.hasSize(0)));
+        denied(mvc.perform(get("/api/v1/internal/technician/work").header("Authorization",reception)));
+
+        mvc.perform(get("/api/v1/internal/service-tickets").header("Authorization",reception)
+                        .param("query",ticket.getTicketCode()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].ticketId").value(ticket.getId()));
+        denied(mvc.perform(get("/api/v1/internal/service-tickets").header("Authorization",a)));
+
+        mvc.perform(get("/api/v1/internal/service-tickets/"+ticket.getId()+"/available-parts").header("Authorization",a))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].partId").value(part.getId()))
+                .andExpect(jsonPath("$[0].brand").value("Apple"))
+                .andExpect(jsonPath("$[0].availableQuantity").value(5));
+        denied(mvc.perform(get("/api/v1/internal/service-tickets/"+ticket.getId()+"/available-parts").header("Authorization",b)));
+
+        mvc.perform(get("/api/v1/internal/service-tickets/"+ticket.getId()+"/transfer-candidates").header("Authorization",a))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].technicianId").value(f.otherTechnician.getId()));
+        long transfer=requestTransfer();
+        mvc.perform(get("/api/v1/internal/transfers/incoming").header("Authorization",b))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].transfer.id").value(transfer))
+                .andExpect(jsonPath("$[0].ticket.ticketId").value(ticket.getId()));
+        mvc.perform(get("/api/v1/internal/transfers/incoming").header("Authorization",a))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",org.hamcrest.Matchers.hasSize(0)));
+
+        ticket.setStatus(ServiceTicketStatus.REPAIRING);em.flush();
+        var usage=command("repair-items/"+item.getId()+"/part-usages",a,new PartUsageCommand(part.getId(),1))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        mvc.perform(get("/api/v1/internal/repair-items/"+item.getId()+"/part-usages").header("Authorization",a))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(json.readTree(usage).get("id").asLong()));
+        denied(mvc.perform(get("/api/v1/internal/repair-items/"+item.getId()+"/part-usages").header("Authorization",b)));
+    }
     @Test void warrantyRequiresAssigneeAndApprovalRemainsReceptionistOnly() throws Exception {
         ticket.setStatus(ServiceTicketStatus.REPAIRING);
         var sourceTicket=f.ticket(ServiceTicketStatus.HANDED_OVER);sourceTicket.setCustomerDevice(ticket.getCustomerDevice());
@@ -163,4 +206,3 @@ class TechnicianAuthorizationIntegrationTest {
                 .param("from",LocalDate.now(clock).toString()).param("to",LocalDate.now(clock).toString())));
     }
 }
-

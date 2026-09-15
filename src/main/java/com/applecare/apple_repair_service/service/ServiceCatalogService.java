@@ -11,8 +11,10 @@ import com.applecare.apple_repair_service.entity.ServiceType;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
+import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository;
+import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 
 import java.util.List;
 
@@ -29,6 +31,7 @@ public class ServiceCatalogService {
     private final DomainAccess access;
     private final BusinessRules rules;
     private final EntityResponses mapper;
+    private final AdminReferenceRepository references;
 
     public ServiceCatalogItemResponse getById(Long id) {
         return mapper.map(access.get(ServiceCatalogItem.class, id));
@@ -66,6 +69,19 @@ public class ServiceCatalogService {
         var e = access.lock(ServiceCatalogItem.class, id);
         e.setStatus(ActiveStatus.INACTIVE);
         return save(e);
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void delete(Long id) {
+        var entity = access.lock(ServiceCatalogItem.class, id);
+        String message = "Không thể xóa dịch vụ vì dữ liệu này đang được sử dụng.";
+        if (references.serviceCatalogItemIsReferenced(id)) throw new ConflictException(message);
+        try {
+            repository.delete(entity);
+            repository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(message, ex);
+        }
     }
 
     private void apply(ServiceCatalogItem e, UpdateServiceCatalogItemRequest r) {

@@ -1,0 +1,23 @@
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { adminApi } from '../../../api/adminApi'
+import { publicApi } from '../../../api/publicApi'
+import { ErrorState, LoadingState } from '../../../components/AsyncState'
+import { ticketStatusLabels } from '../../../types/labels'
+import { formatMoney } from '../../../utils/format'
+
+export function StatisticsPage() {
+  const initial = useMemo(() => {
+    const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 30)
+    return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+  }, [])
+  const [from, setFrom] = useState(initial.from)
+  const [to, setTo] = useState(initial.to)
+  const [branchId, setBranchId] = useState<number>()
+  const [deviceTypeId, setDeviceTypeId] = useState<number>()
+  const branches = useQuery({ queryKey: ['public', 'branches'], queryFn: ({ signal }) => publicApi.branches(signal) })
+  const deviceTypes = useQuery({ queryKey: ['public', 'device-types'], queryFn: ({ signal }) => publicApi.deviceTypes(signal) })
+  const statistics = useQuery({ queryKey: ['admin', 'statistics', from, to, branchId, deviceTypeId], queryFn: ({ signal }) => adminApi.statistics({ from, to, branchId, deviceTypeId }, signal), enabled: Boolean(from && to) })
+  const branchName = branches.data?.find(branch => branch.id === branchId)?.name ?? 'Chưa chọn chi nhánh'
+  return <div className="workspace-page"><header><span className="eyebrow">Admin · Theo chi nhánh</span><h1>Thống kê vận hành</h1><p>Mọi con số được gắn với khoảng thời gian và chi nhánh đang xem. Chế độ chưa chọn branch không được gắn nhãn “toàn hệ thống”.</p></header><div className="branch-context"><span>Chi nhánh đang xem</span><strong>{branchName}</strong></div><div className="toolbar toolbar--four"><label><span>Chi nhánh</span><select value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Chọn chi nhánh</option>{branches.data?.map(branch => <option value={branch.id} key={branch.id}>{branch.name}</option>)}</select></label><label><span>Từ ngày</span><input type="date" value={from} onChange={event => setFrom(event.target.value)} /></label><label><span>Đến ngày</span><input type="date" value={to} onChange={event => setTo(event.target.value)} /></label><label><span>Loại thiết bị</span><select value={deviceTypeId ?? ''} onChange={event => setDeviceTypeId(Number(event.target.value) || undefined)}><option value="">Tất cả loại</option>{deviceTypes.data?.map(type => <option value={type.id} key={type.id}>{type.name}</option>)}</select></label></div>{statistics.isLoading ? <LoadingState /> : statistics.isError ? <ErrorState error={statistics.error} retry={() => statistics.refetch()} /> : statistics.data && <><div className="metric-grid"><article><span>Tổng phiếu</span><strong>{statistics.data.totalTickets}</strong><small>Trong kỳ đã chọn</small></article><article><span>Doanh thu đã thanh toán</span><strong>{formatMoney(statistics.data.paidRevenue)}</strong><small>Chỉ payment đã ghi nhận</small></article><article><span>Phiếu bảo hành quay lại</span><strong>{statistics.data.warrantyReturnTickets}</strong><small>Theo dữ liệu backend</small></article></div><section className="ops-section"><div className="ops-section__title"><span>01</span><h2>Trạng thái hiện tại</h2></div><div className="status-bars">{statistics.data.currentStatusCounts.map(item => <div key={item.status}><span>{ticketStatusLabels[item.status]}</span><div><i style={{ width: `${statistics.data.totalTickets ? Math.max(2, item.count / statistics.data.totalTickets * 100) : 0}%` }} /></div><strong>{item.count}</strong></div>)}</div></section></>}</div>
+}

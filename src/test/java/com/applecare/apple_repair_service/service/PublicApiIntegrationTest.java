@@ -31,10 +31,20 @@ class PublicApiIntegrationTest {
     @BeforeEach void fixture() { f = new ApiFixture(em,clock); f.create(); }
 
     @Test void catalogIsAnonymousFilteredAndOmitsInternalData() throws Exception {
+        var part = new com.applecare.apple_repair_service.entity.Part();
+        part.setPartCode(f.prefix + "PART"); part.setName("Replacement battery");
+        part.setBrand("Apple"); part.setVariant("Original");
+        part.setSalePrice(new java.math.BigDecimal("125.00")); em.persist(part);
+        f.catalog.setPart(part); f.catalog.setConfiguredPrice(null); em.flush();
         mvc.perform(get("/api/v1/service-catalog-items").param("deviceModelId",f.model.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(f.catalog.getId()))
-                .andExpect(jsonPath("$[0].partId").doesNotExist())
+                .andExpect(jsonPath("$[0].serviceTypeCode").value("REPAIR"))
+                .andExpect(jsonPath("$[0].serviceTypeName").value(f.serviceType.getName()))
+                .andExpect(jsonPath("$[0].partId").value(part.getId()))
+                .andExpect(jsonPath("$[0].partBrand").value("Apple"))
+                .andExpect(jsonPath("$[0].partVariant").value("Original"))
+                .andExpect(jsonPath("$[0].displayPrice").value(125))
                 .andExpect(jsonPath("$[0].createdAt").doesNotExist());
         mvc.perform(get("/api/v1/service-catalog-items").param("deviceModelId",f.model.getId().toString())
                 .param("serviceIssueId",Long.toString(Long.MAX_VALUE))).andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(0)));
@@ -75,9 +85,17 @@ class PublicApiIntegrationTest {
         mvc.perform(get("/api/v1/service-tickets/lookup").param("phone",phone)).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ticketCode").value(ticket.getTicketCode()))
                 .andExpect(jsonPath("$[0].approvedTotal").value(100))
+                .andExpect(jsonPath("$[0].repairItems[0].deviceModelId").value(f.model.getId()))
+                .andExpect(jsonPath("$[0].repairItems[0].serviceCatalogItemId").value(f.catalog.getId()))
+                .andExpect(jsonPath("$[0].repairItems[0].serviceTypeCode").value("REPAIR"))
                 .andExpect(jsonPath("$[0].createdById").doesNotExist())
                 .andExpect(jsonPath("$[0].inspectionResult").doesNotExist())
                 .andExpect(jsonPath("$[0].repairItems[0].approvalNote").doesNotExist());
+        mvc.perform(get("/api/v1/service-tickets/lookup").param("ticketCode",ticket.getTicketCode()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(1)))
+                .andExpect(jsonPath("$[0].ticketCode").value(ticket.getTicketCode()));
+        mvc.perform(get("/api/v1/service-tickets/lookup").param("phone",phone).param("ticketCode",ticket.getTicketCode()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
         mvc.perform(get("/api/v1/warranties/eligibility").param("repairItemId",item.getId().toString()).param("phone","wrong"))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/warranties/eligibility").param("repairItemId",item.getId().toString()).param("phone",phone))
@@ -99,4 +117,3 @@ class PublicApiIntegrationTest {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
 }
-

@@ -10,6 +10,8 @@ import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.enums.TechnicianScheduleStatus;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.TechnicianScheduleRepository;
+import com.applecare.apple_repair_service.exception.ConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,6 +51,17 @@ public class TechnicianScheduleService {
         var s = access.lock(TechnicianSchedule.class, id);
         apply(s, r);
         return mapper.map(s);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void delete(Long id) {
+        var schedule = access.lock(TechnicianSchedule.class, id);
+        try {
+            repository.delete(schedule);
+            repository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("Không thể xóa lịch kỹ thuật viên vì dữ liệu này đang được sử dụng.", ex);
+        }
     }
 
     public TechnicianScheduleResponse getById(Long id) {

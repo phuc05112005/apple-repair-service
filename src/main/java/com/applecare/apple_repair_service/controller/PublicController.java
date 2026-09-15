@@ -50,8 +50,9 @@ public class PublicController {
         return queries.appointments(phone);
     }
     @GetMapping("/service-tickets/lookup")
-    public List<PublicTicketResponse> tickets(@RequestParam @NotBlank @Size(max = 255) String phone) {
-        return queries.tickets(phone);
+    public List<PublicTicketResponse> tickets(@RequestParam(required=false) @Size(max = 255) String phone,
+                                               @RequestParam(required=false) @Size(max = 255) String ticketCode) {
+        return queries.tickets(phone, ticketCode);
     }
     @GetMapping("/warranties/eligibility")
     public WarrantyEligibilityResponse eligibility(@RequestParam @NotBlank @Size(max = 255) String phone,
@@ -65,4 +66,3 @@ public class PublicController {
         return commands.feedback(ticketCode, request);
     }
 }
-

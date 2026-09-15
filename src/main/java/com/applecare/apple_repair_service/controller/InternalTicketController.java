@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 
 @RestController
 @RequestMapping("/api/v1/internal/service-tickets")
@@ -18,6 +19,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InternalTicketController {
     private final InternalTicketQueryService queries;
+    private final OperationalQueryService operational;
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
+    public List<OperationalTicketResponse> tickets(@RequestParam(required=false) @Positive Long branchId,
+            @RequestParam(required=false) ServiceTicketStatus status,
+            @RequestParam(required=false) @jakarta.validation.constraints.Size(max=255) String query) {
+        return operational.queue(branchId, status, query);
+    }
     @GetMapping("/{id}")
     public ServiceTicketDetailResponse ticket(@PathVariable @Positive Long id) { return queries.ticket(id); }
     @GetMapping("/{id}/assignments")
@@ -25,4 +34,3 @@ public class InternalTicketController {
     @GetMapping("/{id}/transfers")
     public List<TransferResponse> transfers(@PathVariable @Positive Long id) { return queries.transfers(id); }
 }
-

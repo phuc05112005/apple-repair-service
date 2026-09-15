@@ -6,8 +6,10 @@ import com.applecare.apple_repair_service.dto.response.BranchResponse;
 import com.applecare.apple_repair_service.entity.Branch;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
+import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.BranchRepository;
+import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 
 import java.util.List;
 
@@ -24,6 +26,7 @@ public class BranchService {
     private final DomainAccess access;
     private final BusinessRules rules;
     private final EntityResponses mapper;
+    private final AdminReferenceRepository references;
 
     public BranchResponse getById(Long id) {
         return mapper.map(access.get(Branch.class, id));
@@ -61,6 +64,19 @@ public class BranchService {
         var e = access.lock(Branch.class, id);
         e.setStatus(ActiveStatus.INACTIVE);
         return save(e);
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void delete(Long id) {
+        var entity = access.lock(Branch.class, id);
+        String message = "Không thể xóa chi nhánh vì dữ liệu này đang được sử dụng.";
+        if (references.branchIsReferenced(id)) throw new ConflictException(message);
+        try {
+            repository.delete(entity);
+            repository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(message, ex);
+        }
     }
 
     private void apply(Branch e, UpdateBranchRequest r) {

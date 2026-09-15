@@ -29,9 +29,11 @@ public class AdminServiceTypeController {
     public ServiceTypeResponse update(@PathVariable @Positive Long id, @Valid @RequestBody UpdateServiceTypeRequest request) {
         return service.update(id, request);
     }
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Positive Long id) { service.delete(id); }
     @PostMapping("/{id}/activate")
     public ServiceTypeResponse activate(@PathVariable @Positive Long id) { return service.activate(id); }
     @PostMapping("/{id}/deactivate")
     public ServiceTypeResponse deactivate(@PathVariable @Positive Long id) { return service.deactivate(id); }
 }
-
