@@ -47,9 +47,17 @@ public class PublicQueryService {
     }
     public List<PublicCatalogResponse> catalog(Long modelId, Long issueId, Long typeId) {
         return catalog.findPublicCatalog(modelId, issueId, typeId).stream()
-                .map(x -> new PublicCatalogResponse(x.getId(), x.getDeviceModel().getId(), x.getServiceIssue().getId(),
-                        x.getServiceType().getId(), x.getName(), x.getConfiguredPrice(),
-                        x.getStandardDurationMinutes(), x.getWarrantyDays())).toList();
+                .map(x -> {
+                    var part = x.getPart();
+                    var displayPrice = x.getConfiguredPrice() != null ? x.getConfiguredPrice()
+                            : part == null ? null : part.getSalePrice();
+                    return new PublicCatalogResponse(x.getId(), x.getDeviceModel().getId(), x.getServiceIssue().getId(),
+                            x.getServiceType().getId(), x.getServiceType().getCode(), x.getServiceType().getName(),
+                            part == null ? null : part.getId(), part == null ? null : part.getName(),
+                            part == null ? null : part.getBrand(), part == null ? null : part.getVariant(),
+                            x.getName(), x.getConfiguredPrice(), displayPrice,
+                            x.getStandardDurationMinutes(), x.getWarrantyDays());
+                }).toList();
     }
     public PublicAppointmentResponse appointment(Long id) {
         return appointmentResponse(access.get(Appointment.class, id));
@@ -68,19 +76,34 @@ public class PublicQueryService {
         return new PublicAppointmentResponse(a.getId(), slot.getBranch().getName(), slot.getAppointmentDate(),
                 slot.getStartTime(), slot.getEndTime(), a.getStatus(), a.getDiscountPercent(), a.getBookedAt(), responseDevices);
     }
-    public List<PublicTicketResponse> tickets(String phone) {
-        return tickets.findAllByCustomerDevice_Customer_PhoneOrderByReceivedAtDesc(requiredPhone(phone)).stream()
-                .map(t -> {
-                    var items = repairItems.findAllByServiceTicket_Id(t.getId());
-                    var total = items.stream().filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
-                            .map(RepairItem::getFinalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    return new PublicTicketResponse(t.getTicketCode(), t.getCustomerDevice().getDeviceModel().getName(),
-                            t.getBranch().getName(), t.getStatus(), t.getPaymentStatus(), total,
-                            t.getReceivedAt(), t.getHandedOverAt(), items.stream()
-                            .map(i -> new PublicRepairItemResponse(i.getId(), i.getItemNameSnapshot(),
-                                    i.getApprovalStatus(), i.getFinalPrice(), i.getWarrantyStartDate(),
-                                    i.getWarrantyEndDate(), i.getWarrantyDecision())).toList());
-                }).toList();
+    public List<PublicTicketResponse> tickets(String phone, String ticketCode) {
+        var normalizedPhone = BusinessRules.text(phone);
+        var normalizedCode = BusinessRules.text(ticketCode);
+        BusinessRules.require((normalizedPhone == null) != (normalizedCode == null),
+                "Provide either phone or ticketCode");
+        var matches = normalizedPhone != null
+                ? tickets.findAllByCustomerDevice_Customer_PhoneOrderByReceivedAtDesc(requiredPhone(normalizedPhone))
+                : tickets.findByTicketCode(normalizedCode).stream().toList();
+        return matches.stream().map(this::ticketResponse).toList();
+    }
+
+    private PublicTicketResponse ticketResponse(ServiceTicket ticket) {
+        var items = repairItems.findAllByServiceTicket_Id(ticket.getId());
+        var total = items.stream().filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
+                .map(RepairItem::getFinalPrice).filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new PublicTicketResponse(ticket.getTicketCode(), ticket.getCustomerDevice().getDeviceModel().getName(),
+                ticket.getBranch().getName(), ticket.getStatus(), ticket.getPaymentStatus(), total,
+                ticket.getReceivedAt(), ticket.getHandedOverAt(), items.stream().map(i -> {
+                    var catalogItem = i.getServiceCatalogItem();
+                    var part = catalogItem.getPart();
+                    return new PublicRepairItemResponse(i.getId(), catalogItem.getDeviceModel().getDeviceType().getId(), catalogItem.getDeviceModel().getId(),
+                            catalogItem.getServiceIssue().getId(), catalogItem.getId(), catalogItem.getServiceType().getCode(),
+                            catalogItem.getServiceType().getName(), part == null ? null : part.getId(),
+                            part == null ? null : part.getName(), part == null ? null : part.getBrand(),
+                            part == null ? null : part.getVariant(), i.getItemNameSnapshot(), i.getApprovalStatus(),
+                            i.getFinalPrice(), i.getWarrantyStartDate(), i.getWarrantyEndDate(), i.getWarrantyDecision());
+                }).toList());
     }
     public WarrantyEligibilityResponse eligibility(Long itemId, String phone) {
         var item = access.get(RepairItem.class, itemId);
@@ -97,4 +120,3 @@ public class PublicQueryService {
             throw new ResourceNotFoundException("Service record not found");
     }
 }
-

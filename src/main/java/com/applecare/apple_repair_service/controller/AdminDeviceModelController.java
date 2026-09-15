@@ -29,9 +29,11 @@ public class AdminDeviceModelController {
     public DeviceModelResponse update(@PathVariable @Positive Long id, @Valid @RequestBody UpdateDeviceModelRequest request) {
         return service.update(id, request);
     }
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Positive Long id) { service.delete(id); }
     @PostMapping("/{id}/activate")
     public DeviceModelResponse activate(@PathVariable @Positive Long id) { return service.activate(id); }
     @PostMapping("/{id}/deactivate")
     public DeviceModelResponse deactivate(@PathVariable @Positive Long id) { return service.deactivate(id); }
 }
-

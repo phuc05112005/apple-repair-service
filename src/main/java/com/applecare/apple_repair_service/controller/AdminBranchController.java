@@ -20,18 +20,38 @@ public class AdminBranchController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public BranchResponse create(@Valid @RequestBody CreateBranchRequest request) { return service.create(request); }
+    public BranchResponse create(@Valid @RequestBody CreateBranchRequest request) {
+        return service.create(request);
+    }
+
     @GetMapping
-    public List<BranchResponse> list() { return service.list(); }
+    public List<BranchResponse> list() {
+        return service.list();
+    }
+
     @GetMapping("/{id}")
-    public BranchResponse get(@PathVariable @Positive Long id) { return service.getById(id); }
+    public BranchResponse get(@PathVariable @Positive Long id) {
+        return service.getById(id);
+    }
+
     @PutMapping("/{id}")
     public BranchResponse update(@PathVariable @Positive Long id, @Valid @RequestBody UpdateBranchRequest request) {
         return service.update(id, request);
     }
-    @PostMapping("/{id}/activate")
-    public BranchResponse activate(@PathVariable @Positive Long id) { return service.activate(id); }
-    @PostMapping("/{id}/deactivate")
-    public BranchResponse deactivate(@PathVariable @Positive Long id) { return service.deactivate(id); }
-}
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Positive Long id) {
+        service.delete(id);
+    }
+
+    @PostMapping("/{id}/activate")
+    public BranchResponse activate(@PathVariable @Positive Long id) {
+        return service.activate(id);
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public BranchResponse deactivate(@PathVariable @Positive Long id) {
+        return service.deactivate(id);
+    }
+}

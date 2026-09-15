@@ -6,8 +6,10 @@ import com.applecare.apple_repair_service.dto.response.DeviceTypeResponse;
 import com.applecare.apple_repair_service.entity.DeviceType;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
+import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.DeviceTypeRepository;
+import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,6 +27,7 @@ public class DeviceTypeService {
     private final DomainAccess access;
     private final BusinessRules rules;
     private final EntityResponses mapper;
+    private final AdminReferenceRepository references;
 
     public DeviceTypeResponse getById(Long id) {
         return mapper.map(access.get(DeviceType.class, id));
@@ -62,6 +65,19 @@ public class DeviceTypeService {
         var e = access.lock(DeviceType.class, id);
         e.setStatus(ActiveStatus.INACTIVE);
         return save(e);
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void delete(Long id) {
+        var entity = access.lock(DeviceType.class, id);
+        String message = "Không thể xóa loại thiết bị vì dữ liệu này đang được sử dụng.";
+        if (references.deviceTypeIsReferenced(id)) throw new ConflictException(message);
+        try {
+            repository.delete(entity);
+            repository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(message, ex);
+        }
     }
 
     private void apply(DeviceType e, UpdateDeviceTypeRequest r) {

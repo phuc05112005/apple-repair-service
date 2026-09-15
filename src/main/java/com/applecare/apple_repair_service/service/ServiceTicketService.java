@@ -7,6 +7,7 @@ import com.applecare.apple_repair_service.dto.request.RecordInspectionRequest;
 import com.applecare.apple_repair_service.dto.request.WalkInIntakeRequest;
 import com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse;
 import com.applecare.apple_repair_service.dto.response.ServiceTicketSummaryResponse;
+import com.applecare.apple_repair_service.dto.response.TicketContextResponse;
 import com.applecare.apple_repair_service.entity.Appointment;
 import com.applecare.apple_repair_service.entity.AppointmentDevice;
 import com.applecare.apple_repair_service.entity.Branch;
@@ -284,7 +285,19 @@ public class ServiceTicketService {
     }
 
     private ServiceTicketDetailResponse detail(ServiceTicket t) {
-        return new ServiceTicketDetailResponse(mapper.map(t), repairItems.findAllByServiceTicket_Id(t.getId()).stream().map(mapper::map).toList(),
-                histories.findAllByServiceTicket_IdOrderByChangedAtAsc(t.getId()).stream().map(mapper::map).toList());
+        var items = repairItems.findAllByServiceTicket_Id(t.getId());
+        var device = t.getCustomerDevice();
+        var customer = device.getCustomer();
+        var model = device.getDeviceModel();
+        var context = new TicketContextResponse(customer.getId(), customer.getFullName(), customer.getPhone(), device.getId(),
+                model.getId(), model.getName(), model.getDeviceType() == null ? null : model.getDeviceType().getName(), device.getSerialNumber(), device.getStorage(),
+                t.getAppointmentDevice() == null ? null : t.getAppointmentDevice().getSymptomDescription(),
+                t.getBranch().getId(), t.getBranch().getName(),
+                items.stream().map(RepairItem::getServiceCatalogItem).filter(Objects::nonNull)
+                        .map(ServiceCatalogItem::getServiceIssue).filter(Objects::nonNull)
+                        .map(issue -> issue.getName()).distinct().toList(),
+                items.stream().map(RepairItem::getItemNameSnapshot).distinct().toList());
+        return new ServiceTicketDetailResponse(mapper.map(t), items.stream().map(mapper::map).toList(),
+                histories.findAllByServiceTicket_IdOrderByChangedAtAsc(t.getId()).stream().map(mapper::map).toList(), context);
     }
 }

@@ -48,9 +48,8 @@ public class SecurityConfig {
         var allowed=Arrays.stream(origins.split(",")).map(String::trim).filter(s->!s.isEmpty()).toList();
         if(allowed.stream().anyMatch(s->s.contains("*"))) throw new IllegalStateException("CORS requires explicit origins");
         var config=new CorsConfiguration();config.setAllowedOrigins(allowed);
-        config.setAllowedMethods(List.of("GET","POST","PUT","OPTIONS"));config.setAllowedHeaders(List.of("Authorization","Content-Type"));
+        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));config.setAllowedHeaders(List.of("Authorization","Content-Type"));
         config.setAllowCredentials(false);config.setMaxAge(3600L);
         var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/**",config);return source;
     }
 }
-

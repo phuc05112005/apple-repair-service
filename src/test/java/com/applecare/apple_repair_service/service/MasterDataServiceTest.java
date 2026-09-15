@@ -11,6 +11,7 @@ import com.applecare.apple_repair_service.exception.BusinessRuleViolationExcepti
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.DeviceTypeRepository;
+import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 import com.applecare.apple_repair_service.repository.PartRepository;
 import com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository;
 import com.applecare.apple_repair_service.repository.SystemSettingRepository;
@@ -30,7 +31,7 @@ class MasterDataServiceTest {
     @Test
     void partRejectsNegativePriceBeforePersistence() {
         var repo = mock(PartRepository.class);
-        var service = new PartService(repo, mock(DomainAccess.class), rules, new EntityResponses());
+        var service = new PartService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreatePartRequest("P", "Pin", null, null, new BigDecimal("-1"))));
         verifyNoInteractions(repo);
     }
@@ -42,7 +43,7 @@ class MasterDataServiceTest {
         var type = new ServiceType();
         type.setCode(ServiceTypeCode.REPLACEMENT);
         when(access.get(ServiceType.class, 2L)).thenReturn(type);
-        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses());
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, null, "Replace", BigDecimal.TEN, 30, 90)));
         verifyNoInteractions(repo);
     }
@@ -64,7 +65,7 @@ class MasterDataServiceTest {
         var existing = new DeviceType();
         existing.setId(2L);
         when(repo.findByNameIgnoreCase("iPhone")).thenReturn(Optional.of(existing));
-        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses());
+        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class));
         assertThrows(DuplicateResourceException.class, () -> service.create(new CreateDeviceTypeRequest(" iPhone ")));
         verify(repo, never()).saveAndFlush(any());
     }

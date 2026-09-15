@@ -7,6 +7,7 @@ import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.enums.AppointmentSlotStatus;
 import com.applecare.apple_repair_service.enums.AppointmentStatus;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
+import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.repository.AppointmentRepository;
 import com.applecare.apple_repair_service.repository.AppointmentSlotRepository;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +64,19 @@ public class AppointmentSlotService {
         return response(slot);
     }
 
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void delete(Long id) {
+        var slot = access.lock(AppointmentSlot.class, id);
+        String message = "Không thể xóa khung giờ vì dữ liệu này đang được sử dụng.";
+        if (appointments.existsByAppointmentSlot_Id(id)) throw new ConflictException(message);
+        try {
+            slots.delete(slot);
+            slots.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException(message, ex);
+        }
+    }
+
     public SlotAvailabilityResponse getById(Long id) { return response(access.get(AppointmentSlot.class, id)); }
 
     public List<SlotAvailabilityResponse> list(Long branchId, LocalDate date) {
@@ -106,4 +120,3 @@ public class AppointmentSlotService {
                 appointments.countByAppointmentSlot_IdAndStatusNotIn(slot.getId(), List.of(AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED)));
     }
 }
-

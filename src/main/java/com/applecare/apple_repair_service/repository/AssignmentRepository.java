@@ -15,4 +15,6 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
     List<Assignment> findAllByServiceTicket_IdOrderByAssignedAtAsc(Long serviceTicketId);
 
     List<Assignment> findAllByTechnician_IdAndStatus(Long technicianId, AssignmentStatus status);
+
+    List<Assignment> findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(Long technicianId, AssignmentStatus status);
 }

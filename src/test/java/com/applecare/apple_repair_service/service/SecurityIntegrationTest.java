@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.hamcrest.Matchers.containsString;
 @SpringBootTest
 @AutoConfigureMockMvc(print=MockMvcPrint.NONE)
 @Transactional
@@ -80,8 +81,10 @@ class SecurityIntegrationTest {
         admin.setStatus(UserStatus.INACTIVE);em.flush();
         mvc.perform(get("/api/v1/auth/me").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
     }
-    @Test void receptionistCannotManageUsers() throws Exception {
+    @Test void nonAdminsAndPublicCannotManageUsers() throws Exception {
         mvc.perform(get("/api/v1/admin/users").header("Authorization","Bearer "+login(receptionist))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/users").header("Authorization","Bearer "+login(technician))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/users")).andExpect(status().isUnauthorized());
     }
     @Test void authenticationJsonValidationIsConsistentAndDoesNotEchoSecrets() throws Exception {
         mvc.perform(post("/api/v1/auth/login").contentType(APPLICATION_JSON).content("{"))
@@ -91,5 +94,14 @@ class SecurityIntegrationTest {
             .andExpect(jsonPath("$.fieldErrors").isArray()).andReturn().getResponse().getContentAsString();
         assertFalse(response.contains("rejectedValue"));assertFalse(response.contains("stackTrace"));
     }
+    @Test void corsPreflightAllowsDeleteFromConfiguredFrontendOrigin() throws Exception {
+        mvc.perform(options("/api/v1/admin/branches/1")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "DELETE")
+                        .header("Access-Control-Request-Headers", "authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"))
+                .andExpect(header().string("Access-Control-Allow-Methods", containsString("DELETE")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("authorization")));
+    }
 }
-

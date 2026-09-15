@@ -29,9 +29,11 @@ public class AdminPartController {
     public PartResponse update(@PathVariable @Positive Long id, @Valid @RequestBody UpdatePartRequest request) {
         return service.update(id, request);
     }
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Positive Long id) { service.delete(id); }
     @PostMapping("/{id}/activate")
     public PartResponse activate(@PathVariable @Positive Long id) { return service.activate(id); }
     @PostMapping("/{id}/deactivate")
     public PartResponse deactivate(@PathVariable @Positive Long id) { return service.deactivate(id); }
 }
-

@@ -1,6 +1,7 @@
 package com.applecare.apple_repair_service.repository;
 
 import com.applecare.apple_repair_service.entity.ServiceTicket;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -33,6 +34,22 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicket, Lo
     Optional<ServiceTicket> findByAppointmentDevice_Id(Long appointmentDeviceId);
 
     List<ServiceTicket> findAllByCustomerDevice_Customer_PhoneOrderByReceivedAtDesc(String phone);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select t from ServiceTicket t
+            where (:branchId is null or t.branch.id = :branchId)
+              and (:status is null or t.status = :status)
+              and (:term is null
+                   or lower(t.ticketCode) like lower(concat('%', :term, '%'))
+                   or lower(t.customerDevice.customer.fullName) like lower(concat('%', :term, '%'))
+                   or lower(t.customerDevice.customer.phone) like lower(concat('%', :term, '%'))
+                   or lower(t.customerDevice.deviceModel.name) like lower(concat('%', :term, '%')))
+            order by t.receivedAt desc, t.id desc
+            """)
+    List<ServiceTicket> findOperationalTickets(
+            @org.springframework.data.repository.query.Param("branchId") Long branchId,
+            @org.springframework.data.repository.query.Param("status") ServiceTicketStatus status,
+            @org.springframework.data.repository.query.Param("term") String term);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select t from ServiceTicket t where t.id = :id")

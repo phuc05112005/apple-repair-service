@@ -42,6 +42,9 @@ public class AdminConfigurationController {
     }
     @GetMapping("/appointment-slots/{id}")
     public SlotAvailabilityResponse slot(@PathVariable @Positive Long id) { return slots.getById(id); }
+    @DeleteMapping("/appointment-slots/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSlot(@PathVariable @Positive Long id) { slots.delete(id); }
     @PostMapping("/appointment-slots/{id}/open")
     public SlotAvailabilityResponse open(@PathVariable @Positive Long id) { return slots.open(id); }
     @PostMapping("/appointment-slots/{id}/close")
@@ -57,10 +60,12 @@ public class AdminConfigurationController {
     public List<TechnicianScheduleResponse> schedules(@RequestParam @Positive Long technicianId, @RequestParam LocalDate date) {
         return schedules.listByTechnicianAndDate(technicianId, date);
     }
+    @DeleteMapping("/technician-schedules/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSchedule(@PathVariable @Positive Long id) { schedules.delete(id); }
     @GetMapping("/statistics/overview")
     public StatisticsOverviewResponse statistics(@RequestParam LocalDate from, @RequestParam LocalDate to,
             @RequestParam(required=false) @Positive Long branchId, @RequestParam(required=false) @Positive Long deviceTypeId) {
         return statistics.overview(from, to, branchId, deviceTypeId);
     }
 }
-

@@ -17,6 +17,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransferController {
     private final TransferOperationsService operations;
+    private final OperationalQueryService queries;
+    @GetMapping("/transfers/incoming")
+    @PreAuthorize("hasRole('TECHNICIAN')")
+    public List<IncomingTransferResponse> incoming() { return queries.incomingTransfers(); }
     @PostMapping("/service-tickets/{ticketId}/transfers/request")
     @PreAuthorize("hasRole('TECHNICIAN')")
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,4 +42,3 @@ public class TransferController {
     @PreAuthorize("hasAnyRole('TECHNICIAN','RECEPTIONIST')")
     public TransferResponse cancel(@PathVariable @Positive Long id, @Valid @RequestBody NoteCommand request) { return operations.cancel(id,request); }
 }
-
