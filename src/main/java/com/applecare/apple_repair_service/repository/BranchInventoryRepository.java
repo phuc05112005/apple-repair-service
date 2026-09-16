@@ -14,6 +14,16 @@ public interface BranchInventoryRepository extends JpaRepository<BranchInventory
 
     @org.springframework.data.jpa.repository.Query("""
             select i from BranchInventory i
+            where (:branchId is null or i.branch.id = :branchId)
+              and (:partId is null or i.part.id = :partId)
+            order by i.branch.name, i.part.name, i.id
+            """)
+    List<BranchInventory> findForAdmin(
+            @org.springframework.data.repository.query.Param("branchId") Long branchId,
+            @org.springframework.data.repository.query.Param("partId") Long partId);
+
+    @org.springframework.data.jpa.repository.Query("""
+            select i from BranchInventory i
             where i.branch.id = :branchId
               and i.part.status = :status
               and (:term is null

@@ -106,6 +106,16 @@ class AdminApiIntegrationTest {
                 .contentType("application/json").content(spoof)).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
                 .contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.quantity").value(2));
+        mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+token)
+                .param("branchId",f.branch.getId().toString()).param("partId",part.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].quantity").value(2));
+        mvc.perform(get("/api/v1/admin/parts/"+part.getId()+"/inventory-transactions")
+                .header("Authorization","Bearer "+token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].transactionType").value("STOCK_IN"));
+        mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+login(f.receptionist)))
+                .andExpect(status().isForbidden());
         em.flush();
         var movement=em.createQuery("select t from InventoryTransaction t where t.part.id=:id",InventoryTransaction.class)
                 .setParameter("id",part.getId()).getSingleResult();

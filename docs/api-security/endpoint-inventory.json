@@ -223,6 +223,14 @@
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.DeviceTypeResponse"
 }, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/inventory",
+  "controller" : "AdminInventoryController",
+  "handler" : "inventories",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.BranchInventoryResponse>"
+}, {
   "method" : "POST",
   "path" : "/api/v1/admin/inventory/stock-in",
   "controller" : "AdminInventoryController",
@@ -302,6 +310,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.PartResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/parts/{partId}/inventory-transactions",
+  "controller" : "AdminInventoryController",
+  "handler" : "transactionHistory",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse>"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/service-catalog-items",
