@@ -168,5 +168,10 @@ export interface ServiceTypeResponse { id: number; code: ServiceTypeCode; name: 
 export interface ServiceCatalogItemResponse { id: number; deviceModelId: number; serviceTypeId: number; serviceIssueId: number; partId: number | null; name: string; configuredPrice: number | null; standardDurationMinutes: number | null; warrantyDays: number; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface BranchInventoryResponse { id: number; branchId: number; partId: number; quantity: number; createdAt: string; updatedAt: string }
+export interface InventoryTransactionResponse {
+  id: number; partId: number; transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER'
+  sourceBranchId: number | null; destinationBranchId: number | null; quantity: number; partUsageId: number | null
+  recordedById: number; note: string | null; createdAt: string
+}
 export type TechnicianScheduleStatus = 'WORKING' | 'OFF'
 export interface TechnicianScheduleResponse { id: number; technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: TechnicianScheduleStatus; createdAt: string; updatedAt: string }

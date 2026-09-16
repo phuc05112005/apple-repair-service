@@ -147,6 +147,12 @@ public class InventoryService {
                 .orElseGet(() -> new BranchInventoryResponse(null, branchId, partId, 0, null, null));
     }
 
+    public List<BranchInventoryResponse> listInventories(Long branchId, Long partId) {
+        if (branchId != null) access.get(Branch.class, branchId);
+        if (partId != null) access.get(Part.class, partId);
+        return inventory.findForAdmin(branchId, partId).stream().map(mapper::map).toList();
+    }
+
     public List<InventoryTransactionResponse> getTransactionHistory(Long partId) {
         access.get(Part.class, partId);
         return transactions.findAllByPart_IdOrderByCreatedAtDesc(partId).stream().map(mapper::map).toList();

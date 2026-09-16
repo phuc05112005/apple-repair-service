@@ -55,6 +55,46 @@ class PublicApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(0)));
     }
 
+    @Test void catalogExposesConfiguredRepairReplacementAndInspectionOptions() throws Exception {
+        var replacementType = serviceType(ServiceTypeCode.REPLACEMENT, "Thay thế linh kiện");
+        var inspectionType = serviceType(ServiceTypeCode.INSPECTION, "Kiểm tra / Tư vấn");
+        var part = new com.applecare.apple_repair_service.entity.Part();
+        part.setPartCode(f.prefix + "-BATTERY"); part.setName("Pin kiểm thử");
+        part.setBrand("Pisen"); part.setVariant("Dung lượng cao");
+        part.setSalePrice(new java.math.BigDecimal("1790000.00")); em.persist(part);
+        var replacement = catalog(replacementType, part, "Thay pin", null, 60, 180);
+        var inspection = catalog(inspectionType, null, "Kiểm tra pin", java.math.BigDecimal.ZERO, 30, 0);
+        em.flush();
+
+        mvc.perform(get("/api/v1/service-catalog-items")
+                        .param("deviceModelId",f.model.getId().toString())
+                        .param("serviceIssueId",f.issue.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(3)))
+                .andExpect(jsonPath("$[*].serviceTypeCode", containsInAnyOrder("REPAIR","REPLACEMENT","INSPECTION")))
+                .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].partBrand").value("Pisen"))
+                .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].partVariant").value("Dung lượng cao"))
+                .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].displayPrice").value(1790000.0))
+                .andExpect(jsonPath("$[?(@.id == "+inspection.getId()+")].standardDurationMinutes").value(30));
+    }
+
+    private com.applecare.apple_repair_service.entity.ServiceType serviceType(ServiceTypeCode code, String name) {
+        return em.createQuery("select s from ServiceType s where s.code=:code", com.applecare.apple_repair_service.entity.ServiceType.class)
+                .setParameter("code",code).getResultStream().findFirst().orElseGet(() -> {
+                    var value = new com.applecare.apple_repair_service.entity.ServiceType();
+                    value.setCode(code); value.setName(f.prefix + name); em.persist(value); return value;
+                });
+    }
+
+    private com.applecare.apple_repair_service.entity.ServiceCatalogItem catalog(
+            com.applecare.apple_repair_service.entity.ServiceType type,
+            com.applecare.apple_repair_service.entity.Part part, String name,
+            java.math.BigDecimal price, int minutes, int warrantyDays) {
+        var value = new com.applecare.apple_repair_service.entity.ServiceCatalogItem();
+        value.setDeviceModel(f.model); value.setServiceIssue(f.issue); value.setServiceType(type); value.setPart(part);
+        value.setName(f.prefix + name); value.setConfiguredPrice(price);
+        value.setStandardDurationMinutes(minutes); value.setWarrantyDays(warrantyDays); em.persist(value); return value;
+    }
+
     @Test void anonymousBookingAndLookupUsePublicDtoAndClosedSlotsDisappear() throws Exception {
         mvc.perform(get("/api/v1/appointment-slots").param("branchId",f.branch.getId().toString())
                 .param("date",f.slot.getAppointmentDate().toString())).andExpect(status().isOk())

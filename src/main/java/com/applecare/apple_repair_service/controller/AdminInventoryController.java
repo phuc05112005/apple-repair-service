@@ -26,6 +26,16 @@ public class AdminInventoryController {
     public BranchInventoryResponse inventory(@RequestParam @Positive Long branchId, @RequestParam @Positive Long partId) {
         return inventory.getInventory(branchId, partId);
     }
+    @GetMapping("/admin/inventory")
+    public List<BranchInventoryResponse> inventories(
+            @RequestParam(required = false) @Positive Long branchId,
+            @RequestParam(required = false) @Positive Long partId) {
+        return inventory.listInventories(branchId, partId);
+    }
+    @GetMapping("/admin/parts/{partId}/inventory-transactions")
+    public List<InventoryTransactionResponse> transactionHistory(@PathVariable @Positive Long partId) {
+        return inventory.getTransactionHistory(partId);
+    }
     @PostMapping("/admin/inventory/stock-in")
     public BranchInventoryResponse stockIn(@Valid @RequestBody StockAdjustmentCommand request) {
         return inventory.stockIn(new StockAdjustmentRequest(request.branchId(),request.partId(),request.quantity(),actor.id(),request.note()));
@@ -40,4 +50,3 @@ public class AdminInventoryController {
                 request.destinationBranchId(),request.quantity(),actor.id(),request.note()));
     }
 }
-
