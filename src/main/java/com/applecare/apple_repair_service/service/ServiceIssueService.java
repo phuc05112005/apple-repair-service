@@ -4,15 +4,18 @@ import com.applecare.apple_repair_service.dto.request.CreateServiceIssueRequest;
 import com.applecare.apple_repair_service.dto.request.UpdateServiceIssueRequest;
 import com.applecare.apple_repair_service.dto.response.ServiceIssueResponse;
 import com.applecare.apple_repair_service.entity.ServiceIssue;
+import com.applecare.apple_repair_service.entity.DeviceType;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
 import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.ServiceIssueRepository;
 import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
+import com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.HashSet;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +31,7 @@ public class ServiceIssueService {
     private final BusinessRules rules;
     private final EntityResponses mapper;
     private final AdminReferenceRepository references;
+    private final ServiceCatalogItemRepository catalog;
 
     public ServiceIssueResponse getById(Long id) {
         return mapper.map(access.get(ServiceIssue.class, id));
@@ -41,7 +45,7 @@ public class ServiceIssueService {
     public ServiceIssueResponse create(CreateServiceIssueRequest r) {
         rules.validate(r);
         var e = new ServiceIssue();
-        apply(e, new UpdateServiceIssueRequest(r.name()));
+        apply(e, new UpdateServiceIssueRequest(r.name(), r.deviceTypeIds()));
         return save(e);
     }
 
@@ -85,7 +89,22 @@ public class ServiceIssueService {
             throw new DuplicateResourceException("Name already exists");
         });
         e.setName(BusinessRules.text(r.name()));
-
+        var types = new HashSet<DeviceType>();
+        for (Long typeId : r.deviceTypeIds()) {
+            var type = access.get(DeviceType.class, typeId);
+            BusinessRules.require(type.getStatus() == ActiveStatus.ACTIVE, "Loại thiết bị đã ngừng sử dụng.");
+            types.add(type);
+        }
+        if (e.getId() != null) {
+            for (var existing : e.getDeviceTypes()) {
+                BusinessRules.require(types.stream().anyMatch(type -> type.getId().equals(existing.getId()))
+                                || !catalog.existsByServiceIssue_IdAndDeviceModel_DeviceType_Id(e.getId(), existing.getId()),
+                        "Không thể bỏ loại thiết bị đang được danh mục dịch vụ sử dụng.");
+            }
+        }
+        e.getDeviceTypes().clear();
+        e.getDeviceTypes().addAll(types);
+        e.setMappingInitialized(true);
     }
 
     private ServiceIssueResponse save(ServiceIssue e) {

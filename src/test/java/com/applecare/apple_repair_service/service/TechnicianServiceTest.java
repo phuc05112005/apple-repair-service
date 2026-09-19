@@ -147,7 +147,7 @@ class TechnicianServiceTest {
         when(schedules.findAllByTechnician_IdAndWorkDate(any(), any())).thenReturn(List.of(old));
         when(access.get(Branch.class, 1L)).thenReturn(ticket.getBranch());
         when(schedules.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
-        var service = new TechnicianScheduleService(schedules, access, rules, eligibility, new EntityResponses());
+        var service = new TechnicianScheduleService(schedules, access, rules, new EntityResponses());
         assertNotNull(service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(10, 0), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(9, 59), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
     }

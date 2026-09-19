@@ -93,6 +93,8 @@ class HttpWorkflowIntegrationTest {
             em.createQuery("delete from Customer c where c.phone like :prefix").setParameter("prefix",f.prefix+"%").executeUpdate();
             em.createQuery("delete from ServiceCatalogItem c where c.deviceModel.id=:id").setParameter("id",f.model.getId()).executeUpdate();
             em.createQuery("delete from DeviceModel d where d.id=:id").setParameter("id",f.model.getId()).executeUpdate();
+            var issue = em.find(ServiceIssue.class, f.issue.getId());
+            if (issue != null) { issue.getDeviceTypes().clear(); em.flush(); }
             for(var entity:List.of("DeviceType","ServiceIssue","ServiceType"))
                 em.createQuery("delete from "+entity+" e where e.name=:name").setParameter("name",f.prefix).executeUpdate();
             em.createQuery("delete from Part p where p.id=:id").setParameter("id",partId).executeUpdate();

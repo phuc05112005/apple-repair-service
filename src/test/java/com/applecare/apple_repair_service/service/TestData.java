@@ -27,6 +27,7 @@ final class TestData {
         var u = new User();
         u.setId(id);
         u.setFullName("User");
+        u.setPasswordHash("unit-test-only-password-hash");
         u.setRole(UserRole.TECHNICIAN);
         u.setStatus(UserStatus.ACTIVE);
         return u;

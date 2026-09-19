@@ -22,6 +22,7 @@ import com.applecare.apple_repair_service.enums.AppointmentStatus;
 import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.PaymentStatus;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.enums.WarrantyDecision;
 import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
@@ -135,8 +136,11 @@ public class ServiceTicketService {
             item.setServiceTicket(ticket);
             item.setServiceCatalogItem(c);
             item.setItemNameSnapshot(c.getName());
-            item.setBasePrice(c.getConfiguredPrice());
-            item.setFinalPrice(c.getConfiguredPrice());
+            var quotedPrice = c.getConfiguredPrice() != null ? c.getConfiguredPrice()
+                    : c.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
+                    && c.getPart() != null ? c.getPart().getSalePrice() : null;
+            item.setBasePrice(quotedPrice);
+            item.setFinalPrice(quotedPrice);
             item.setApprovalStatus(ApprovalStatus.APPROVED);
             repairItems.save(item);
         }

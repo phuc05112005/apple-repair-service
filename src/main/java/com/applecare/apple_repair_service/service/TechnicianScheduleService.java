@@ -8,6 +8,8 @@ import com.applecare.apple_repair_service.entity.TechnicianSchedule;
 import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.enums.TechnicianScheduleStatus;
+import com.applecare.apple_repair_service.enums.UserRole;
+import com.applecare.apple_repair_service.enums.UserStatus;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.TechnicianScheduleRepository;
 import com.applecare.apple_repair_service.exception.ConflictException;
@@ -30,7 +32,6 @@ public class TechnicianScheduleService {
     private final TechnicianScheduleRepository repository;
     private final DomainAccess access;
     private final BusinessRules rules;
-    private final TechnicianEligibility eligibility;
     private final EntityResponses mapper;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -73,7 +74,10 @@ public class TechnicianScheduleService {
     }
 
     private void apply(TechnicianSchedule s, UpdateTechnicianScheduleRequest r) {
-        var user = eligibility.technician(r.technicianId());
+        var user = access.get(User.class, r.technicianId());
+        BusinessRules.require(user.getRole() == UserRole.RECEPTIONIST || user.getRole() == UserRole.TECHNICIAN,
+                "Chỉ nhân viên tiếp nhận và kỹ thuật viên được xếp ca làm.");
+        BusinessRules.require(user.getStatus() == UserStatus.ACTIVE, "Nhân viên đã ngừng hoạt động.");
         var branch = access.get(Branch.class, r.branchId());
         BusinessRules.require(branch.getStatus() == ActiveStatus.ACTIVE, "Branch is inactive");
         BusinessRules.require(r.startTime().isBefore(r.endTime()), "Shift start must be before end");
@@ -81,7 +85,7 @@ public class TechnicianScheduleService {
             boolean overlap = repository.findAllByTechnician_IdAndWorkDate(r.technicianId(), r.workDate()).stream()
                     .anyMatch(x -> !Objects.equals(x.getId(), s.getId()) && x.getStatus() != TechnicianScheduleStatus.CANCELLED
                             && r.startTime().isBefore(x.getEndTime()) && r.endTime().isAfter(x.getStartTime()));
-            BusinessRules.require(!overlap, "Technician shifts overlap");
+            BusinessRules.require(!overlap, "Ca làm của nhân viên bị trùng giờ.");
         }
         s.setTechnician(user);
         s.setBranch(branch);

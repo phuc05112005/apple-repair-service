@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
+import java.math.BigDecimal;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -36,14 +37,28 @@ class ReceptionistApiIntegrationTest {
         return json.readTree(body).get("accessToken").asString();
     }
     @Test void receptionistIntakeWritesJwtActorAndRejectsInvalidTransition() throws Exception {
-        var request=new CreateAppointmentRequest(f.prefix,f.prefix,f.slot.getId(),null,
+        String contactName = f.prefix + " Customer";
+        String contactPhone = f.prefix + "-phone";
+        var request=new CreateAppointmentRequest(contactName,contactPhone,f.slot.getId(),null,
                 List.of(new AppointmentDeviceRequest(f.model.getId(),null,List.of(new AppointmentServiceItemRequest(f.catalog.getId(),null)))));
         var booked=mvc.perform(post("/api/v1/appointments").contentType("application/json").content(json.writeValueAsString(request)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long id=json.readTree(booked).get("appointmentId").asLong();
+        em.flush();
+        em.clear();
+        var persistedCustomer = em.find(Appointment.class, id).getCustomer();
+        assertEquals(contactName, persistedCustomer.getFullName());
+        assertEquals(contactPhone, persistedCustomer.getPhone());
         String bearer="Bearer "+login(f.receptionist);
         mvc.perform(get("/api/v1/internal/appointments").header("Authorization",bearer).param("branchId",f.branch.getId().toString())
-                .param("status","PENDING_CONFIRMATION")).andExpect(status().isOk()).andExpect(jsonPath("$[0].appointment.id").value(id));
+                .param("status","PENDING_CONFIRMATION")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].appointment.id").value(id))
+                .andExpect(jsonPath("$[0].appointment.customerFullName").value(contactName))
+                .andExpect(jsonPath("$[0].appointment.customerPhone").value(contactPhone));
+        mvc.perform(get("/api/v1/internal/appointments/"+id).header("Authorization",bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointment.customerFullName").value(contactName))
+                .andExpect(jsonPath("$.appointment.customerPhone").value(contactPhone));
         // A body on this bodyless command cannot override the authenticated actor.
         mvc.perform(post("/api/v1/internal/appointments/"+id+"/confirm").header("Authorization",bearer)
                 .contentType("application/json").content("{\"confirmedByUserId\":"+f.technician.getId()+"}"))
@@ -67,5 +82,47 @@ class ReceptionistApiIntegrationTest {
                 .contentType("application/json").content("{\"paymentMethod\":\"CASH\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/internal/appointments/1/confirm").header("Authorization",bearer)).andExpect(status().isForbidden());
     }
-}
 
+    @Test void walkInReplacementUsesPartPriceWhenServicePriceIsNotConfigured() throws Exception {
+        var existingTypes = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
+                .setParameter("code", ServiceTypeCode.REPLACEMENT).getResultList();
+        ServiceType replacementType;
+        if (existingTypes.isEmpty()) {
+            replacementType = new ServiceType();
+            replacementType.setCode(ServiceTypeCode.REPLACEMENT);
+            replacementType.setName(f.prefix + " replacement");
+            em.persist(replacementType);
+        } else replacementType = existingTypes.getFirst();
+        var part = new Part();
+        part.setPartCode(f.prefix + "-battery");
+        part.setName("Battery");
+        part.setBrand("Example brand");
+        part.setVariant("High capacity");
+        part.setSalePrice(new BigDecimal("750000.00"));
+        em.persist(part);
+        var replacement = new ServiceCatalogItem();
+        replacement.setName(f.prefix + " battery replacement");
+        replacement.setDeviceModel(f.model);
+        replacement.setServiceIssue(f.issue);
+        replacement.setServiceType(replacementType);
+        replacement.setPart(part);
+        replacement.setWarrantyDays(0);
+        em.persist(replacement);
+        em.flush();
+
+        var request = new WalkInIntakeRequest(f.prefix + " customer", f.prefix + " phone", f.branch.getId(),
+                f.model.getId(), null, null, "Device received", List.of(replacement.getId()));
+        String bearer = "Bearer " + login(f.receptionist);
+        var response = mvc.perform(post("/api/v1/internal/service-tickets/walk-in").header("Authorization", bearer)
+                .contentType("application/json").content(json.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.repairItems[0].serviceCatalogItemId").value(replacement.getId()))
+                .andExpect(jsonPath("$.repairItems[0].basePrice").value(750000))
+                .andExpect(jsonPath("$.repairItems[0].finalPrice").value(750000))
+                .andReturn().getResponse().getContentAsString();
+        long itemId = json.readTree(response).get("repairItems").get(0).get("id").asLong();
+        em.flush();
+        em.clear();
+        assertEquals(new BigDecimal("750000.00"), em.find(RepairItem.class, itemId).getFinalPrice());
+    }
+}

@@ -9,7 +9,7 @@ import { FinalCta } from '../../components/public/home/FinalCta'
 
 export function HomePage() {
   const devices = useQuery({ queryKey: ['public', 'device-types'], queryFn: ({ signal }) => publicApi.deviceTypes(signal) })
-  const issues = useQuery({ queryKey: ['public', 'service-issues'], queryFn: ({ signal }) => publicApi.serviceIssues(signal) })
+  const issues = useQuery({ queryKey: ['public', 'service-issues'], queryFn: ({ signal }) => publicApi.serviceIssues(undefined, signal) })
   const catalog = useQuery({ queryKey: ['public', 'catalog', 'landing'], queryFn: ({ signal }) => publicApi.catalog({}, signal) })
   const branches = useQuery({ queryKey: ['public', 'branches'], queryFn: ({ signal }) => publicApi.branches(signal) })
 

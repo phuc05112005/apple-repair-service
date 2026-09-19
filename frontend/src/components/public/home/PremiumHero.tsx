@@ -28,8 +28,8 @@ export function PremiumHero() {
       <div className="studio-device-scene__orbit studio-device-scene__orbit--one" aria-hidden="true" />
       <div className="studio-device-scene__orbit studio-device-scene__orbit--two" aria-hidden="true" />
       <img src="/images/premium-device-studio.png" alt="Bộ thiết bị gồm điện thoại, máy tính bảng, máy tính xách tay, đồng hồ và tai nghe" width="1200" height="1200" fetchPriority="high" />
-      <div className="studio-scene-label studio-scene-label--top"><span>01</span><p>Thiết bị</p><strong>Được nhận diện đúng</strong></div>
-      <div className="studio-scene-label studio-scene-label--bottom"><span>02</span><p>Tiến trình</p><strong>Luôn có thể tra cứu</strong></div>
+      <div className="studio-scene-label studio-scene-label--top"><span>01</span><p>Chuyên nghiệp</p><strong>Quy trình chuẩn trong từng bước</strong></div>
+      <div className="studio-scene-label studio-scene-label--bottom"><span>02</span><p>Cam kết</p><strong>Minh bạch suốt quá trình sửa chữa</strong></div>
     </div>
     <a className="studio-hero__scroll" href="#supported-devices"><span>Cuộn để khám phá</span><i aria-hidden="true" /></a>
   </section>

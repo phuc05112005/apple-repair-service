@@ -30,7 +30,7 @@ class UserCreationTest {
         assertFalse(request("Local-Test-123!").toString().contains("Local-Test-123!"));
     }
     @Test void duplicateUsernameDoesNotWrite() {
-        when(repository.existsByUsername("technician")).thenReturn(true);
+        when(repository.existsByUsernameIgnoreCase("technician")).thenReturn(true);
         assertThrows(DuplicateResourceException.class,()->service.create(request("Local-Test-123!")));
         verify(repository,never()).saveAndFlush(any());
     }
@@ -39,4 +39,3 @@ class UserCreationTest {
         verify(repository,never()).saveAndFlush(any());
     }
 }
-

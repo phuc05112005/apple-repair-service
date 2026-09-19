@@ -19,6 +19,7 @@ interface Row {
   address?: string
   phone?: string | null
   deviceTypeId?: number
+  deviceTypeIds?: number[]
   code?: ServiceTypeCode
   deviceModelId?: number
   serviceIssueId?: number
@@ -35,15 +36,15 @@ interface Row {
   updatedAt?: string
 }
 
-const labels: Record<Resource, string> = { branches: 'Chi nhánh', 'device-types': 'Loại thiết bị', 'device-models': 'Model thiết bị', 'service-issues': 'Vấn đề dịch vụ', 'service-types': 'Loại dịch vụ', 'service-catalog-items': 'Danh mục dịch vụ', parts: 'Linh kiện' }
+const labels: Record<Resource, string> = { branches: 'Quản lý chi nhánh', 'device-types': 'Loại thiết bị', 'device-models': 'Model thiết bị', 'service-issues': 'Vấn đề dịch vụ', 'service-types': 'Loại dịch vụ', 'service-catalog-items': 'Danh mục dịch vụ', parts: 'Linh kiện' }
 const descriptions: Record<Resource, string> = {
-  branches: 'Quản lý địa điểm tiếp nhận và thông tin liên hệ.',
+  branches: 'Theo dõi địa điểm tiếp nhận, thông tin liên hệ và trạng thái hoạt động của từng chi nhánh.',
   'device-types': 'Quản lý các nhóm thiết bị được hệ thống hỗ trợ.',
   'device-models': 'Gắn từng model với đúng loại thiết bị.',
   'service-issues': 'Quản lý các vấn đề khách hàng có thể lựa chọn.',
   'service-types': 'Quản lý ý nghĩa nghiệp vụ của từng loại dịch vụ.',
   'service-catalog-items': 'Liên kết model, vấn đề, loại dịch vụ, linh kiện, giá và bảo hành.',
-  parts: 'Quản lý linh kiện, hãng, phiên bản, giá và tình trạng sử dụng.',
+  parts: 'Thông tin linh kiện, hãng, phiên bản, giá và tình trạng sử dụng.',
 }
 const catalogResources: Resource[] = ['device-types', 'device-models', 'service-issues', 'service-types', 'service-catalog-items']
 const serviceTypeLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', INSPECTION: 'Kiểm tra / Tư vấn', WARRANTY: 'Bảo hành' }
@@ -69,7 +70,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
 
   const rows = useQuery({ queryKey: ['admin', resource], queryFn: ({ signal }) => adminApi.resourceList<Row>(resource, signal) })
   const needCatalogLookups = resource === 'service-catalog-items' || resource === 'parts'
-  const deviceTypes = useQuery({ queryKey: ['admin', 'device-types'], queryFn: ({ signal }) => adminApi.resourceList<DeviceTypeResponse>('device-types', signal), enabled: resource === 'device-models' || needCatalogLookups })
+  const deviceTypes = useQuery({ queryKey: ['admin', 'device-types'], queryFn: ({ signal }) => adminApi.resourceList<DeviceTypeResponse>('device-types', signal), enabled: resource === 'device-models' || resource === 'service-issues' || needCatalogLookups })
   const models = useQuery({ queryKey: ['admin', 'device-models'], queryFn: ({ signal }) => adminApi.resourceList<DeviceModelResponse>('device-models', signal), enabled: needCatalogLookups })
   const issues = useQuery({ queryKey: ['admin', 'service-issues'], queryFn: ({ signal }) => adminApi.resourceList<ServiceIssueResponse>('service-issues', signal), enabled: needCatalogLookups })
   const serviceTypes = useQuery({ queryKey: ['admin', 'service-types'], queryFn: ({ signal }) => adminApi.resourceList<ServiceTypeResponse>('service-types', signal), enabled: needCatalogLookups })
@@ -87,6 +88,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
   const branchNames = useMemo(() => new Map(branches.data?.map(item => [item.id, item.name])), [branches.data])
 
   function payload() {
+    if (resource === 'service-issues') return { name: form.name, deviceTypeIds: (form.deviceTypeIds ?? '').split(',').filter(Boolean).map(Number) }
     if (resource === 'device-models') return { deviceTypeId: Number(form.deviceTypeId), name: form.name }
     if (resource === 'service-types') return { code: form.code, name: form.name }
     if (resource === 'service-catalog-items') return { deviceModelId: Number(form.deviceModelId), serviceTypeId: Number(form.serviceTypeId), serviceIssueId: Number(form.serviceIssueId), partId: form.partId ? Number(form.partId) : null, name: form.name, configuredPrice: form.configuredPrice ? Number(form.configuredPrice) : null, standardDurationMinutes: form.standardDurationMinutes ? Number(form.standardDurationMinutes) : null, warrantyDays: Number(form.warrantyDays || 0) }
@@ -109,8 +111,8 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
   function edit(row: Row) { setEditing(row); setShowForm(true); setForm(Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value == null ? '' : String(value)]))) }
   function create() { setEditing(undefined); setForm(emptyForm); setShowForm(true) }
   function switchResource(next: Resource) { setResource(next); setEditing(undefined); setDetail(undefined); setDeleting(undefined); setShowForm(false); setForm(emptyForm); setStatusFilter(''); setTypeFilter(''); setServiceTypeFilter(''); setBrandFilter('') }
-  function field(key: string, label: string, type = 'text', required = true) { return <label className="field"><span>{label}{!required && <i>Không bắt buộc</i>}</span><input required={required} type={type} value={form[key] ?? ''} onChange={event => setForm(value => ({ ...value, [key]: event.target.value }))} /></label> }
-  function select(key: string, label: string, options: { id?: number; value?: string; name: string }[], optional = false) { return <label className="field"><span>{label}{optional && <i>Không bắt buộc</i>}</span><select required={!optional} value={form[key] ?? ''} onChange={event => setForm(value => ({ ...value, [key]: event.target.value }))}><option value="">{optional ? 'Không áp dụng' : `Chọn ${label.toLowerCase()}`}</option>{options.map(option => <option key={option.id ?? option.value} value={option.id ?? option.value}>{option.name}</option>)}</select></label> }
+  function field(key: string, label: string, type = 'text', required = true) { return <label className="field"><span>{label}{!required && <i>Không bắt buộc</i>}</span><input placeholder="Nhập thông tin danh mục" required={required} type={type} value={form[key] ?? ''} onChange={event => setForm(value => ({ ...value, [key]: event.target.value }))} /></label> }
+  function select(key: string, label: string, options: { id?: number; value?: string; name: string }[], optional = false) { return <label className="field"><span>{label}{optional && <i>Không bắt buộc</i>}</span><select required={!optional} value={form[key] ?? ''} onChange={event => setForm(value => ({ ...value, [key]: event.target.value, ...(key === "deviceModelId" ? { serviceIssueId: "" } : {}) }))}><option value="">{optional ? 'Không áp dụng' : `Chọn ${label.toLowerCase()}`}</option>{options.map(option => <option key={option.id ?? option.value} value={option.id ?? option.value}>{option.name}</option>)}</select></label> }
 
   const data = rows.data ?? []
   const brands = Array.from(new Set((resource === 'parts' ? data : parts.data ?? []).map(item => item.brand).filter((value): value is string => Boolean(value)))).sort(compareText)
@@ -123,7 +125,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
   if (resource === 'parts' || resource === 'service-catalog-items') sortOptions.push({ value: 'price-asc', label: 'Giá tăng dần', compare: (a, b) => priceOf(a, partMap) - priceOf(b, partMap) }, { value: 'price-desc', label: 'Giá giảm dần', compare: (a, b) => priceOf(b, partMap) - priceOf(a, partMap) })
 
   return <div className="workspace-page admin-resource-page">
-    <header className="admin-page-header"><div><span className="eyebrow">Quản trị dữ liệu</span><h1>{resource === 'parts' ? 'Quản lý linh kiện' : labels[resource]}</h1><p>{descriptions[resource]}</p></div><button className="button button--primary" onClick={create}>+ Thêm {labels[resource].toLowerCase()}</button></header>
+    <header className="admin-page-header"><div><span className="eyebrow">Danh mục</span><h1>{resource === 'parts' ? 'Quản lý thông tin linh kiện' : labels[resource]}</h1><p>{descriptions[resource]}</p></div><button className="button button--primary" onClick={create}>+ Thêm {labels[resource].toLowerCase()}</button></header>
     {grouped && <nav className="segmented" aria-label="Nhóm dữ liệu dịch vụ">{catalogResources.map(item => <button key={item} aria-current={resource === item ? 'page' : undefined} className={resource === item ? 'active' : ''} onClick={() => switchResource(item)}>{labels[item]}</button>)}</nav>}
     {rows.isLoading ? <LoadingState label="Đang tải danh sách…" /> : rows.isError ? <ErrorState error={rows.error} retry={() => rows.refetch()} /> : <AdminDataTable rows={data} rowKey={row => row.id} columns={columns} filters={filters} sortOptions={sortOptions} searchPlaceholder={resource === 'parts' ? 'Tìm linh kiện, mã, hãng hoặc phiên bản...' : `Tìm ${labels[resource].toLowerCase()}...`} searchableText={row => searchableText(row, resource, typeNames, modelMap, issueNames, serviceTypeMap, partMap)} />}
 
@@ -132,10 +134,10 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
         {resource === 'branches' && <>{field('name', 'Tên chi nhánh')}{field('address', 'Địa chỉ')}{field('phone', 'Điện thoại', 'tel', false)}</>}
         {resource === 'device-types' && field('name', 'Tên loại thiết bị')}
         {resource === 'device-models' && <>{select('deviceTypeId', 'Loại thiết bị', deviceTypes.data ?? [])}{field('name', 'Tên model')}</>}
-        {resource === 'service-issues' && field('name', 'Tên vấn đề')}
+        {resource === 'service-issues' && <>{field('name', 'Tên vấn đề')}<fieldset className="field"><legend>Áp dụng cho loại thiết bị</legend>{deviceTypes.isLoading ? <LoadingState /> : deviceTypes.isError ? <ErrorState error={deviceTypes.error} retry={() => deviceTypes.refetch()} /> : (deviceTypes.data ?? []).filter(type => type.status === 'ACTIVE' || (form.deviceTypeIds ?? '').split(',').includes(String(type.id))).map(type => { const selected = (form.deviceTypeIds ?? '').split(',').includes(String(type.id)); return <label key={type.id} className="check-option"><input type="checkbox" checked={selected} onChange={() => setForm(value => ({ ...value, deviceTypeIds: Array.from(new Set((value.deviceTypeIds ?? '').split(',').filter(Boolean).filter(id => id !== String(type.id)).concat(selected ? [] : [String(type.id)]))).join(',') }))} />{type.name}</label> })}</fieldset></>}
         {resource === 'service-types' && <>{select('code', 'Mã loại dịch vụ', (Object.keys(serviceTypeLabels) as ServiceTypeCode[]).map(value => ({ value, name: `${serviceTypeLabels[value]} — ${value}` })))}{field('name', 'Tên hiển thị')}</>}
         {resource === 'parts' && <>{field('partCode', 'Mã linh kiện')}{field('name', 'Tên linh kiện')}{field('brand', 'Hãng', 'text', false)}{field('variant', 'Phiên bản', 'text', false)}{field('salePrice', 'Giá bán', 'number')}</>}
-        {resource === 'service-catalog-items' && <>{select('deviceModelId', 'Model', models.data ?? [])}{select('serviceIssueId', 'Vấn đề', issues.data ?? [])}{select('serviceTypeId', 'Loại dịch vụ', (serviceTypes.data ?? []).map(item => ({ ...item, name: serviceTypeLabels[item.code] })))}{select('partId', 'Linh kiện', (parts.data ?? []).map(item => ({ ...item, name: `${item.name} · ${item.brand ?? 'Không hãng'} · ${item.variant ?? 'Không phiên bản'}` })), true)}{field('name', 'Tên dịch vụ')}{field('configuredPrice', 'Giá cấu hình', 'number', false)}{field('standardDurationMinutes', 'Thời lượng phút', 'number', false)}{field('warrantyDays', 'Số ngày bảo hành', 'number')}</>}
+        {resource === 'service-catalog-items' && <>{select('deviceModelId', 'Model', models.data ?? [])}{select('serviceIssueId', 'Vấn đề', (issues.data ?? []).filter(issue => issue.deviceTypeIds.includes(modelMap.get(Number(form.deviceModelId))?.deviceTypeId ?? -1)))}{select('serviceTypeId', 'Loại dịch vụ', (serviceTypes.data ?? []).map(item => ({ ...item, name: serviceTypeLabels[item.code] })))}{select('partId', 'Linh kiện', (parts.data ?? []).map(item => ({ ...item, name: `${item.name} · ${item.brand ?? 'Chưa rõ hãng'} · ${item.variant ?? 'Bản tiêu chuẩn'}` })), true)}{field('name', 'Tên dịch vụ')}{field('configuredPrice', 'Giá cấu hình', 'number', false)}{field('standardDurationMinutes', 'Thời lượng phút', 'number', false)}{field('warrantyDays', 'Số ngày bảo hành', 'number')}</>}
       </div>{save.isError && <ErrorState error={save.error} />}
     </DetailDrawer>}
 
@@ -209,6 +211,7 @@ function canSave(resource: Resource, form: Record<string, string>) {
   if (!form.name?.trim()) return false
   if (resource === 'branches') return Boolean(form.address?.trim())
   if (resource === 'device-models') return Boolean(form.deviceTypeId)
+  if (resource === 'service-issues') return Boolean(form.deviceTypeIds?.split(',').filter(Boolean).length)
   if (resource === 'service-types') return Boolean(form.code)
   if (resource === 'parts') return Boolean(form.partCode?.trim() && form.salePrice !== '' && Number(form.salePrice) >= 0)
   if (resource === 'service-catalog-items') return Boolean(form.deviceModelId && form.serviceIssueId && form.serviceTypeId && Number(form.warrantyDays || 0) >= 0)

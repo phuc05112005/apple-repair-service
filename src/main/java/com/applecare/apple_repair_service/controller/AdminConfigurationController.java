@@ -20,6 +20,7 @@ import java.time.LocalDate;
 public class AdminConfigurationController {
     private final SystemSettingService settings;
     private final AppointmentSlotService slots;
+    private final AppointmentScheduleService appointmentSchedules;
     private final TechnicianScheduleService schedules;
     private final StatisticsService statistics;
 
@@ -38,7 +39,28 @@ public class AdminConfigurationController {
     }
     @GetMapping("/appointment-slots")
     public List<SlotAvailabilityResponse> slots(@RequestParam @Positive Long branchId, @RequestParam LocalDate date) {
+        appointmentSchedules.materialize(branchId, date);
         return slots.list(branchId, date);
+    }
+    @GetMapping("/appointment-weekly-schedules")
+    public List<WeeklyScheduleResponse> weeklySchedules(@RequestParam @Positive Long branchId) {
+        return appointmentSchedules.week(branchId);
+    }
+    @PutMapping("/appointment-weekly-schedules")
+    public WeeklyScheduleResponse saveWeeklySchedule(@Valid @RequestBody SaveWeeklyScheduleRequest request) {
+        return appointmentSchedules.saveWeekday(request);
+    }
+    @PutMapping("/appointment-weekly-schedules/batch")
+    public List<WeeklyScheduleResponse> saveWeeklySchedules(@RequestBody List<SaveWeeklyScheduleRequest> requests) {
+        return appointmentSchedules.saveWeekdays(requests);
+    }
+    @GetMapping("/appointment-date-overrides")
+    public DateOverrideResponse dateOverride(@RequestParam @Positive Long branchId, @RequestParam LocalDate date) {
+        return appointmentSchedules.override(branchId, date);
+    }
+    @PutMapping("/appointment-date-overrides")
+    public DateOverrideResponse saveDateOverride(@Valid @RequestBody SaveDateOverrideRequest request) {
+        return appointmentSchedules.saveOverride(request);
     }
     @GetMapping("/appointment-slots/{id}")
     public SlotAvailabilityResponse slot(@PathVariable @Positive Long id) { return slots.getById(id); }

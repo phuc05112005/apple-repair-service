@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { BranchInventoryResponse, BranchResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, StatisticsOverviewResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse } from './contracts'
+import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
 
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
@@ -12,10 +12,11 @@ export const adminApi = {
   resourceDelete: (resource: string, id: number) => apiRequest<void>(`/api/v1/admin/${resource}/${id}`, { auth: true, method: 'DELETE' }),
   resourceStatus: <T>(resource: string, id: number, active: boolean) => apiRequest<T>(`/api/v1/admin/${resource}/${id}/${active ? 'activate' : 'deactivate'}`, { auth: true, method: 'POST' }),
   users: (signal?: AbortSignal) => apiRequest<UserResponse[]>('/api/v1/admin/users', { auth: true, signal }),
-  createUser: (body: { username: string; password: string; fullName: string; phone?: string; role: string }) => apiRequest<UserResponse>('/api/v1/admin/users', { auth: true, method: 'POST', body }),
+  createUser: (body: { username: string; password: string; fullName: string; phone?: string; role: string; status: string }) => apiRequest<UserResponse>('/api/v1/admin/users', { auth: true, method: 'POST', body }),
   updateUserProfile: (id: number, body: { fullName: string; phone?: string }) => apiRequest<UserResponse>(`/api/v1/admin/users/${id}/profile`, { auth: true, method: 'PUT', body }),
   updateUserRole: (id: number, role: string) => apiRequest<UserResponse>(`/api/v1/admin/users/${id}/role`, { auth: true, method: 'PUT', body: { role } }),
   updateUserStatus: (id: number, status: string) => apiRequest<UserResponse>(`/api/v1/admin/users/${id}/status`, { auth: true, method: 'PUT', body: { status } }),
+  resetUserPassword: (id: number, password: string) => apiRequest<void>(`/api/v1/admin/users/${id}/password`, { auth: true, method: 'PUT', body: { password } }),
   branches: (signal?: AbortSignal) => apiRequest<BranchResponse[]>('/api/v1/admin/branches', { auth: true, signal }),
   parts: (signal?: AbortSignal) => apiRequest<PartResponse[]>('/api/v1/admin/parts', { auth: true, signal }),
   inventory: (branchId: number, partId: number, signal?: AbortSignal) => apiRequest<BranchInventoryResponse>('/api/v1/internal/inventory', { auth: true, query: { branchId, partId }, signal }),
@@ -24,6 +25,11 @@ export const adminApi = {
   adjustStock: (direction: 'stock-in' | 'stock-out', body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>(`/api/v1/admin/inventory/${direction}`, { auth: true, method: 'POST', body }),
   transferStock: (body: { partId: number; sourceBranchId: number; destinationBranchId: number; quantity: number; note?: string }) => apiRequest('/api/v1/admin/inventory/transfer', { auth: true, method: 'POST', body }),
   slots: (branchId: number, date: string, signal?: AbortSignal) => apiRequest<SlotAvailabilityResponse[]>('/api/v1/admin/appointment-slots', { auth: true, query: { branchId, date }, signal }),
+  weeklySchedules: (branchId: number, signal?: AbortSignal) => apiRequest<WeeklyScheduleResponse[]>('/api/v1/admin/appointment-weekly-schedules', { auth: true, query: { branchId }, signal }),
+  saveWeekday: (body: WeeklyScheduleResponse) => apiRequest<WeeklyScheduleResponse>('/api/v1/admin/appointment-weekly-schedules', { auth: true, method: 'PUT', body }),
+  saveWeekdays: (body: WeeklyScheduleResponse[]) => apiRequest<WeeklyScheduleResponse[]>('/api/v1/admin/appointment-weekly-schedules/batch', { auth: true, method: 'PUT', body }),
+  dateOverride: (branchId: number, date: string, signal?: AbortSignal) => apiRequest<DateOverrideResponse>('/api/v1/admin/appointment-date-overrides', { auth: true, query: { branchId, date }, signal }),
+  saveDateOverride: (body: { branchId: number; date: string; mode: DateOverrideResponse['mode']; slots: SlotRule[] }) => apiRequest<DateOverrideResponse>('/api/v1/admin/appointment-date-overrides', { auth: true, method: 'PUT', body }),
   saveSlot: (id: number | undefined, body: { branchId: number; slotDate: string; startTime: string; endTime: string }) => apiRequest<SlotAvailabilityResponse>(id ? `/api/v1/admin/appointment-slots/${id}` : '/api/v1/admin/appointment-slots', { auth: true, method: id ? 'PUT' : 'POST', body }),
   setSlotOpen: (id: number, open: boolean) => apiRequest<SlotAvailabilityResponse>(`/api/v1/admin/appointment-slots/${id}/${open ? 'open' : 'close'}`, { auth: true, method: 'POST' }),
   deleteSlot: (id: number) => apiRequest<void>(`/api/v1/admin/appointment-slots/${id}`, { auth: true, method: 'DELETE' }),
