@@ -23,7 +23,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if(!header.startsWith("Bearer ") || header.length()<=7) throw new BadCredentialsException("Invalid bearer token");
                 var jwt=tokens.decode(header.substring(7));
                 var user=users.loadUserByUsername(jwt.getSubject());
-                if(!user.isEnabled() || user.id().longValue()!=((Number)jwt.getClaim("userId")).longValue()) throw new BadCredentialsException("Invalid bearer token");
+                if(!user.isEnabled() || user.id().longValue()!=((Number)jwt.getClaim("userId")).longValue()
+                        || !tokens.credentialTag(user).equals(jwt.getClaimAsString("credentialTag")))
+                    throw new BadCredentialsException("Invalid bearer token");
                 var authentication=UsernamePasswordAuthenticationToken.authenticated(user,null,user.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 var context=SecurityContextHolder.createEmptyContext();context.setAuthentication(authentication);SecurityContextHolder.setContext(context);
@@ -34,4 +36,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         chain.doFilter(request,response);
     }
 }
-

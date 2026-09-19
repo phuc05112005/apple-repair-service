@@ -8,11 +8,80 @@ import { ticketStatusLabels } from '../../types/labels'
 import { formatDate } from '../../utils/format'
 
 export function AdminHomePage() {
-  return <div className="workspace-page"><header><span className="eyebrow">Không gian quản trị</span><h1>Điều hành theo từng chi nhánh.</h1><p>Chọn ngữ cảnh chi nhánh trước khi xem thống kê, tồn kho, lịch hẹn và lịch kỹ thuật viên.</p></header><div className="workspace-grid"><WorkspaceCard number="01" title="Dữ liệu nền" text="Thiết bị, model, vấn đề, loại dịch vụ, danh mục và linh kiện." to="catalog" /><WorkspaceCard number="02" title="Vận hành chi nhánh" text="Tồn kho, khung giờ và lịch làm việc theo chi nhánh." to="inventory" /><WorkspaceCard number="03" title="Theo dõi kết quả" text="Thống kê trong khoảng thời gian và chi nhánh được chọn." to="statistics" /></div></div>
+return (
+
+  <div className="workspace-page">
+    <header>
+      <span className="eyebrow">Tổng quan</span>
+      <h1>Quản lý và theo dõi hoạt động toàn hệ thống.</h1>
+      <p>
+        Chọn chi nhánh để quản lý dữ liệu vận hành, tồn kho, lịch hẹn,
+        lịch làm việc kỹ thuật viên và theo dõi các chỉ số thống kê.
+      </p>
+    </header>
+      <div className="workspace-grid">
+        <WorkspaceCard
+          number="01"
+          title="Danh mục hệ thống"
+          text="Quản lý thiết bị, model, vấn đề dịch vụ, loại dịch vụ, bảng giá và linh kiện."
+          to="catalog"
+        />
+
+        <WorkspaceCard
+          number="02"
+          title="Kho linh kiện"
+          text="Theo dõi tồn kho, khung giờ tiếp nhận và lịch làm việc của kỹ thuật viên."
+          to="inventory"
+        />
+
+        <WorkspaceCard
+          number="03"
+          title="Thống kê & báo cáo"
+          text="Theo dõi tình hình hoạt động, doanh thu và kết quả dịch vụ theo thời gian và chi nhánh."
+          to="statistics"
+        />
+      </div>
+
+    </div>
+  );
 }
 
 export function ReceptionistHomePage() {
-  return <div className="workspace-page"><header><span className="eyebrow">Không gian lễ tân</span><h1>Hôm nay cần xử lý gì?</h1><p>Quy trình tập trung từ lịch hẹn đến tiếp nhận, phân công, thanh toán và bàn giao.</p></header><div className="workspace-grid"><WorkspaceCard number="01" title="Lịch hẹn" text="Xác nhận, đổi lịch, ghi nhận khách đến hoặc hết hạn." to="appointments" /><WorkspaceCard number="02" title="Tiếp nhận" text="Tạo phiếu từ lịch hẹn hoặc khách đến trực tiếp." to="intake" /><WorkspaceCard number="03" title="Phiếu dịch vụ" text="Theo dõi, phân công, thanh toán và bàn giao theo trạng thái." to="tickets" /></div></div>
+  return (
+
+  <div className="workspace-page">
+    <header>
+      <span className="eyebrow">Điều phối dịch vụ</span>
+      <h1>Quản lý quy trình tiếp nhận và xử lý dịch vụ.</h1>
+      <p>
+        Theo dõi lịch hẹn, tiếp nhận thiết bị, tạo phiếu dịch vụ,
+        phân công kỹ thuật viên và hỗ trợ bàn giao sau sửa chữa.
+      </p>
+    </header>
+      <div className="workspace-grid">
+        <WorkspaceCard
+          number="01"
+          title="Quản lý lịch hẹn"
+          text="Xác nhận lịch, thay đổi thời gian và ghi nhận trạng thái khách đến."
+          to="appointments"
+        />
+
+        <WorkspaceCard
+          number="02"
+          title="Tiếp nhận thiết bị"
+          text="Tiếp nhận khách đặt lịch trước hoặc khách đến trực tiếp và tạo phiếu dịch vụ."
+          to="intake"
+        />
+
+        <WorkspaceCard
+          number="03"
+          title="Phiếu dịch vụ"
+          text="Theo dõi tiến trình, phân công kỹ thuật viên, thanh toán và bàn giao thiết bị."
+          to="tickets"
+        />
+      </div>
+    </div>
+  );
 }
 
 export function TechnicianHomePage() {
@@ -31,7 +100,7 @@ export function TechnicianHomePage() {
 }
 
 export function InternalModulePage({ role, title, note }: { role: UserRole; title: string; note?: string }) {
-  return <div className="workspace-page"><header><span className="eyebrow">{role === 'ADMIN' ? 'Quản trị' : role === 'RECEPTIONIST' ? 'Vận hành lễ tân' : 'Kỹ thuật viên'}</span><h1>{title}</h1><p>{note ?? 'Module chỉ hiển thị hành động được backend cho phép.'}</p></header><div className="phase-notice"><strong>Module đang được hoàn thiện</strong><p>Route và role guard đã hoạt động; dữ liệu giả không được sử dụng.</p></div></div>
+  return <div className="workspace-page"><header><span className="eyebrow">{role === 'ADMIN' ? 'Quản trị' : role === 'RECEPTIONIST' ? 'Nhân viên tiếp nhận' : 'Kỹ thuật viên'}</span><h1>{title}</h1><p>{note ?? 'Chọn một mục trong thanh điều hướng để tiếp tục công việc.'}</p></header><div className="phase-notice"><strong>Chức năng đang được hoàn thiện</strong><p>Vui lòng quay lại sau.</p></div></div>
 }
 
 function WorkspaceCard({ number, title, text, to }: { number: string; title: string; text: string; to: string }) {

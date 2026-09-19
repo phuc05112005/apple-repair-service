@@ -65,7 +65,7 @@ class MasterDataServiceTest {
         var existing = new DeviceType();
         existing.setId(2L);
         when(repo.findByNameIgnoreCase("iPhone")).thenReturn(Optional.of(existing));
-        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class), mock(com.applecare.apple_repair_service.repository.ServiceIssueRepository.class));
         assertThrows(DuplicateResourceException.class, () -> service.create(new CreateDeviceTypeRequest(" iPhone ")));
         verify(repo, never()).saveAndFlush(any());
     }

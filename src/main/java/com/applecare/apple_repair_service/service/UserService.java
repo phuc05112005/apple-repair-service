@@ -3,6 +3,7 @@ package com.applecare.apple_repair_service.service;
 import com.applecare.apple_repair_service.dto.request.UpdateUserProfileRequest;
 import com.applecare.apple_repair_service.dto.request.UpdateUserRoleRequest;
 import com.applecare.apple_repair_service.dto.request.UpdateUserStatusRequest;
+import com.applecare.apple_repair_service.dto.request.ResetUserPasswordRequest;
 import com.applecare.apple_repair_service.dto.response.UserResponse;
 import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
@@ -28,21 +29,21 @@ public class UserService {
     public UserResponse create(com.applecare.apple_repair_service.dto.request.CreateUserRequest request) {
         rules.validate(request);
         var username = request.username().trim();
-        BusinessRules.require(username.length() >= 3, "Username must have at least three characters");
+        BusinessRules.require(username.length() >= 3, "Tên đăng nhập phải có ít nhất 3 ký tự.");
         BusinessRules.require(request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 72,
-                "Password must not exceed 72 UTF-8 bytes");
-        if (repository.existsByUsername(username))
-            throw new com.applecare.apple_repair_service.exception.DuplicateResourceException("Username already exists");
+                "Mật khẩu không được vượt quá 72 byte UTF-8.");
+        if (repository.existsByUsernameIgnoreCase(username))
+            throw new com.applecare.apple_repair_service.exception.DuplicateResourceException("Tên đăng nhập đã tồn tại.");
         var user = new User();
         user.setUsername(username);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setFullName(request.fullName().trim());
         user.setPhone(BusinessRules.text(request.phone()));
         user.setRole(request.role());
-        user.setStatus(com.applecare.apple_repair_service.enums.UserStatus.ACTIVE);
+        user.setStatus(request.status() == null ? com.applecare.apple_repair_service.enums.UserStatus.ACTIVE : request.status());
         try { return mapper.map(repository.saveAndFlush(user)); }
         catch (org.springframework.dao.DataIntegrityViolationException ex) {
-            throw new com.applecare.apple_repair_service.exception.DuplicateResourceException("Username already exists");
+            throw new com.applecare.apple_repair_service.exception.DuplicateResourceException("Tên đăng nhập đã tồn tại.");
         }
     }
 
@@ -81,5 +82,14 @@ public class UserService {
         var u = access.lock(User.class, id);
         u.setStatus(r.status());
         return mapper.map(u);
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public void resetPassword(Long id, ResetUserPasswordRequest request) {
+        rules.validate(request);
+        BusinessRules.require(request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 72,
+                "Mật khẩu không được vượt quá 72 byte UTF-8.");
+        var user = access.lock(User.class, id);
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
 }

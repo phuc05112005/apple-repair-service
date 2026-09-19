@@ -37,8 +37,10 @@ public class PublicQueryService {
         return models.findPublicModels(typeId).stream()
                 .map(x -> new PublicDeviceModelResponse(x.getId(), x.getDeviceType().getId(), x.getName())).toList();
     }
-    public List<PublicNamedResponse> serviceIssues() {
-        return issues.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE).stream()
+    public List<PublicNamedResponse> serviceIssues(Long deviceTypeId) {
+        var matches = deviceTypeId == null ? issues.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE)
+                : issues.findPublicByDeviceType(ActiveStatus.ACTIVE, deviceTypeId);
+        return matches.stream()
                 .map(x -> new PublicNamedResponse(x.getId(), x.getName())).toList();
     }
     public List<PublicBranchResponse> branches() {

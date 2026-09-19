@@ -41,6 +41,9 @@ export interface SlotAvailabilityResponse {
   slotId: number; branchId: number; slotDate: string; startTime: string; endTime: string
   status: AppointmentSlotStatus; activeBookingCount: number
 }
+export interface SlotRule { startTime: string; endTime: string; enabled: boolean }
+export interface WeeklyScheduleResponse { branchId: number; weekday: number; enabled: boolean; slots: SlotRule[] }
+export interface DateOverrideResponse { branchId: number; date: string; mode: 'INHERIT' | 'DISABLED' | 'REPLACE'; slots: SlotRule[] }
 export interface AppointmentServiceItemRequest { serviceCatalogItemId: number; warrantySourceItemId?: number | null }
 export interface AppointmentDeviceRequest {
   deviceModelId: number; symptomDescription?: string; serviceItems: AppointmentServiceItemRequest[]
@@ -74,7 +77,7 @@ export interface WarrantyEligibilityResponse {
 export interface PublicFeedbackRequest { phone: string; satisfied: boolean; comment?: string }
 export interface PublicFeedbackResponse { ticketCode: string; satisfied: boolean; comment: string | null }
 export interface AppointmentResponse {
-  id: number; customerId: number; appointmentSlotId: number; status: AppointmentStatus
+  id: number; customerId: number; customerFullName: string; customerPhone: string; appointmentSlotId: number; status: AppointmentStatus
   discountPercent: number; confirmedById: number | null; confirmedAt: string | null
   note: string | null; cancelReason: string | null; bookedAt: string; updatedAt: string
 }
@@ -163,7 +166,7 @@ export interface UserResponse { id: number; username: string; fullName: string; 
 export interface BranchResponse { id: number; name: string; address: string; phone: string | null; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface DeviceTypeResponse { id: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface DeviceModelResponse { id: number; deviceTypeId: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
-export interface ServiceIssueResponse { id: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
+export interface ServiceIssueResponse { id: number; name: string; status: ActiveStatus; deviceTypeIds: number[]; createdAt: string; updatedAt: string }
 export interface ServiceTypeResponse { id: number; code: ServiceTypeCode; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface ServiceCatalogItemResponse { id: number; deviceModelId: number; serviceTypeId: number; serviceIssueId: number; partId: number | null; name: string; configuredPrice: number | null; standardDurationMinutes: number | null; warrantyDays: number; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
@@ -173,5 +176,5 @@ export interface InventoryTransactionResponse {
   sourceBranchId: number | null; destinationBranchId: number | null; quantity: number; partUsageId: number | null
   recordedById: number; note: string | null; createdAt: string
 }
-export type TechnicianScheduleStatus = 'WORKING' | 'OFF'
+export type TechnicianScheduleStatus = 'WORKING' | 'OFF' | 'CANCELLED'
 export interface TechnicianScheduleResponse { id: number; technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: TechnicianScheduleStatus; createdAt: string; updatedAt: string }

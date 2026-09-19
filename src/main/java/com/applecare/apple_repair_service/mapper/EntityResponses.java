@@ -57,7 +57,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class EntityResponses {
     public AppointmentResponse map(Appointment e) {
-        return new AppointmentResponse(e.getId(), e.getCustomer() == null ? null : e.getCustomer().getId(), e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getId(), e.getStatus(), e.getDiscountPercent(), e.getConfirmedBy() == null ? null : e.getConfirmedBy().getId(), e.getConfirmedAt(), e.getNote(), e.getCancelReason(), e.getBookedAt(), e.getUpdatedAt());
+        return new AppointmentResponse(e.getId(), e.getCustomer() == null ? null : e.getCustomer().getId(),
+                e.getCustomer() == null ? null : e.getCustomer().getFullName(),
+                e.getCustomer() == null ? null : e.getCustomer().getPhone(),
+                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getId(), e.getStatus(), e.getDiscountPercent(), e.getConfirmedBy() == null ? null : e.getConfirmedBy().getId(), e.getConfirmedAt(), e.getNote(), e.getCancelReason(), e.getBookedAt(), e.getUpdatedAt());
     }
 
     public AppointmentDeviceResponse map(AppointmentDevice e) {
@@ -129,7 +132,9 @@ public class EntityResponses {
     }
 
     public ServiceIssueResponse map(ServiceIssue e) {
-        return new ServiceIssueResponse(e.getId(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+        return new ServiceIssueResponse(e.getId(), e.getName(), e.getStatus(),
+                e.getDeviceTypes().stream().map(DeviceType::getId).collect(java.util.stream.Collectors.toSet()),
+                e.getCreatedAt(), e.getUpdatedAt());
     }
 
     public ServiceStatusHistoryResponse map(ServiceStatusHistory e) {

@@ -19,6 +19,7 @@ public class PublicController {
     private final PublicQueryService queries;
     private final PublicCommandService commands;
     private final AppointmentSlotService slots;
+    private final AppointmentScheduleService appointmentSchedules;
 
     @GetMapping("/device-types")
     public List<PublicNamedResponse> deviceTypes() { return queries.deviceTypes(); }
@@ -27,7 +28,7 @@ public class PublicController {
         return queries.deviceModels(deviceTypeId);
     }
     @GetMapping("/service-issues")
-    public List<PublicNamedResponse> serviceIssues() { return queries.serviceIssues(); }
+    public List<PublicNamedResponse> serviceIssues(@RequestParam(required = false) @Positive Long deviceTypeId) { return queries.serviceIssues(deviceTypeId); }
     @GetMapping("/service-catalog-items")
     public List<PublicCatalogResponse> catalog(@RequestParam(required = false) @Positive Long deviceModelId,
             @RequestParam(required = false) @Positive Long serviceIssueId,
@@ -38,6 +39,7 @@ public class PublicController {
     public List<PublicBranchResponse> branches() { return queries.branches(); }
     @GetMapping("/appointment-slots")
     public List<SlotAvailabilityResponse> slots(@RequestParam @Positive Long branchId, @RequestParam LocalDate date) {
+        appointmentSchedules.materialize(branchId, date);
         return slots.availability(branchId, date);
     }
     @PostMapping("/appointments")

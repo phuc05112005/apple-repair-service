@@ -6,13 +6,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ServiceCatalogItemRepository extends JpaRepository<ServiceCatalogItem, Long> {
+    boolean existsByServiceIssue_IdAndDeviceModel_DeviceType_Id(Long serviceIssueId, Long deviceTypeId);
     @org.springframework.data.jpa.repository.Query("""
-            select c from ServiceCatalogItem c left join c.part p
+            select c from ServiceCatalogItem c left join c.part p join c.serviceIssue.deviceTypes issueType
             where c.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.deviceType.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.serviceIssue.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.serviceType.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
+              and issueType.id = c.deviceModel.deviceType.id
               and (p is null or p.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE)
               and (:deviceModelId is null or c.deviceModel.id = :deviceModelId)
               and (:serviceIssueId is null or c.serviceIssue.id = :serviceIssueId)

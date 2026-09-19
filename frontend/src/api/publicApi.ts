@@ -8,7 +8,7 @@ import type {
 export const publicApi = {
   deviceTypes: (signal?: AbortSignal) => apiRequest<PublicNamedResponse[]>('/api/v1/device-types', { signal }),
   deviceModels: (deviceTypeId?: number, signal?: AbortSignal) => apiRequest<PublicDeviceModelResponse[]>('/api/v1/device-models', { query: { deviceTypeId }, signal }),
-  serviceIssues: (signal?: AbortSignal) => apiRequest<PublicNamedResponse[]>('/api/v1/service-issues', { signal }),
+  serviceIssues: (deviceTypeId?: number, signal?: AbortSignal) => apiRequest<PublicNamedResponse[]>('/api/v1/service-issues', { query: { deviceTypeId }, signal }),
   catalog: (filters: { deviceModelId?: number; serviceIssueId?: number; serviceTypeId?: number }, signal?: AbortSignal) =>
     apiRequest<PublicCatalogResponse[]>('/api/v1/service-catalog-items', { query: filters, signal }),
   branches: (signal?: AbortSignal) => apiRequest<PublicBranchResponse[]>('/api/v1/branches', { signal }),

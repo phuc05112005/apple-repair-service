@@ -8,6 +8,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +22,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "service_issues", uniqueConstraints = {
@@ -41,6 +46,16 @@ public class ServiceIssue {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ActiveStatus status = ActiveStatus.ACTIVE;
+
+    @ManyToMany
+    @JoinTable(name = "service_issue_device_types",
+            joinColumns = @JoinColumn(name = "service_issue_id"),
+            inverseJoinColumns = @JoinColumn(name = "device_type_id"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_service_issue_device_type", columnNames = {"service_issue_id", "device_type_id"}))
+    private Set<DeviceType> deviceTypes = new HashSet<>();
+
+    @Column(name = "mapping_initialized", nullable = false, columnDefinition = "boolean not null default false")
+    private boolean mappingInitialized;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

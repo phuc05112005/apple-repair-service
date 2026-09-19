@@ -8,7 +8,10 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.*;
+import java.util.Base64;
 @Service
 public class JwtTokenService {
     private final JwtEncoder encoder;
@@ -33,7 +36,8 @@ public class JwtTokenService {
                     return invalid();
                 UserRole.valueOf(jwt.getClaimAsString("role"));
                 return OAuth2TokenValidatorResult.success();
-            } catch(RuntimeException ex) { return invalid(); }
+            } catch(RuntimeException ex) {
+                return invalid(); }
         }));
     }
     private static OAuth2TokenValidatorResult invalid() {
@@ -42,9 +46,17 @@ public class JwtTokenService {
     public Jwt issue(UserPrincipal user) {
         var now=clock.instant();
         var claims=JwtClaimsSet.builder().issuer(issuer).subject(user.getUsername()).issuedAt(now).expiresAt(now.plus(expiration))
-                .claim("userId",user.id()).claim("role",user.role().name()).build();
+                .claim("userId",user.id()).claim("role",user.role().name())
+                .claim("credentialTag",credentialTag(user)).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),claims));
+    }
+    public String credentialTag(UserPrincipal user) {
+        try {
+            var digest=MessageDigest.getInstance("SHA-256").digest(user.getPassword().getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 unavailable",ex);
+        }
     }
     public Jwt decode(String token) { return decoder.decode(token); }
 }
-

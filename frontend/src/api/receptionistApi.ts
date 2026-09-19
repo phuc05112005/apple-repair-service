@@ -1,10 +1,18 @@
-import { apiRequest } from './client'
+import { ApiError, apiRequest } from './client'
 import type { AppointmentDetailResponse, AppointmentStatus, ApprovalStatus, AssignmentResponse, AssignmentSource, OperationalTicketResponse, PaymentMethod, RepairItemResponse, ServiceTicketDetailResponse, ServiceTicketStatus, TechnicianRecommendationResponse, TicketPaymentSummaryResponse } from './contracts'
 
+function requireCustomerContact(detail: AppointmentDetailResponse): AppointmentDetailResponse {
+  if (!detail.appointment?.customerFullName?.trim() || !detail.appointment?.customerPhone?.trim()) {
+    throw new ApiError(502, 'APPOINTMENT_CONTACT_MISSING', 'API lịch hẹn chưa trả tên hoặc số điện thoại khách hàng. Vui lòng khởi động lại backend với bản mới rồi tải lại trang.')
+  }
+  return detail
+}
+
 export const receptionistApi = {
-  appointments: (filters: { branchId?: number; date?: string; status?: AppointmentStatus }, signal?: AbortSignal) =>
-    apiRequest<AppointmentDetailResponse[]>('/api/v1/internal/appointments', { auth: true, query: filters, signal }),
-  appointment: (id: number, signal?: AbortSignal) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}`, { auth: true, signal }),
+  appointments: async (filters: { branchId?: number; date?: string; status?: AppointmentStatus }, signal?: AbortSignal) =>
+    (await apiRequest<AppointmentDetailResponse[]>('/api/v1/internal/appointments', { auth: true, query: filters, signal })).map(requireCustomerContact),
+  appointment: async (id: number, signal?: AbortSignal) =>
+    requireCustomerContact(await apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}`, { auth: true, signal })),
   confirm: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/confirm`, { auth: true, method: 'POST' }),
   reschedule: (id: number, appointmentSlotId: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/reschedule`, { auth: true, method: 'POST', body: { appointmentSlotId } }),
   cancel: (id: number, reason: string) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/cancel`, { auth: true, method: 'POST', body: { reason } }),

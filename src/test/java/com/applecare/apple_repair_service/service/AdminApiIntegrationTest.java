@@ -59,6 +59,46 @@ class AdminApiIntegrationTest {
         mvc.perform(post("/api/v1/admin/users").header("Authorization","Bearer "+token).contentType("application/json").content(body))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DUPLICATE_RESOURCE"));
     }
+    @Test void adminResetsEmployeePasswordAndRevokesOldSession() throws Exception {
+        String originalHash = f.receptionist.getPasswordHash();
+        String employeeToken = json.readTree(mvc.perform(post("/api/v1/auth/login").contentType("application/json")
+                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("accessToken").asString();
+        String path = "/api/v1/admin/users/" + f.receptionist.getId() + "/password";
+        String body = json.writeValueAsString(new ResetUserPasswordRequest("Fresh-password-2026!"));
+        mvc.perform(put(path).header("Authorization", "Bearer " + employeeToken)
+                .contentType("application/json").content(body)).andExpect(status().isForbidden());
+        mvc.perform(put(path).header("Authorization", "Bearer " + token)
+                .contentType("application/json").content(body)).andExpect(status().isNoContent());
+        em.flush(); em.clear();
+        assertTrue(encoder.matches("Fresh-password-2026!", em.find(User.class, f.receptionist.getId()).getPasswordHash()));
+        assertNotEquals(originalHash, em.find(User.class, f.receptionist.getId()).getPasswordHash());
+        mvc.perform(post("/api/v1/auth/login").contentType("application/json")
+                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/auth/login").contentType("application/json")
+                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), "Fresh-password-2026!"))))
+                .andExpect(status().isOk());
+        mvc.perform(put("/api/v1/admin/users/999999999/password").header("Authorization", "Bearer " + token)
+                .contentType("application/json").content(body)).andExpect(status().isNotFound());
+        mvc.perform(put(path).header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsString(new ResetUserPasswordRequest("short"))))
+                .andExpect(status().isBadRequest());
+    }
+    @Test void receptionistCannotChangeWeeklyAppointmentConfiguration() throws Exception {
+        var response = mvc.perform(post("/api/v1/auth/login").contentType("application/json")
+                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String receptionistToken = json.readTree(response).get("accessToken").asString();
+        mvc.perform(get("/api/v1/admin/appointment-weekly-schedules").param("branchId", f.branch.getId().toString())
+                .header("Authorization", "Bearer " + receptionistToken)).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/admin/appointment-weekly-schedules").header("Authorization", "Bearer " + receptionistToken)
+                .contentType("application/json").content(json.writeValueAsString(new SaveWeeklyScheduleRequest(
+                        f.branch.getId(), 1, true, List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true))))))
+                .andExpect(status().isForbidden());
+    }
     @Test void adminUpdatesDisablesReactivatesUsersButCannotDisableSelf() throws Exception {
         var request=new CreateUserRequest(f.prefix+"reception-new",ApiFixture.PASSWORD,"New receptionist",null,UserRole.RECEPTIONIST);
         var created=mvc.perform(post("/api/v1/admin/users").header("Authorization","Bearer "+token)

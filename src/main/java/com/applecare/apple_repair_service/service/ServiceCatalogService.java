@@ -95,6 +95,9 @@ public class ServiceCatalogService {
         e.setStandardDurationMinutes(r.standardDurationMinutes());
         e.setWarrantyDays(r.warrantyDays());
         BusinessRules.require(e.getServiceType().getCode() != ServiceTypeCode.REPLACEMENT || e.getPart() != null, "Replacement requires part");
+        BusinessRules.require(e.getServiceIssue().getDeviceTypes().stream()
+                .anyMatch(type -> type.getId().equals(e.getDeviceModel().getDeviceType().getId())),
+                "Vấn đề dịch vụ không áp dụng cho loại thiết bị của model.");
     }
 
     private ServiceCatalogItemResponse save(ServiceCatalogItem e) {

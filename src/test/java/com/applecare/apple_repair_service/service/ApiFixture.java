@@ -32,7 +32,7 @@ final class ApiFixture {
         if (existing.isEmpty()) {
             serviceType = new ServiceType(); serviceType.setName(prefix); serviceType.setCode(ServiceTypeCode.REPAIR); em.persist(serviceType);
         } else serviceType = existing.getFirst();
-        issue = new ServiceIssue(); issue.setName(prefix); em.persist(issue);
+        issue = new ServiceIssue(); issue.setName(prefix); issue.getDeviceTypes().add(deviceType); issue.setMappingInitialized(true); em.persist(issue);
         catalog = new ServiceCatalogItem(); catalog.setName(prefix); catalog.setDeviceModel(model);
         catalog.setServiceType(serviceType); catalog.setServiceIssue(issue); catalog.setConfiguredPrice(new BigDecimal("100.00"));
         catalog.setStandardDurationMinutes(30); catalog.setWarrantyDays(30); em.persist(catalog);
@@ -61,4 +61,3 @@ final class ApiFixture {
         i.setApprovalNote("PRIVATE APPROVAL NOTE"); em.persist(i); return i;
     }
 }
-

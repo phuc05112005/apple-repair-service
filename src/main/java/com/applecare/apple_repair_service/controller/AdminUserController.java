@@ -37,4 +37,9 @@ public class AdminUserController {
     public UserResponse status(@PathVariable @Positive Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
         return service.updateStatus(id, request, actor.id());
     }
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@PathVariable @Positive Long id, @Valid @RequestBody ResetUserPasswordRequest request) {
+        service.resetPassword(id, request);
+    }
 }

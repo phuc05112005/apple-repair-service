@@ -1,5 +1,21 @@
 [ {
   "method" : "GET",
+  "path" : "/api/v1/admin/appointment-date-overrides",
+  "controller" : "AdminConfigurationController",
+  "handler" : "dateOverride",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.DateOverrideResponse"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/admin/appointment-date-overrides",
+  "controller" : "AdminConfigurationController",
+  "handler" : "saveDateOverride",
+  "access" : "hasRole('ADMIN')",
+  "request" : "SaveDateOverrideRequest",
+  "response" : "com.applecare.apple_repair_service.dto.response.DateOverrideResponse"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/admin/appointment-slots",
   "controller" : "AdminConfigurationController",
   "handler" : "slots",
@@ -54,6 +70,30 @@
   "access" : "hasRole('ADMIN')",
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.SlotAvailabilityResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/appointment-weekly-schedules",
+  "controller" : "AdminConfigurationController",
+  "handler" : "weeklySchedules",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.WeeklyScheduleResponse>"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/admin/appointment-weekly-schedules",
+  "controller" : "AdminConfigurationController",
+  "handler" : "saveWeeklySchedule",
+  "access" : "hasRole('ADMIN')",
+  "request" : "SaveWeeklyScheduleRequest",
+  "response" : "com.applecare.apple_repair_service.dto.response.WeeklyScheduleResponse"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/admin/appointment-weekly-schedules/batch",
+  "controller" : "AdminConfigurationController",
+  "handler" : "saveWeeklySchedules",
+  "access" : "hasRole('ADMIN')",
+  "request" : "List",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.WeeklyScheduleResponse>"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/branches",
@@ -566,6 +606,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.UserResponse"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/admin/users/{id}/password",
+  "controller" : "AdminUserController",
+  "handler" : "resetPassword",
+  "access" : "hasRole('ADMIN')",
+  "request" : "ResetUserPasswordRequest",
+  "response" : "void"
 }, {
   "method" : "PUT",
   "path" : "/api/v1/admin/users/{id}/profile",
