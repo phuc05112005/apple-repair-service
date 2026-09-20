@@ -720,6 +720,14 @@
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.AppointmentDetailResponse>"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/internal/appointments/ready-for-intake",
+  "controller" : "ReceptionistController",
+  "handler" : "readyForIntake",
+  "access" : "hasRole('RECEPTIONIST')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.AppointmentDetailResponse>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/internal/appointments/{id}",
   "controller" : "ReceptionistController",
   "handler" : "appointment",

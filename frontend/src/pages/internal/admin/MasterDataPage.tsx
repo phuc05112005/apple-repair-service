@@ -8,7 +8,7 @@ import { ConfirmDialog, DetailDrawer } from '../../../components/Dialog'
 import { EmptyState, ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toast } from '../../../components/Toast'
-import { formatDate, formatMoney } from '../../../utils/format'
+import { formatDateTime, formatMoney } from '../../../utils/format'
 import { compareText } from '../../../utils/table'
 
 type Resource = 'branches' | 'device-types' | 'device-models' | 'service-issues' | 'service-types' | 'service-catalog-items' | 'parts'
@@ -47,7 +47,7 @@ const descriptions: Record<Resource, string> = {
   parts: 'Thông tin linh kiện, hãng, phiên bản, giá và tình trạng sử dụng.',
 }
 const catalogResources: Resource[] = ['device-types', 'device-models', 'service-issues', 'service-types', 'service-catalog-items']
-const serviceTypeLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', INSPECTION: 'Kiểm tra / Tư vấn', WARRANTY: 'Bảo hành' }
+const serviceTypeLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', WARRANTY: 'Bảo hành' }
 const emptyForm = { warrantyDays: '0' }
 
 export function MasterDataPage({ initial, grouped = false }: { initial: Resource; grouped?: boolean }) {
@@ -184,8 +184,8 @@ function ResourceDetail({ resource, row, typeNames, modelMap, issueNames, servic
     return <div className="detail-stack">
       <DetailSection title="Thông tin linh kiện"><dl className="detail-grid"><Data label="Tên" value={row.name} /><Data label="Mã linh kiện" value={row.partCode} /><Data label="Hãng" value={row.brand ?? 'Chưa xác định'} /><Data label="Phiên bản" value={row.variant ?? 'Tiêu chuẩn'} /><Data label="Giá bán" value={formatMoney(row.salePrice)} /><Data label="Trạng thái" value={row.status === 'ACTIVE' ? 'Đang dùng' : 'Ngừng dùng'} /></dl></DetailSection>
       <DetailSection title="Danh mục dịch vụ đang sử dụng"><RelationshipList empty="Chưa có dịch vụ nào sử dụng linh kiện này.">{usedBy.map(item => { const model = modelMap.get(item.deviceModelId); const type = serviceTypeMap.get(item.serviceTypeId); return <li key={item.id}><strong>{item.name}</strong><span>{model?.name} · {issueNames.get(item.serviceIssueId)} · {type ? serviceTypeLabels[type.code] : ''}</span></li> })}</RelationshipList></DetailSection>
-      <DetailSection title="Tồn kho theo chi nhánh">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa phát sinh tồn kho tại chi nhánh.">{inventories.map(item => <li key={item.id}><strong>{branchNames.get(item.branchId) ?? `Chi nhánh #${item.branchId}`}</strong><span>{item.quantity} linh kiện · cập nhật {formatDate(item.updatedAt)}</span></li>)}</RelationshipList>}</DetailSection>
-      <DetailSection title="Lịch sử biến động">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa có biến động tồn kho.">{transactions.slice(0, 12).map(item => <li key={item.id}><strong>{transactionLabel(item.transactionType)} · {item.quantity}</strong><span>{formatDate(item.createdAt)} · {movementBranches(item, branchNames)}</span></li>)}</RelationshipList>}</DetailSection>
+      <DetailSection title="Tồn kho theo chi nhánh">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa phát sinh tồn kho tại chi nhánh.">{inventories.map(item => <li key={item.id}><strong>{branchNames.get(item.branchId) ?? `Chi nhánh #${item.branchId}`}</strong><span>{item.quantity} linh kiện · cập nhật {formatDateTime(item.updatedAt)}</span></li>)}</RelationshipList>}</DetailSection>
+      <DetailSection title="Lịch sử biến động">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa có biến động tồn kho.">{transactions.slice(0, 12).map(item => <li key={item.id}><strong>{transactionLabel(item.transactionType)} · {item.quantity}</strong><span>{formatDateTime(item.createdAt)} · {movementBranches(item, branchNames)}</span></li>)}</RelationshipList>}</DetailSection>
     </div>
   }
   if (resource === 'service-catalog-items') {

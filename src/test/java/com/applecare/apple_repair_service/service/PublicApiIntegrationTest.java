@@ -55,26 +55,47 @@ class PublicApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(0)));
     }
 
-    @Test void catalogExposesConfiguredRepairReplacementAndInspectionOptions() throws Exception {
+    @Test void catalogExposesConfiguredRepairAndReplacementOptions() throws Exception {
+        var discountSetting = em.createQuery("select s from SystemSetting s where s.settingKey=:key",
+                        com.applecare.apple_repair_service.entity.SystemSetting.class)
+                .setParameter("key", "ONLINE_DISCOUNT_PERCENT").getResultStream().findFirst()
+                .orElseGet(() -> {
+                      var setting = new com.applecare.apple_repair_service.entity.SystemSetting();
+                      setting.setSettingKey("ONLINE_DISCOUNT_PERCENT");
+                      setting.setSettingValue("10.00");
+                      em.persist(setting);
+                    return setting;
+                });
+        discountSetting.setSettingValue("10.00");
         var replacementType = serviceType(ServiceTypeCode.REPLACEMENT, "Thay thế linh kiện");
-        var inspectionType = serviceType(ServiceTypeCode.INSPECTION, "Kiểm tra / Tư vấn");
         var part = new com.applecare.apple_repair_service.entity.Part();
         part.setPartCode(f.prefix + "-BATTERY"); part.setName("Pin kiểm thử");
         part.setBrand("Pisen"); part.setVariant("Dung lượng cao");
         part.setSalePrice(new java.math.BigDecimal("1790000.00")); em.persist(part);
         var replacement = catalog(replacementType, part, "Thay pin", null, 60, 180);
-        var inspection = catalog(inspectionType, null, "Kiểm tra pin", java.math.BigDecimal.ZERO, 30, 0);
         em.flush();
 
         mvc.perform(get("/api/v1/service-catalog-items")
                         .param("deviceModelId",f.model.getId().toString())
                         .param("serviceIssueId",f.issue.getId().toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(3)))
-                .andExpect(jsonPath("$[*].serviceTypeCode", containsInAnyOrder("REPAIR","REPLACEMENT","INSPECTION")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$",hasSize(2)))
+                .andExpect(jsonPath("$[*].serviceTypeCode", containsInAnyOrder("REPAIR","REPLACEMENT")))
                 .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].partBrand").value("Pisen"))
                 .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].partVariant").value("Dung lượng cao"))
                 .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].displayPrice").value(1790000.0))
-                .andExpect(jsonPath("$[?(@.id == "+inspection.getId()+")].standardDurationMinutes").value(30));
+                .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].onlineDiscountPercent").value(10.0))
+                .andExpect(jsonPath("$[?(@.id == "+replacement.getId()+")].onlinePrice").value(1611000.0))
+                .andExpect(jsonPath("$[?(@.id == "+f.catalog.getId()+")].onlinePrice").value(90.0));
+
+        var request = new CreateAppointmentRequest(f.prefix, f.prefix, f.slot.getId(), null,
+                List.of(new AppointmentDeviceRequest(f.model.getId(), null,
+                        List.of(new AppointmentServiceItemRequest(replacement.getId(), null)))));
+        mvc.perform(post("/api/v1/appointments").contentType("application/json")
+                        .content(json.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.discountPercent").value(10.0))
+                .andExpect(jsonPath("$.devices[0].services[0].basePrice").value(1790000.0))
+                .andExpect(jsonPath("$.devices[0].services[0].finalPrice").value(1611000.0));
     }
 
     private com.applecare.apple_repair_service.entity.ServiceType serviceType(ServiceTypeCode code, String name) {

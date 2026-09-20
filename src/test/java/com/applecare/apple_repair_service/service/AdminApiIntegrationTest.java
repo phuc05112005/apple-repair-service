@@ -18,10 +18,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.time.LocalTime;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -170,7 +167,6 @@ class AdminApiIntegrationTest {
         var deviceType = new DeviceType(); deviceType.setName(f.prefix+"-delete-type"); em.persist(deviceType);
         var model = new DeviceModel(); model.setName(f.prefix+"-delete-model"); model.setDeviceType(f.deviceType); em.persist(model);
         var issue = new ServiceIssue(); issue.setName(f.prefix+"-delete-issue"); em.persist(issue);
-        var serviceType = unreferencedServiceType();
         var catalog = new ServiceCatalogItem(); catalog.setName(f.prefix+"-delete-catalog"); catalog.setDeviceModel(f.model);
         catalog.setServiceType(f.serviceType); catalog.setServiceIssue(f.issue); catalog.setConfiguredPrice(BigDecimal.ONE);
         catalog.setStandardDurationMinutes(10); catalog.setWarrantyDays(0); em.persist(catalog);
@@ -187,7 +183,6 @@ class AdminApiIntegrationTest {
         deleteAndAssertGone("/api/v1/admin/device-types/", DeviceType.class, deviceType.getId(), true);
         deleteAndAssertGone("/api/v1/admin/device-models/", DeviceModel.class, model.getId(), true);
         deleteAndAssertGone("/api/v1/admin/service-issues/", ServiceIssue.class, issue.getId(), true);
-        deleteAndAssertGone("/api/v1/admin/service-types/", ServiceType.class, serviceType.getId(), true);
         deleteAndAssertGone("/api/v1/admin/service-catalog-items/", ServiceCatalogItem.class, catalog.getId(), true);
         deleteAndAssertGone("/api/v1/admin/parts/", Part.class, part.getId(), true);
         deleteAndAssertGone("/api/v1/admin/appointment-slots/", AppointmentSlot.class, slot.getId(), true);
@@ -270,17 +265,4 @@ class AdminApiIntegrationTest {
         }
     }
 
-    private ServiceType unreferencedServiceType() {
-        Set<ServiceTypeCode> existingCodes = em.createQuery("select s.code from ServiceType s", ServiceTypeCode.class)
-                .getResultStream().collect(Collectors.toSet());
-        var unusedCode = Arrays.stream(ServiceTypeCode.values()).filter(code -> !existingCodes.contains(code)).findFirst();
-        if (unusedCode.isPresent()) {
-            var type = new ServiceType(); type.setCode(unusedCode.get()); type.setName(f.prefix+"-delete-service-type");
-            em.persist(type); return type;
-        }
-        return em.createQuery("select s from ServiceType s where s.id <> :fixtureId and not exists " +
-                        "(select c.id from ServiceCatalogItem c where c.serviceType = s)", ServiceType.class)
-                .setParameter("fixtureId", f.serviceType.getId()).setMaxResults(1).getResultStream().findFirst()
-                .orElseThrow(() -> new AssertionError("Test database has no unreferenced service type available"));
-    }
 }

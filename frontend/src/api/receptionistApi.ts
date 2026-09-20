@@ -13,12 +13,14 @@ export const receptionistApi = {
     (await apiRequest<AppointmentDetailResponse[]>('/api/v1/internal/appointments', { auth: true, query: filters, signal })).map(requireCustomerContact),
   appointment: async (id: number, signal?: AbortSignal) =>
     requireCustomerContact(await apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}`, { auth: true, signal })),
+  readyForIntake: async (signal?: AbortSignal) =>
+    (await apiRequest<AppointmentDetailResponse[]>('/api/v1/internal/appointments/ready-for-intake', { auth: true, signal })).map(requireCustomerContact),
   confirm: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/confirm`, { auth: true, method: 'POST' }),
   reschedule: (id: number, appointmentSlotId: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/reschedule`, { auth: true, method: 'POST', body: { appointmentSlotId } }),
   cancel: (id: number, reason: string) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/cancel`, { auth: true, method: 'POST', body: { reason } }),
   arrive: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/arrive`, { auth: true, method: 'POST' }),
   expire: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/expire`, { auth: true, method: 'POST' }),
-  intake: (appointmentDeviceId: number, request: { serialNumber?: string; storage?: string; receivedCondition: string }) =>
+  intake: (appointmentDeviceId: number, request: { serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds?: number[] }) =>
     apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/appointment-devices/${appointmentDeviceId}/intake`, { auth: true, method: 'POST', body: request }),
   walkIn: (request: { customerFullName: string; phone: string; branchId: number; deviceModelId: number; serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds?: number[] }) =>
     apiRequest<ServiceTicketDetailResponse>('/api/v1/internal/service-tickets/walk-in', { auth: true, method: 'POST', body: request }),

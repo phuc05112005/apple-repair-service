@@ -29,7 +29,7 @@ public class ServiceStatusService {
     void initialize(ServiceTicket ticket, User actor) {
         BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_ASSIGNMENT, "Invalid initial ticket state");
         BusinessRules.require(histories.findAllByServiceTicket_IdOrderByChangedAtAsc(ticket.getId()).isEmpty(), "Ticket history already initialized");
-        history(ticket, null, ServiceTicketStatus.WAITING_ASSIGNMENT, actor, "Intake");
+        history(ticket, null, ServiceTicketStatus.WAITING_ASSIGNMENT, actor, "Tiếp nhận thiết bị");
     }
 
     void changeStatus(ServiceTicket ticket, ServiceTicketStatus next, User actor, String note) {

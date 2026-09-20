@@ -18,6 +18,8 @@ public record PublicCatalogResponse(
         String name,
         BigDecimal configuredPrice,
         BigDecimal displayPrice,
+        BigDecimal onlineDiscountPercent,
+        BigDecimal onlinePrice,
         Integer standardDurationMinutes,
         Integer warrantyDays
 ) {

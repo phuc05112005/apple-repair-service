@@ -2,7 +2,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import type { PublicCatalogResponse, PublicNamedResponse, ServiceTypeCode } from '../../../api/contracts'
 
-const serviceLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', INSPECTION: 'Kiểm tra / Tư vấn', WARRANTY: 'Bảo hành' }
+const serviceLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', WARRANTY: 'Bảo hành' }
 
 export function ServiceEditorial({ issues, catalog }: { issues: UseQueryResult<PublicNamedResponse[], Error>; catalog: UseQueryResult<PublicCatalogResponse[], Error> }) {
   const availableTypes = Array.from(new Set((catalog.data ?? []).filter(item => item.serviceTypeCode !== 'WARRANTY').map(item => item.serviceTypeCode)))

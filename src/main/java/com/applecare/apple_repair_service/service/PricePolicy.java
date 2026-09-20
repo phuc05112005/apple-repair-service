@@ -1,5 +1,7 @@
 package com.applecare.apple_repair_service.service;
 
+import com.applecare.apple_repair_service.entity.ServiceCatalogItem;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -8,6 +10,11 @@ public final class PricePolicy {
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private PricePolicy() {
+    }
+
+    public static BigDecimal catalogBasePrice(ServiceCatalogItem item) {
+        if (item.getConfiguredPrice() != null) return item.getConfiguredPrice();
+        return item.getPart() == null ? null : item.getPart().getSalePrice();
     }
 
     public static BigDecimal discounted(BigDecimal price, BigDecimal percent) {

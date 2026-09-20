@@ -6,7 +6,7 @@ import type { PublicCatalogResponse, ServiceTypeCode } from '../../api/contracts
 import { EmptyState, ErrorState, LoadingState } from '../../components/AsyncState'
 import { formatMoney } from '../../utils/format'
 
-const serviceLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', INSPECTION: 'Kiểm tra / Tư vấn', WARRANTY: 'Bảo hành' }
+const serviceLabels: Record<ServiceTypeCode, string> = { REPAIR: 'Sửa chữa', REPLACEMENT: 'Thay thế linh kiện', WARRANTY: 'Bảo hành' }
 
 export function DevicesPage() {
   const [params] = useSearchParams()
