@@ -551,7 +551,7 @@ DROP TABLE IF EXISTS `service_types`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `service_types` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `code` enum('INSPECTION','REPAIR','REPLACEMENT','WARRANTY') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` enum('REPAIR','REPLACEMENT','WARRANTY') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('ACTIVE','INACTIVE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,

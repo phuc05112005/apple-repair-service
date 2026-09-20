@@ -7,7 +7,7 @@ import { DetailDrawer } from '../../../components/Dialog'
 import { ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toast } from '../../../components/Toast'
-import { formatDate, formatMoney } from '../../../utils/format'
+import { formatDateTime, formatMoney } from '../../../utils/format'
 import { compareText } from '../../../utils/table'
 
 export function InventoryPage() {
@@ -38,7 +38,7 @@ export function InventoryPage() {
     { key: 'brand', label: 'Hãng', render: row => partMap.get(row.partId)?.brand ?? 'Chưa xác định' },
     { key: 'variant', label: 'Phiên bản', render: row => partMap.get(row.partId)?.variant ?? 'Tiêu chuẩn' },
     { key: 'quantity', label: 'Số lượng', render: row => <strong className="quantity-cell">{row.quantity}</strong> },
-    { key: 'updated', label: 'Cập nhật gần nhất', render: row => formatDate(row.updatedAt) },
+    { key: 'updated', label: 'Cập nhật gần nhất', render: row => formatDateTime(row.updatedAt) },
     { key: 'status', label: 'Tình trạng', render: row => <StatusBadge label={row.quantity > 0 ? 'Còn hàng' : 'Hết hàng'} tone={row.quantity > 0 ? 'success' : 'warning'} /> },
     { key: 'actions', label: 'Thao tác', className: 'table-actions-cell', render: row => <button className="text-action" onClick={() => { setBranchId(row.branchId); setPartId(row.partId); setDestinationBranchId(undefined); setShowAdjustment(true) }}>Điều chỉnh</button> },
   ]

@@ -12,7 +12,7 @@ export type WarrantyDecision = 'APPROVED' | 'REJECTED' | null
 export type AssignmentSource = 'ACCEPTED_RECOMMENDATION' | 'MANUAL_OVERRIDE' | 'TRANSFER'
 export type AssignmentStatus = 'ACTIVE' | 'ENDED'
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'OTHER'
-export type ServiceTypeCode = 'REPAIR' | 'REPLACEMENT' | 'INSPECTION' | 'WARRANTY'
+export type ServiceTypeCode = 'REPAIR' | 'REPLACEMENT' | 'WARRANTY'
 export type TransferStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED'
 export type PartUsageStatus = 'USED' | 'REVERSED'
 
@@ -34,6 +34,7 @@ export interface PublicCatalogResponse {
   serviceTypeCode: ServiceTypeCode; serviceTypeName: string
   partId: number | null; partName: string | null; partBrand: string | null; partVariant: string | null
   name: string; configuredPrice: number | null; displayPrice: number | null
+  onlineDiscountPercent: number; onlinePrice: number | null
   standardDurationMinutes: number | null; warrantyDays: number | null
 }
 export interface PublicBranchResponse { id: number; name: string; address: string; phone: string }

@@ -51,11 +51,12 @@ class AppointmentServiceTest {
     final AppointmentRepository appointments = mock(AppointmentRepository.class);
     final AppointmentDeviceRepository devices = mock(AppointmentDeviceRepository.class);
     final AppointmentServiceItemRepository items = mock(AppointmentServiceItemRepository.class);
+    final com.applecare.apple_repair_service.repository.ServiceTicketRepository tickets = mock(com.applecare.apple_repair_service.repository.ServiceTicketRepository.class);
     final CustomerIdentity customers = mock(CustomerIdentity.class);
     final SystemSettingService settings = mock(SystemSettingService.class);
     final DomainAccess access = mock(DomainAccess.class);
     final WarrantyPolicy warranty = new WarrantyPolicy();
-    final AppointmentService service = new AppointmentService(appointments, devices, items, customers, settings, access,
+    final AppointmentService service = new AppointmentService(appointments, devices, items, tickets, customers, settings, access,
             new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), warranty, new EntityResponses(), clock, new RetryingWrites(new WriteTransaction()));
     final AppointmentSlot slot = new AppointmentSlot();
     final DeviceModel model = new DeviceModel();
@@ -224,6 +225,14 @@ class AppointmentServiceTest {
         catalog(4L, model).getServiceType().setCode(ServiceTypeCode.WARRANTY);
         service.createAppointment(request(List.of(new AppointmentDeviceRequest(2L, null, List.of(new AppointmentServiceItemRequest(4L, 99L))))));
         assertEquals(99L, savedItems.getFirst().getWarrantySourceItem().getId());
+    }
+
+    @Test
+    void warrantyBookingRequiresCoveredSource() {
+        catalog(4L, model).getServiceType().setCode(ServiceTypeCode.WARRANTY);
+        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(
+                request(List.of(new AppointmentDeviceRequest(2L, null,
+                        List.of(new AppointmentServiceItemRequest(4L, null)))))));
     }
 
     @Test

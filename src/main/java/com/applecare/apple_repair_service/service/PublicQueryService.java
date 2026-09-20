@@ -27,6 +27,7 @@ public class PublicQueryService {
     private final ServiceTicketRepository tickets;
     private final RepairItemRepository repairItems;
     private final DomainAccess access;
+    private final SystemSettingService settings;
     private final WarrantyService warranties;
 
     public List<PublicNamedResponse> deviceTypes() {
@@ -48,16 +49,18 @@ public class PublicQueryService {
                 .map(x -> new PublicBranchResponse(x.getId(), x.getName(), x.getAddress(), x.getPhone())).toList();
     }
     public List<PublicCatalogResponse> catalog(Long modelId, Long issueId, Long typeId) {
+        var discount = settings.getDecimal("ONLINE_DISCOUNT_PERCENT", PricePolicy.DEFAULT_ONLINE_DISCOUNT);
+        PricePolicy.discounted(null, discount);
         return catalog.findPublicCatalog(modelId, issueId, typeId).stream()
                 .map(x -> {
                     var part = x.getPart();
-                    var displayPrice = x.getConfiguredPrice() != null ? x.getConfiguredPrice()
-                            : part == null ? null : part.getSalePrice();
+                    var displayPrice = PricePolicy.catalogBasePrice(x);
                     return new PublicCatalogResponse(x.getId(), x.getDeviceModel().getId(), x.getServiceIssue().getId(),
                             x.getServiceType().getId(), x.getServiceType().getCode(), x.getServiceType().getName(),
                             part == null ? null : part.getId(), part == null ? null : part.getName(),
                             part == null ? null : part.getBrand(), part == null ? null : part.getVariant(),
-                            x.getName(), x.getConfiguredPrice(), displayPrice,
+                            x.getName(), x.getConfiguredPrice(), displayPrice, discount,
+                            PricePolicy.discounted(displayPrice, discount),
                             x.getStandardDurationMinutes(), x.getWarrantyDays());
                 }).toList();
     }

@@ -83,6 +83,64 @@ class ReceptionistApiIntegrationTest {
         mvc.perform(post("/api/v1/internal/appointments/1/confirm").header("Authorization",bearer)).andExpect(status().isForbidden());
     }
 
+    @Test void arrivedBookingCanChangeRepairToReplacementAndKeepOnlineDiscount() throws Exception {
+        var replacementType = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
+                .setParameter("code", ServiceTypeCode.REPLACEMENT).getSingleResult();
+        var replacement = new ServiceCatalogItem();
+        replacement.setName(f.prefix + " replacement");
+        replacement.setDeviceModel(f.model);
+        replacement.setServiceIssue(f.issue);
+        replacement.setServiceType(replacementType);
+        replacement.setConfiguredPrice(new BigDecimal("200.00"));
+        replacement.setWarrantyDays(30);
+        em.persist(replacement);
+        em.flush();
+
+        var request = new CreateAppointmentRequest(f.prefix + " customer", f.prefix + " phone", f.slot.getId(), null,
+                List.of(new AppointmentDeviceRequest(f.model.getId(), null,
+                        List.of(new AppointmentServiceItemRequest(f.catalog.getId(), null)))));
+        var booking = mvc.perform(post("/api/v1/appointments").contentType("application/json")
+                .content(json.writeValueAsString(request))).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long appointmentId = json.readTree(booking).get("appointmentId").asLong();
+        String bearer = "Bearer " + login(f.receptionist);
+        String base = "/api/v1/internal/appointments/" + appointmentId;
+        mvc.perform(post(base + "/confirm").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.status").value("CONFIRMED"));
+        mvc.perform(post(base + "/confirm").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.status").value("CONFIRMED"));
+        mvc.perform(post(base + "/arrive").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.status").value("ARRIVED"));
+        mvc.perform(post(base + "/arrive").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.status").value("ARRIVED"));
+        long deviceId = em.createQuery("select d.id from AppointmentDevice d where d.appointment.id=:id", Long.class)
+                .setParameter("id", appointmentId).getSingleResult();
+        mvc.perform(get("/api/v1/internal/appointments/ready-for-intake").header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.appointment.id == " + appointmentId + ")].devices[0].device.id")
+                        .value(org.hamcrest.Matchers.hasItem((int) deviceId)));
+
+        var command = new IntakeDeviceCommand(f.prefix, "128 GB", "Received", List.of(replacement.getId()));
+        var response = mvc.perform(post("/api/v1/internal/appointment-devices/" + deviceId + "/intake")
+                .header("Authorization", bearer).contentType("application/json")
+                .content(json.writeValueAsString(command)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticket.discountPercent").value(10))
+                .andExpect(jsonPath("$.repairItems[0].serviceCatalogItemId").value(replacement.getId()))
+                .andExpect(jsonPath("$.repairItems[0].basePrice").value(200))
+                .andExpect(jsonPath("$.repairItems[0].finalPrice").value(180))
+                .andReturn().getResponse().getContentAsString();
+        long ticketId = json.readTree(response).get("ticket").get("id").asLong();
+        em.flush();
+        em.clear();
+        assertEquals(new BigDecimal("10.00"), em.find(ServiceTicket.class, ticketId).getDiscountPercent());
+        assertEquals(1, em.createQuery("select r from RepairItem r where r.serviceTicket.id=:id", RepairItem.class)
+                .setParameter("id", ticketId).getResultList().size());
+        mvc.perform(get("/api/v1/internal/appointments/ready-for-intake").header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.appointment.id == " + appointmentId + ")]").isEmpty());
+    }
+
     @Test void walkInReplacementUsesPartPriceWhenServicePriceIsNotConfigured() throws Exception {
         var existingTypes = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
                 .setParameter("code", ServiceTypeCode.REPLACEMENT).getResultList();
@@ -121,6 +179,10 @@ class ReceptionistApiIntegrationTest {
                 .andExpect(jsonPath("$.repairItems[0].finalPrice").value(750000))
                 .andReturn().getResponse().getContentAsString();
         long itemId = json.readTree(response).get("repairItems").get(0).get("id").asLong();
+        assertTrue(json.readTree(response).get("ticket").get("ticketCode").asString()
+                .matches("ST-\\d{8}-[0-9A-F]{12}"));
+        assertNotNull(json.readTree(response).get("ticket").get("receivedAt"));
+        assertNotNull(json.readTree(response).get("history").get(0).get("changedAt"));
         em.flush();
         em.clear();
         assertEquals(new BigDecimal("750000.00"), em.find(RepairItem.class, itemId).getFinalPrice());

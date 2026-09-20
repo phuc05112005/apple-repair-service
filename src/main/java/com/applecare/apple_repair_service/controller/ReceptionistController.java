@@ -37,6 +37,8 @@ public class ReceptionistController {
     @GetMapping("/appointments/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
     public AppointmentDetailResponse appointment(@PathVariable @Positive Long id) { return appointments.getById(id); }
+    @GetMapping("/appointments/ready-for-intake")
+    public List<AppointmentDetailResponse> readyForIntake() { return appointments.readyForIntake(); }
     @PostMapping("/appointments/{id}/confirm")
     public AppointmentDetailResponse confirm(@PathVariable @Positive Long id) {
         return appointments.confirmAppointment(id,new ConfirmAppointmentRequest(actor.id()));
@@ -57,7 +59,7 @@ public class ReceptionistController {
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceTicketDetailResponse intake(@PathVariable @Positive Long appointmentDeviceId, @Valid @RequestBody IntakeDeviceCommand request) {
         return tickets.intakeAppointmentDevice(new IntakeAppointmentDeviceRequest(appointmentDeviceId,request.serialNumber(),
-                request.storage(),request.receivedCondition(),actor.id()));
+                request.storage(),request.receivedCondition(),request.serviceCatalogItemIds(),actor.id()));
     }
     @PostMapping("/service-tickets/walk-in")
     @ResponseStatus(HttpStatus.CREATED)
@@ -90,4 +92,3 @@ public class ReceptionistController {
     @PostMapping("/service-tickets/{id}/handover")
     public ServiceTicketDetailResponse handover(@PathVariable @Positive Long id) { return tickets.handover(id,new HandoverRequest(actor.id())); }
 }
-

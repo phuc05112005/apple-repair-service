@@ -5,7 +5,7 @@ import { technicianApi } from '../../api/technicianApi'
 import { EmptyState, ErrorState, LoadingState } from '../../components/AsyncState'
 import { StatusBadge } from '../../components/StatusBadge'
 import { ticketStatusLabels } from '../../types/labels'
-import { formatDate } from '../../utils/format'
+import { formatDateTime } from '../../utils/format'
 
 export function AdminHomePage() {
 return (
@@ -95,7 +95,7 @@ export function TechnicianHomePage() {
   return <div className="workspace-page workspace-page--focused"><header><span className="eyebrow">Công việc của tôi</span><h1>Phiếu được phân công.</h1><p>Danh sách được xác định từ tài khoản kỹ thuật viên đang đăng nhập.</p></header>
     {incoming.data?.length ? <section className="ops-section"><div className="ops-section__title"><span>!</span><h2>Yêu cầu chuyển giao đến</h2></div>{incoming.data.map(item => <article className="recommendation" key={item.transfer.id}><div><strong>{item.ticket.ticketCode} · {item.ticket.deviceModelName}</strong><StatusBadge label="Chờ phản hồi" tone="warning" /></div><p>Từ {item.transfer.fromTechnicianName}{item.transfer.note ? ` · ${item.transfer.note}` : ''}</p><div className="button-row"><button className="button button--primary" disabled={decide.isPending} onClick={() => decide.mutate({ id: item.transfer.id, accept: true })}>Nhận việc</button><button className="button button--quiet" disabled={decide.isPending} onClick={() => decide.mutate({ id: item.transfer.id, accept: false })}>Từ chối</button></div></article>)}</section> : null}
     {decide.isError && <ErrorState error={decide.error} />}
-    {work.isLoading ? <LoadingState label="Đang tải công việc…" /> : work.isError ? <ErrorState error={work.error} retry={() => work.refetch()} /> : !work.data?.length ? <EmptyState title="Hiện không có phiếu được phân công" /> : <div className="appointment-list">{work.data.map(ticket => <article key={ticket.ticketId}><div><span className="record-code">{ticket.ticketCode}</span><h3>{ticket.deviceModelName} · {ticket.customerFullName}</h3><p>{ticket.serviceIssues.join(', ') || ticket.requestedServices.join(', ')} · Tiếp nhận {formatDate(ticket.receivedAt)}</p><small>Dự kiến {ticket.estimatedDurationMinutes} phút</small></div><div><StatusBadge label={ticketStatusLabels[ticket.status]} tone="info" /><Link className="button button--primary" to={`tickets/${ticket.ticketId}`}>Xử lý</Link></div></article>)}</div>}
+    {work.isLoading ? <LoadingState label="Đang tải công việc…" /> : work.isError ? <ErrorState error={work.error} retry={() => work.refetch()} /> : !work.data?.length ? <EmptyState title="Hiện không có phiếu được phân công" /> : <div className="appointment-list">{work.data.map(ticket => <article key={ticket.ticketId}><div><span className="record-code">Phiếu #{ticket.ticketId}</span><h3>{ticket.deviceModelName} · {ticket.customerFullName}</h3><p>{ticket.serviceIssues.join(', ') || ticket.requestedServices.join(', ')} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}</p><small>Dự kiến {ticket.estimatedDurationMinutes} phút</small></div><div><StatusBadge label={ticketStatusLabels[ticket.status]} tone="info" /><Link className="button button--primary" to={`tickets/${ticket.ticketId}`}>Xử lý</Link></div></article>)}</div>}
   </div>
 }
 

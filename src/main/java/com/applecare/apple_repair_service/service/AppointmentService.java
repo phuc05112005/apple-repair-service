@@ -18,11 +18,13 @@ import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.enums.AppointmentSlotStatus;
 import com.applecare.apple_repair_service.enums.AppointmentStatus;
+import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.exception.InvalidStateTransitionException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AppointmentDeviceRepository;
 import com.applecare.apple_repair_service.repository.AppointmentRepository;
 import com.applecare.apple_repair_service.repository.AppointmentServiceItemRepository;
+import com.applecare.apple_repair_service.repository.ServiceTicketRepository;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -42,6 +44,7 @@ public class AppointmentService {
     private final AppointmentRepository appointments;
     private final AppointmentDeviceRepository devices;
     private final AppointmentServiceItemRepository items;
+    private final ServiceTicketRepository tickets;
     private final CustomerIdentity customers;
     private final SystemSettingService settings;
     private final DomainAccess access;
@@ -86,12 +89,16 @@ public class AppointmentService {
             devices.save(device);
             for (var request : d.serviceItems()) {
                 var catalog = validCatalog(request.serviceCatalogItemId(), d.deviceModelId());
+                BusinessRules.require(catalog.getServiceType().getCode() != ServiceTypeCode.WARRANTY
+                                || request.warrantySourceItemId() != null,
+                        "Vui lòng chọn dịch vụ gốc còn bảo hành trước khi đặt lịch bảo hành.");
                 var item = new AppointmentServiceItem();
                 item.setAppointmentDevice(device);
                 item.setServiceCatalogItem(catalog);
                 item.setServiceNameSnapshot(catalog.getName());
-                item.setBasePriceSnapshot(catalog.getConfiguredPrice());
-                item.setFinalPriceSnapshot(PricePolicy.discounted(catalog.getConfiguredPrice(), discount));
+                var basePrice = PricePolicy.catalogBasePrice(catalog);
+                item.setBasePriceSnapshot(basePrice);
+                item.setFinalPriceSnapshot(PricePolicy.discounted(basePrice, discount));
                 if (request.warrantySourceItemId() != null) {
                     var source = access.get(RepairItem.class, request.warrantySourceItemId());
                     warranty.validateBooking(source, customer.getId(), catalog, LocalDate.now(clock));
@@ -131,6 +138,17 @@ public class AppointmentService {
         return appointments.findFiltered(branchId, date, status).stream().map(this::detail).toList();
     }
 
+    public List<AppointmentDetailResponse> readyForIntake() {
+        return appointments.findFiltered(null, null, AppointmentStatus.ARRIVED).stream()
+                .map(appointment -> new AppointmentDetailResponse(mapper.map(appointment),
+                        devices.findAllByAppointment_Id(appointment.getId()).stream()
+                                .filter(device -> tickets.findByAppointmentDevice_Id(device.getId()).isEmpty())
+                                .map(device -> new AppointmentDeviceDetailResponse(mapper.map(device),
+                                        items.findAllByAppointmentDevice_Id(device.getId()).stream().map(mapper::map).toList()))
+                                .toList()))
+                .filter(detail -> !detail.devices().isEmpty()).toList();
+    }
+
     public List<AppointmentSummaryResponse> findByPhone(String phone) {
         return appointments.findAllByCustomer_PhoneOrderByBookedAtDesc(BusinessRules.required(phone, "Phone")).stream().map(a -> new AppointmentSummaryResponse(a.getId(), a.getCustomer().getId(), a.getAppointmentSlot().getId(), a.getStatus(), a.getBookedAt())).toList();
     }
@@ -139,6 +157,7 @@ public class AppointmentService {
     public AppointmentDetailResponse confirmAppointment(Long id, ConfirmAppointmentRequest r) {
         rules.validate(r);
         var a = access.lock(Appointment.class, id);
+        if (a.getStatus() == AppointmentStatus.CONFIRMED) return detail(a);
         transition(a, AppointmentStatus.CONFIRMED);
         a.setConfirmedBy(access.get(User.class, r.confirmedByUserId()));
         a.setConfirmedAt(LocalDateTime.now(clock));
@@ -178,6 +197,7 @@ public class AppointmentService {
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public AppointmentDetailResponse markArrived(Long id) {
         var a = access.lock(Appointment.class, id);
+        if (a.getStatus() == AppointmentStatus.ARRIVED) return detail(a);
         transition(a, AppointmentStatus.ARRIVED);
         return detail(a);
     }
@@ -195,7 +215,7 @@ public class AppointmentService {
                     Set.of(AppointmentStatus.ARRIVED, AppointmentStatus.CANCELLED, AppointmentStatus.EXPIRED).contains(next);
             default -> false;
         };
-        if (!allowed) throw new InvalidStateTransitionException(a.getStatus() + " -> " + next);
+        if (!allowed) throw new InvalidStateTransitionException("Lịch hẹn đã thay đổi trạng thái. Vui lòng tải lại thông tin trước khi thao tác.");
         a.setStatus(next);
     }
 

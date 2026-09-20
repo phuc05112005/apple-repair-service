@@ -92,21 +92,49 @@ public class ServiceTicketService {
         BusinessRules.require(appointment.getStatus() == AppointmentStatus.ARRIVED, "Appointment must be ARRIVED");
         if (tickets.findByAppointmentDevice_Id(device.getId()).isPresent())
             throw new ConflictException("Device already received");
+        var bookedItems = bookingItems.findAllByAppointmentDevice_Id(device.getId());
+        var replacements = r.serviceCatalogItemIds();
+        if (replacements != null) {
+            BusinessRules.require(bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null),
+                    "Không thể đổi dịch vụ của lịch hẹn bảo hành tại bước tiếp nhận.");
+            BusinessRules.require(new HashSet<>(replacements).size() == replacements.size(), "Dịch vụ được chọn bị trùng.");
+            for (var id : replacements) {
+                var selected = catalog(id, device.getDeviceModel().getId());
+                BusinessRules.require(selected.getServiceType().getCode() == ServiceTypeCode.REPAIR
+                                || selected.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT,
+                        "Chỉ có thể đổi giữa dịch vụ sửa chữa và thay thế linh kiện.");
+            }
+        }
         var physical = customers.resolveDevice(appointment.getCustomer().getId(), new CustomerDeviceInfoRequest(device.getDeviceModel().getId(), r.serialNumber(), r.storage()));
         var ticket = newTicket(physical, appointment.getAppointmentSlot().getBranch().getId(), r.createdByUserId(), r.receivedCondition());
         ticket.setAppointmentDevice(device);
         ticket.setDiscountPercent(appointment.getDiscountPercent());
         tickets.saveAndFlush(ticket);
-        for (var booked : bookingItems.findAllByAppointmentDevice_Id(device.getId())) {
-            var item = new RepairItem();
-            item.setServiceTicket(ticket);
-            item.setServiceCatalogItem(booked.getServiceCatalogItem());
-            item.setItemNameSnapshot(booked.getServiceNameSnapshot());
-            item.setBasePrice(booked.getBasePriceSnapshot());
-            item.setFinalPrice(booked.getFinalPriceSnapshot());
-            item.setWarrantySourceItem(booked.getWarrantySourceItem());
-            item.setApprovalStatus(ApprovalStatus.APPROVED);
-            repairItems.save(item);
+        if (replacements == null) {
+            for (var booked : bookedItems) {
+                var item = new RepairItem();
+                item.setServiceTicket(ticket);
+                item.setServiceCatalogItem(booked.getServiceCatalogItem());
+                item.setItemNameSnapshot(booked.getServiceNameSnapshot());
+                item.setBasePrice(booked.getBasePriceSnapshot());
+                item.setFinalPrice(booked.getFinalPriceSnapshot());
+                item.setWarrantySourceItem(booked.getWarrantySourceItem());
+                item.setApprovalStatus(ApprovalStatus.APPROVED);
+                repairItems.save(item);
+            }
+        } else {
+            for (var id : replacements) {
+                var selected = catalog(id, device.getDeviceModel().getId());
+                var item = new RepairItem();
+                item.setServiceTicket(ticket);
+                item.setServiceCatalogItem(selected);
+                item.setItemNameSnapshot(selected.getName());
+                var basePrice = PricePolicy.catalogBasePrice(selected);
+                item.setBasePrice(basePrice);
+                item.setFinalPrice(PricePolicy.discounted(basePrice, appointment.getDiscountPercent()));
+                item.setApprovalStatus(ApprovalStatus.APPROVED);
+                repairItems.save(item);
+            }
         }
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
@@ -136,9 +164,7 @@ public class ServiceTicketService {
             item.setServiceTicket(ticket);
             item.setServiceCatalogItem(c);
             item.setItemNameSnapshot(c.getName());
-            var quotedPrice = c.getConfiguredPrice() != null ? c.getConfiguredPrice()
-                    : c.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
-                    && c.getPart() != null ? c.getPart().getSalePrice() : null;
+            var quotedPrice = PricePolicy.catalogBasePrice(c);
             item.setBasePrice(quotedPrice);
             item.setFinalPrice(quotedPrice);
             item.setApprovalStatus(ApprovalStatus.APPROVED);
