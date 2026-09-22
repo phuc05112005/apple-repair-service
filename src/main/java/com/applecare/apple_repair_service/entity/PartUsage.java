@@ -74,4 +74,10 @@ public class PartUsage {
 
     @Column(name = "reversal_note", columnDefinition = "TEXT")
     private String reversalNote;
+
+    // A removed defective component is a custody record, never usable branch stock.
+    // Quantity, actor and timestamp are shared with this atomic replacement event.
+    @Column(name = "defective_return_note", columnDefinition = "TEXT")
+    private String defectiveReturnNote;
+
 }

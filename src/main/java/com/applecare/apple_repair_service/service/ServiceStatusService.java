@@ -25,11 +25,15 @@ public class ServiceStatusService {
     private final ServiceStatusHistoryRepository histories;
     private final AssignmentRepository assignments;
     private final Clock clock;
+    private final ServiceTimingService timing;
+
+    void planChanged(ServiceTicket ticket, User actor) { timing.planChanged(ticket, actor); }
 
     void initialize(ServiceTicket ticket, User actor) {
         BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_ASSIGNMENT, "Invalid initial ticket state");
         BusinessRules.require(histories.findAllByServiceTicket_IdOrderByChangedAtAsc(ticket.getId()).isEmpty(), "Ticket history already initialized");
         history(ticket, null, ServiceTicketStatus.WAITING_ASSIGNMENT, actor, "Tiếp nhận thiết bị");
+        timing.created(ticket, actor);
     }
 
     void changeStatus(ServiceTicket ticket, ServiceTicketStatus next, User actor, String note) {
@@ -41,23 +45,26 @@ public class ServiceStatusService {
                     Set.of(ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.CANCELLED).contains(next);
             case WAITING_APPROVAL ->
                     next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.WAITING_HANDOVER;
-            case REPAIRING -> next == ServiceTicketStatus.WAITING_PART || next == ServiceTicketStatus.WAITING_HANDOVER;
+            case REPAIRING -> next == ServiceTicketStatus.WAITING_PART || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.WAITING_APPROVAL;
             case WAITING_PART -> next == ServiceTicketStatus.REPAIRING;
             case WAITING_HANDOVER -> next == ServiceTicketStatus.HANDED_OVER;
             default -> false;
         };
         if (!allowed) throw new InvalidStateTransitionException(old + " -> " + next);
         ticket.setStatus(next);
-        history(ticket, old, next, actor, note);
+        var eventAt = history(ticket, old, next, actor, note);
+        if (next == ServiceTicketStatus.REPAIRING && ticket.getActualRepairStartedAt() == null) ticket.setActualRepairStartedAt(eventAt);
+        if (next == ServiceTicketStatus.WAITING_HANDOVER && ticket.getActualRepairCompletedAt() == null) ticket.setActualRepairCompletedAt(eventAt);
         if (next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED) {
             assignments.findFirstByServiceTicket_IdAndStatus(ticket.getId(), AssignmentStatus.ACTIVE).ifPresent(a -> {
                 a.setStatus(AssignmentStatus.ENDED);
-                a.setEndedAt(LocalDateTime.now(clock));
+                a.setEndedAt(eventAt);
             });
         }
+        timing.statusChanged(ticket, old, actor);
     }
 
-    private void history(ServiceTicket ticket, ServiceTicketStatus old, ServiceTicketStatus next, User actor, String note) {
+    private LocalDateTime history(ServiceTicket ticket, ServiceTicketStatus old, ServiceTicketStatus next, User actor, String note) {
         var h = new ServiceStatusHistory();
         h.setServiceTicket(ticket);
         h.setFromStatus(old);
@@ -66,5 +73,6 @@ public class ServiceStatusService {
         h.setNote(BusinessRules.text(note));
         h.setChangedAt(LocalDateTime.now(clock));
         histories.save(h);
+        return h.getChangedAt();
     }
 }

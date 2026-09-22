@@ -67,6 +67,10 @@ public class TechnicianController {
     public PartUsageResponse reverse(@PathVariable @Positive Long id, @Valid @RequestBody NoteCommand request) {
         return operations.reverseUsage(id,request);
     }
+    @PostMapping("/technician/repair-items/{id}/approval")
+    public RepairItemResponse approval(@PathVariable @Positive Long id, @Valid @RequestBody ApprovalCommand request) {
+        return operations.approval(id, request);
+    }
     @PostMapping("/repair-items/{id}/warranty-decision")
     public RepairItemResponse warranty(@PathVariable @Positive Long id, @Valid @RequestBody WarrantyDecisionRequest request) {
         return operations.warranty(id,request);

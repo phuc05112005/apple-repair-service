@@ -4,12 +4,12 @@ import { adminApi } from '../../../api/adminApi'
 import { publicApi } from '../../../api/publicApi'
 import { ErrorState, LoadingState } from '../../../components/AsyncState'
 import { ticketStatusLabels } from '../../../types/labels'
-import { formatMoney } from '../../../utils/format'
+import { addBusinessDays, businessDate, formatMoney } from '../../../utils/format'
 
 export function StatisticsPage() {
   const initial = useMemo(() => {
-    const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 30)
-    return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
+    const to = businessDate()
+    return { from: addBusinessDays(to, -30), to }
   }, [])
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)

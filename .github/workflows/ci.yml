@@ -13,64 +13,64 @@ on:
 
 jobs:
   backend:
-  name: Backend - Spring Boot
-  runs-on: ubuntu-latest
+    name: Backend - Spring Boot
+    runs-on: ubuntu-latest
 
-  services:
-    mysql:
-      image: mysql:8.4
-      env:
-        MYSQL_ROOT_PASSWORD: 123456
-        MYSQL_DATABASE: apple_repair_service
-      ports:
-        - 3307:3306
-      options: >-
-        --health-cmd="mysqladmin ping -h localhost -uroot -p123456"
-        --health-interval=10s
-        --health-timeout=5s
-        --health-retries=10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: 123456
+          MYSQL_DATABASE: apple_repair_service_test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -p123456"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
-  steps:
-    - name: Checkout source code
-      uses: actions/checkout@v6
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v6
 
-    - name: Set up Java 21
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: "21"
-        cache: maven
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
 
-    - name: Show Java version
-      run: java -version
+      - name: Show Java version
+        run: java -version
 
-    - name: Install MySQL client
-      run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
 
-    - name: Import database schema
-      run: |
-        mysql \
-          -h 127.0.0.1 \
-          -P 3307 \
-          -u root \
-          -p123456 \
-          apple_repair_service < database/schema.sql
+      - name: Import database schema
+        run: |
+          mysql \
+            -h 127.0.0.1 \
+            -P 3307 \
+            -u root \
+            -p123456 \
+            apple_repair_service_test < database/schema.sql
 
-    - name: Run backend tests
-      env:
-        SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service
-        SPRING_DATASOURCE_USERNAME: root
-        SPRING_DATASOURCE_PASSWORD: 123456
-        JWT_SECRET: ci-test-secret-key-ci-test-secret-key
-      run: mvn --batch-mode test
+      - name: Run backend tests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service_test
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 123456
+          JWT_SECRET: ci-test-secret-key-ci-test-secret-key
+        run: mvn --batch-mode test
 
-    - name: Package backend
-      env:
-        SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service
-        SPRING_DATASOURCE_USERNAME: root
-        SPRING_DATASOURCE_PASSWORD: 123456
-        JWT_SECRET: ci-test-secret-key-ci-test-secret-key
-      run: mvn --batch-mode package -DskipTests
+      - name: Package backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service_test
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: 123456
+          JWT_SECRET: ci-test-secret-key-ci-test-secret-key
+        run: mvn --batch-mode package -DskipTests
 
   frontend:
     name: Frontend - React
@@ -87,7 +87,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

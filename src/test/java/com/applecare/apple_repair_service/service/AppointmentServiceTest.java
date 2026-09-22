@@ -67,10 +67,14 @@ class AppointmentServiceTest {
     @BeforeEach
     void setup() {
         slot.setId(1L);
+        slot.setBranch(TestData.branch(1));
         slot.setAppointmentDate(LocalDate.now(clock));
         slot.setStartTime(LocalTime.of(11, 0));
         slot.setEndTime(LocalTime.NOON);
         model.setId(2L);
+        var deviceType = new com.applecare.apple_repair_service.entity.DeviceType();
+        deviceType.setId(1L);
+        model.setDeviceType(deviceType);
         customer.setId(3L);
         when(access.get(AppointmentSlot.class, 1L)).thenReturn(slot);
         when(access.get(DeviceModel.class, 2L)).thenReturn(model);
@@ -108,6 +112,10 @@ class AppointmentServiceTest {
         var type = new ServiceType();
         type.setCode(ServiceTypeCode.REPAIR);
         c.setServiceType(type);
+        var issue = new com.applecare.apple_repair_service.entity.ServiceIssue();
+        issue.setId(1L);
+        issue.getDeviceTypes().add(m.getDeviceType());
+        c.setServiceIssue(issue);
         when(access.get(ServiceCatalogItem.class, id)).thenReturn(c);
         return c;
     }
@@ -128,6 +136,47 @@ class AppointmentServiceTest {
         a.setStatus(status);
         when(access.lock(Appointment.class, 10L)).thenReturn(a);
         return a;
+    }
+
+    @Test
+    void staleInactiveBranchCannotBeBooked() {
+        slot.getBranch().setStatus(com.applecare.apple_repair_service.enums.ActiveStatus.INACTIVE);
+        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(device(4L)))));
+        verifyNoInteractions(customers);
+    }
+
+    @Test
+    void staleMasterAndInvalidIssueMappingCannotBeBooked() {
+        var c = catalog(40L, model);
+        var inactive = com.applecare.apple_repair_service.enums.ActiveStatus.INACTIVE;
+        var active = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE;
+        for (int field = 0; field < 6; field++) {
+            c.setStatus(active); model.setStatus(active); model.getDeviceType().setStatus(active);
+            c.getServiceIssue().setStatus(active); c.getServiceType().setStatus(active);
+            c.getServiceIssue().getDeviceTypes().add(model.getDeviceType());
+            switch (field) {
+                case 0 -> c.setStatus(inactive);
+                case 1 -> model.setStatus(inactive);
+                case 2 -> model.getDeviceType().setStatus(inactive);
+                case 3 -> c.getServiceIssue().setStatus(inactive);
+                case 4 -> c.getServiceType().setStatus(inactive);
+                case 5 -> c.getServiceIssue().getDeviceTypes().clear();
+            }
+            assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(device(40L)))));
+        }
+        verifyNoInteractions(customers);
+    }
+
+    @Test
+    void replacementRequiresActiveCatalogPart() {
+        var c = catalog(40L, model);
+        c.getServiceType().setCode(ServiceTypeCode.REPLACEMENT);
+        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(device(40L)))));
+        var part = new com.applecare.apple_repair_service.entity.Part();
+        part.setStatus(com.applecare.apple_repair_service.enums.ActiveStatus.INACTIVE);
+        c.setPart(part);
+        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(device(40L)))));
+        verifyNoInteractions(customers);
     }
 
     @Test

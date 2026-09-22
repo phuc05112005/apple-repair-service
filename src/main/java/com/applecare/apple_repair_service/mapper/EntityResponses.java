@@ -116,11 +116,14 @@ public class EntityResponses {
     }
 
     public PartUsageResponse map(PartUsage e) {
-        return new PartUsageResponse(e.getId(), e.getRepairItem() == null ? null : e.getRepairItem().getId(), e.getPart() == null ? null : e.getPart().getId(), e.getQuantity(), e.getStatus(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getUsedAt(), e.getReversedBy() == null ? null : e.getReversedBy().getId(), e.getReversedAt(), e.getReversalNote());
+        return new PartUsageResponse(e.getId(), e.getRepairItem() == null ? null : e.getRepairItem().getId(), e.getPart() == null ? null : e.getPart().getId(), e.getQuantity(), e.getStatus(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getUsedAt(), e.getReversedBy() == null ? null : e.getReversedBy().getId(), e.getReversedAt(), e.getReversalNote(), e.getDefectiveReturnNote());
     }
 
     public RepairItemResponse map(RepairItem e) {
-        return new RepairItemResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getServiceCatalogItem() == null ? null : e.getServiceCatalogItem().getId(), e.getItemNameSnapshot(), e.getApprovalStatus(), e.getBasePrice(), e.getFinalPrice(), e.getApprovalRecordedBy() == null ? null : e.getApprovalRecordedBy().getId(), e.getApprovalDecisionAt(), e.getApprovalNote(), e.getWarrantyStartDate(), e.getWarrantyEndDate(), e.getWarrantySourceItem() == null ? null : e.getWarrantySourceItem().getId(), e.getWarrantyDecision(), e.getWarrantyDecisionNote(), e.getCreatedAt(), e.getUpdatedAt());
+        return new RepairItemResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getServiceCatalogItem() == null ? null : e.getServiceCatalogItem().getId(), e.getItemNameSnapshot(), e.getApprovalStatus(), e.getBasePrice(), e.getFinalPrice(), e.getApprovalRecordedBy() == null ? null : e.getApprovalRecordedBy().getId(), e.getApprovalDecisionAt(), e.getApprovalNote(), e.getWarrantyStartDate(), e.getWarrantyEndDate(), e.getWarrantySourceItem() == null ? null : e.getWarrantySourceItem().getId(), e.getWarrantyDecision(), e.getWarrantyDecisionNote(), e.getCreatedAt(), e.getUpdatedAt(), e.getConfirmationMethod(), e.getWarrantyRemedy(),
+                e.getWarrantyReplacementCatalog() == null ? null : e.getWarrantyReplacementCatalog().getId(),
+                (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart() == null ? null
+                : (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart().getId());
     }
 
     public ServiceCatalogItemResponse map(ServiceCatalogItem e) {
@@ -142,7 +145,7 @@ public class EntityResponses {
     }
 
     public ServiceTicketResponse map(ServiceTicket e) {
-        return new ServiceTicketResponse(e.getId(), e.getTicketCode(), e.getAppointmentDevice() == null ? null : e.getAppointmentDevice().getId(), e.getCustomerDevice() == null ? null : e.getCustomerDevice().getId(), e.getBranch() == null ? null : e.getBranch().getId(), e.getCreatedBy() == null ? null : e.getCreatedBy().getId(), e.getStatus(), e.getReceivedCondition(), e.getInspectionResult(), e.getInspectedBy() == null ? null : e.getInspectedBy().getId(), e.getDiscountPercent(), e.getPaymentStatus(), e.getPaymentMethod(), e.getPaidAt(), e.getHandedOverBy() == null ? null : e.getHandedOverBy().getId(), e.getHandedOverAt(), e.getCancelReason(), e.getReceivedAt(), e.getUpdatedAt());
+        return new ServiceTicketResponse(e.getId(), e.getTicketCode(), e.getAppointmentDevice() == null ? null : e.getAppointmentDevice().getId(), e.getCustomerDevice() == null ? null : e.getCustomerDevice().getId(), e.getBranch() == null ? null : e.getBranch().getId(), e.getCreatedBy() == null ? null : e.getCreatedBy().getId(), e.getStatus(), e.getReceivedCondition(), e.getInspectionResult(), e.getInspectedBy() == null ? null : e.getInspectedBy().getId(), e.getDiscountPercent(), e.getPaymentStatus(), e.getPaymentMethod(), e.getPaidAt(), e.getHandedOverBy() == null ? null : e.getHandedOverBy().getId(), e.getHandedOverAt(), e.getCancelReason(), e.getReceivedAt(), e.getUpdatedAt(), e.getAuthorizedScope(), com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(e));
     }
 
     public ServiceTypeResponse map(ServiceType e) {

@@ -26,6 +26,6 @@ public record ServiceTicketResponse(
         LocalDateTime handedOverAt,
         String cancelReason,
         LocalDateTime receivedAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt, String authorizedScope, TicketTimingResponse timing
 ) {
 }

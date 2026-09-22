@@ -53,9 +53,9 @@ class TicketCoreServiceTest {
     final TicketCodeGenerator codes = mock(TicketCodeGenerator.class);
     final List<ServiceStatusHistory> history = new ArrayList<>();
     final List<RepairItem> items = new ArrayList<>();
-    final ServiceStatusService status = new ServiceStatusService(histories, assignments, TestData.CLOCK);
+    final ServiceStatusService status = new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class));
     final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
-    final ServiceTicketService service = new ServiceTicketService(tickets, repairs, booking, histories, customers, access, rules, new EntityResponses(), status, codes, new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), new PaymentService(repairs, access, rules, TestData.CLOCK));
+    final ServiceTicketService service = new ServiceTicketService(tickets, repairs, booking, histories, customers, access, rules, new EntityResponses(), status, codes, new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), new PaymentService(repairs, access, rules, TestData.CLOCK), mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
 
     @BeforeEach
     void setup() {
@@ -151,6 +151,34 @@ class TicketCoreServiceTest {
     }
 
     @Test
+    void higherPriceWithPhoneConsentProceedsWithoutWaiting() {
+        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var old = TestData.item(2, t, ApprovalStatus.APPROVED);
+        old.setItemNameSnapshot("Repair"); old.setBasePrice(BigDecimal.TEN);
+        items.add(old);
+        when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(old.getServiceCatalogItem());
+        service.recordInspection(1L, new RecordInspectionRequest("Phát sinh chi phí", 1L, false,
+                List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, new BigDecimal("20.00"), null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.PHONE, "Khách đồng ý báo giá"));
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertEquals(ApprovalStatus.REJECTED, old.getApprovalStatus());
+        assertEquals(ApprovalStatus.APPROVED, items.getLast().getApprovalStatus());
+    }
+
+    @Test
+    void removingAgreedServiceWithDirectConsentDoesNotForceWaiting() {
+        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var retained = TestData.item(2, t, ApprovalStatus.APPROVED);
+        var removed = TestData.item(3, t, ApprovalStatus.APPROVED);
+        items.addAll(List.of(retained, removed));
+        when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(retained.getServiceCatalogItem());
+        service.recordInspection(1L, new RecordInspectionRequest("Đổi phạm vi", 1L, false,
+                List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.DIRECT, "Khách đổi phương án"));
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertEquals(ApprovalStatus.REJECTED, removed.getApprovalStatus());
+        assertTrue(items.stream().anyMatch(item -> item.getApprovalStatus() == ApprovalStatus.APPROVED));
+    }
+
+    @Test
     void unchangedInspectionReusesExistingItem() {
         var t = ticket(ServiceTicketStatus.INSPECTING);
         var old = TestData.item(2, t, ApprovalStatus.APPROVED);
@@ -167,7 +195,11 @@ class TicketCoreServiceTest {
     }
 
     void inspect(boolean required) {
-        ticket(ServiceTicketStatus.INSPECTING);
+        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var agreed = TestData.item(2, t, ApprovalStatus.APPROVED);
+        agreed.setItemNameSnapshot("Repair");
+        agreed.setBasePrice(BigDecimal.TEN);
+        if (!required) items.add(agreed);
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(TestData.catalog(2));
         service.recordInspection(1L, new RecordInspectionRequest("Inspected", 1L, required, List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null))));
     }

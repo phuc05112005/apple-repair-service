@@ -72,6 +72,8 @@ class HttpWorkflowIntegrationTest {
         if(f==null || f.branch==null || f.branch.getId()==null) return;
         tx(()-> {
             for(var entry:List.of(
+                    new String[]{"DefectivePartReturn", "e.branch.id"},
+                    new String[]{"ServiceTimeEstimateHistory", "e.serviceTicket.branch.id"},
                     new String[]{"ServiceFeedback","e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction","e.serviceTicket.branch.id"},
                     new String[]{"Transfer","e.fromAssignment.serviceTicket.branch.id"},

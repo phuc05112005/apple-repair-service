@@ -14,6 +14,6 @@ public record PartUsageResponse(
         LocalDateTime usedAt,
         Long reversedById,
         LocalDateTime reversedAt,
-        String reversalNote
+        String reversalNote, String defectiveReturnNote
 ) {
 }

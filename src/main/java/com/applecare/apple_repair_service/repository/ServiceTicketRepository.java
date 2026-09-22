@@ -9,6 +9,9 @@ import java.util.Optional;
 
 
 public interface ServiceTicketRepository extends JpaRepository<ServiceTicket, Long> {
+ @org.springframework.data.jpa.repository.Query("select t from ServiceTicket t join fetch t.branch where t.status=com.applecare.apple_repair_service.enums.ServiceTicketStatus.WAITING_ASSIGNMENT order by t.receivedAt,t.id")
+ List<ServiceTicket> findUnassignedForTiming();
+
 
     @org.springframework.data.jpa.repository.Query("select new com.applecare.apple_repair_service.dto.response.StatusCountResponse(t.status, count(t)) from ServiceTicket t where t.receivedAt >= :from and t.receivedAt < :until and (:branchId is null or t.branch.id = :branchId) and (:deviceTypeId is null or t.customerDevice.deviceModel.deviceType.id = :deviceTypeId) group by t.status")
     java.util.List<com.applecare.apple_repair_service.dto.response.StatusCountResponse> countCurrentStatuses(@org.springframework.data.repository.query.Param("from") java.time.LocalDateTime from,
@@ -46,6 +49,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicket, Lo
                    or lower(t.customerDevice.deviceModel.name) like lower(concat('%', :term, '%')))
             order by t.receivedAt desc, t.id desc
             """)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"customerDevice.customer","customerDevice.deviceModel","branch"})
     List<ServiceTicket> findOperationalTickets(
             @org.springframework.data.repository.query.Param("branchId") Long branchId,
             @org.springframework.data.repository.query.Param("status") ServiceTicketStatus status,

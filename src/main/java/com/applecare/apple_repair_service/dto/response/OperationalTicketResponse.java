@@ -22,6 +22,6 @@ public record OperationalTicketResponse(
         long estimatedDurationMinutes,
         Long activeAssignmentId,
         Long activeTechnicianId,
-        String activeTechnicianName
+        String activeTechnicianName, LocalDateTime assignedAt, TicketTimingResponse timing
 ) {
 }

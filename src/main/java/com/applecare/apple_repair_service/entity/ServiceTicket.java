@@ -83,6 +83,12 @@ public class ServiceTicket {
     @Column(name = "received_condition", nullable = false, columnDefinition = "TEXT")
     private String receivedCondition;
 
+    @Column(name = "customer_reported_issue", columnDefinition = "TEXT")
+    private String customerReportedIssue;
+
+    @Column(name = "authorized_scope", columnDefinition = "TEXT")
+    private String authorizedScope;
+
     @Column(name = "inspection_result", columnDefinition = "TEXT")
     private String inspectionResult;
 
@@ -123,6 +129,29 @@ public class ServiceTicket {
     @NotNull
     @Column(name = "received_at", nullable = false)
     private LocalDateTime receivedAt;
+
+    @Column(name="assignment_due_at")
+    private LocalDateTime assignmentDueAt;
+
+    @Column(name="initial_estimated_start_at")
+    private LocalDateTime initialEstimatedStartAt;
+
+    @Column(name="estimated_start_at")
+    private LocalDateTime estimatedStartAt;
+
+    @Column(name="initial_estimated_completion_at")
+    private LocalDateTime initialEstimatedCompletionAt;
+
+    @Column(name="estimated_completion_at")
+    private LocalDateTime estimatedCompletionAt;
+
+    @Column(name="actual_repair_started_at")
+    private LocalDateTime actualRepairStartedAt;
+
+    @Column(name="actual_repair_completed_at")
+    private LocalDateTime actualRepairCompletedAt;
+    @Column(name="estimated_duration_minutes") private Long estimatedDurationMinutes;
+    @Enumerated(EnumType.STRING) @Column(name="estimate_source") private com.applecare.apple_repair_service.enums.EstimateSource estimateSource;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)

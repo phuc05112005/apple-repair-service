@@ -48,6 +48,7 @@ public class InventoryService {
     private final BusinessRules rules;
     private final EntityResponses mapper;
     private final Clock clock;
+    private final DefectiveInventoryService defectiveInventory;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
@@ -83,6 +84,21 @@ public class InventoryService {
         BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.REPAIRING || ticket.getStatus() == ServiceTicketStatus.WAITING_PART, "Part usage requires an ongoing repair");
         var part = lockPart(r.partId());
         var branch = branch(ticket.getBranch().getId());
+        if (item.getServiceCatalogItem().getServiceType().getCode() == com.applecare.apple_repair_service.enums.ServiceTypeCode.REPLACEMENT) {
+            var expected = item.getServiceCatalogItem().getPart();
+            BusinessRules.require(expected != null && expected.getId().equals(part.getId()),
+                    "Linh kiện sử dụng phải khớp với phương án thay thế đã được duyệt.");
+        }
+        boolean warrantyReplacement = item.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT;
+        if (item.getWarrantySourceItem() != null) {
+            BusinessRules.require(item.getWarrantyDecision() == com.applecare.apple_repair_service.enums.WarrantyDecision.APPROVED && warrantyReplacement,
+                    "Ghi nhận phương án thay bảo hành trước khi xuất linh kiện; dịch vụ trả phí cần hạng mục riêng.");
+            BusinessRules.require(item.getWarrantyReplacementCatalog() != null && item.getWarrantyReplacementCatalog().getPart().getId().equals(part.getId()),
+                    "Linh kiện phải đúng phương án thay bảo hành.");
+            BusinessRules.required(r.defectiveReturnNote(), "Nhập mô tả linh kiện lỗi thu hồi (không nhập lại kho sử dụng)");
+        } else if (BusinessRules.text(r.defectiveReturnNote()) != null)
+            BusinessRules.require(item.getServiceCatalogItem().getServiceType().getCode() == com.applecare.apple_repair_service.enums.ServiceTypeCode.REPLACEMENT,
+                    "Thu hồi linh kiện gắn với hạng mục thay thế.");
         var actor = access.get(User.class, r.recordedByUserId());
         var stock = lockedStock(branch, part);
         decrease(stock, r.quantity());
@@ -92,8 +108,14 @@ public class InventoryService {
         usage.setQuantity(r.quantity());
         usage.setRecordedBy(actor);
         usage.setUsedAt(LocalDateTime.now(clock));
+        usage.setDefectiveReturnNote(BusinessRules.text(r.defectiveReturnNote()));
         usages.saveAndFlush(usage);
         movement(part, InventoryTransactionType.USAGE_OUT, branch, null, r.quantity(), usage, actor, null);
+        if (usage.getDefectiveReturnNote() != null) {
+            var original = item.getWarrantySourceItem() == null ? null : item.getWarrantySourceItem().getServiceCatalogItem().getPart();
+            var removed = r.defectivePartId() != null ? access.get(Part.class,r.defectivePartId()) : original != null ? original : part;
+            defectiveInventory.record(usage, removed, usage.getDefectiveReturnNote());
+        }
         return mapper.map(usage);
     }
 
@@ -104,6 +126,8 @@ public class InventoryService {
         access.lock(ServiceTicket.class, initial.getRepairItem().getServiceTicket().getId());
         var usage = access.lock(PartUsage.class, r.partUsageId());
         if (usage.getStatus() != PartUsageStatus.ACTIVE) throw new ConflictException("Part usage already reversed");
+        BusinessRules.require(usage.getDefectiveReturnNote() == null,
+                "Đã ghi nhận thay bảo hành và thu hồi linh kiện lỗi. Không thể hoàn linh kiện lỗi vào kho sử dụng.");
         // Returns remain possible when a catalog part has subsequently been deactivated.
         var part = access.lock(Part.class, usage.getPart().getId());
         var branch = access.get(Branch.class, usage.getRepairItem().getServiceTicket().getBranch().getId());

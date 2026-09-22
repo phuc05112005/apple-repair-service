@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import type { ServiceTypeCode } from '../../../api/contracts'
 import { receptionistApi } from '../../../api/receptionistApi'
 import { publicApi } from '../../../api/publicApi'
@@ -26,6 +26,8 @@ export function IntakePage() {
   const [serialNumber, setSerialNumber] = useState('')
   const [storage, setStorage] = useState('')
   const [condition, setCondition] = useState('')
+  const [reportedIssue, setReportedIssue] = useState('')
+  const [authorizedScope, setAuthorizedScope] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [branchId, setBranchId] = useState<number>()
@@ -39,7 +41,7 @@ export function IntakePage() {
   const [serviceId, setServiceId] = useState<number>()
 
   const readyAppointments = useQuery({ queryKey: ['internal', 'appointments', 'ready-for-intake'], queryFn: ({ signal }) => receptionistApi.readyForIntake(signal), enabled: mode === 'appointment' })
-  const readyDevices = (readyAppointments.data ?? []).flatMap(appointment => appointment.devices.map(entry => ({ appointment: appointment.appointment, entry })))
+  const readyDevices = (readyAppointments.isSuccess ? readyAppointments.data : []).flatMap(appointment => appointment.devices.map(entry => ({ appointment: appointment.appointment, entry })))
   const selectedBooking = readyDevices.find(option => option.entry.device.id === appointmentDeviceId)
   const appointmentModelId = selectedBooking?.entry.device.deviceModelId
   const appointmentCatalog = useQuery({ queryKey: ['public', 'catalog', appointmentModelId], queryFn: ({ signal }) => publicApi.catalog({ deviceModelId: appointmentModelId }, signal), enabled: mode === 'appointment' && Boolean(appointmentModelId) })
@@ -99,6 +101,8 @@ export function IntakePage() {
         serialNumber: serialNumber || undefined,
         storage: storage || undefined,
         receivedCondition: condition.trim(),
+        customerReportedIssue: reportedIssue.trim() || undefined,
+        authorizedScope: authorizedScope.trim() || undefined,
         serviceCatalogItemIds: selectedService ? [selectedService.id] : undefined,
       }),
     onSuccess: detail => navigate('/internal/receptionist/tickets/' + detail.ticket.id, { state: { created: true } }),
@@ -129,9 +133,9 @@ export function IntakePage() {
       {mode === 'appointment' ? <><section className="intake-section">
         <div className="intake-section__heading"><span>01</span><div><h2>Thiết bị theo lịch hẹn</h2><p>Tiếp nhận thiết bị sau khi khách đã đến chi nhánh.</p></div></div>
         {readyAppointments.isLoading && <LoadingState label="Đang tải các lịch hẹn đã đến…" />}
-        {readyAppointments.isError && <ErrorState error={readyAppointments.error} retry={() => readyAppointments.refetch()} />}
-        <label className="field"><span>Chọn lịch hẹn và thiết bị đã đến</span><select value={appointmentDeviceId ?? ''} onChange={event => { setAppointmentDeviceId(Number(event.target.value) || undefined); setChangeBookedService(false); resetService() }}><option value="">Chọn khách đã đến để tiếp nhận</option>{readyAppointments.data?.map(appointment => <optgroup key={appointment.appointment.id} label={`Lịch #${appointment.appointment.id} · ${appointment.appointment.customerFullName} · ${appointment.appointment.customerPhone}`}>{appointment.devices.map((entry, index) => <option key={entry.device.id} value={entry.device.id}>Thiết bị {index + 1} · {entry.serviceItems.map(item => item.serviceNameSnapshot).join(', ') || 'Chưa chọn dịch vụ'}</option>)}</optgroup>)}</select></label>
-        {!readyAppointments.isLoading && !readyDevices.length && <p className="intake-hint">Chưa có lịch hẹn nào đã ghi nhận khách đến và đang chờ tiếp nhận thiết bị.</p>}
+        {readyAppointments.isError && <ErrorState error={readyAppointments.error} title="Chưa tải được lịch chờ tiếp nhận" description="Vui lòng tải lại danh sách. Nếu lỗi vẫn còn, bạn có thể kiểm tra trạng thái khách tại trang Lịch hẹn và thử lại sau." retry={() => readyAppointments.refetch()} />}
+        {readyAppointments.isSuccess && readyDevices.length > 0 && <label className="field"><span>Chọn lịch hẹn và thiết bị đã đến</span><select value={appointmentDeviceId ?? ''} onChange={event => { setAppointmentDeviceId(Number(event.target.value) || undefined); setChangeBookedService(false); resetService() }}><option value="">Chọn khách đã đến để tiếp nhận</option>{readyAppointments.data.map(appointment => <optgroup key={appointment.appointment.id} label={`Lịch #${appointment.appointment.id} · ${appointment.appointment.customerFullName} · ${appointment.appointment.customerPhone}`}>{appointment.devices.map((entry, index) => <option key={entry.device.id} value={entry.device.id}>Thiết bị {index + 1} · {entry.serviceItems.map(item => item.serviceNameSnapshot).join(', ') || 'Chưa chọn dịch vụ'}</option>)}</optgroup>)}</select></label>}
+        {readyAppointments.isSuccess && !readyDevices.length && <div className="intake-empty" role="status"><span className="intake-empty__icon" aria-hidden="true">✓</span><h3>Chưa có khách chờ tiếp nhận</h3><p>Lịch hẹn sẽ xuất hiện tại đây sau khi bạn ghi nhận <strong>Khách đã đến</strong>. Những thiết bị đã tiếp nhận sẽ tự rời khỏi danh sách.</p><div className="button-row"><Link className="button button--primary" to="/internal/receptionist/appointments">Xem lịch hẹn</Link><button type="button" className="button button--quiet" disabled={readyAppointments.isFetching} onClick={() => readyAppointments.refetch()}>{readyAppointments.isFetching ? 'Đang tải lại…' : 'Tải lại danh sách'}</button></div></div>}
         {selectedBooking && <div className="intake-booking-card"><strong>Lịch #{selectedBooking.appointment.id} · {selectedBooking.appointment.customerFullName}</strong><span>{selectedBooking.appointment.customerPhone}</span><p>Dịch vụ đã đặt: {selectedBooking.entry.serviceItems.map(item => item.serviceNameSnapshot).join(', ')}</p><small>Ưu đãi của lịch hẹn: {selectedBooking.appointment.discountPercent}%</small></div>}
       </section>
       {selectedBooking && <section className="intake-section intake-section--service">
@@ -150,7 +154,7 @@ export function IntakePage() {
           <div className="intake-section__heading"><span>01</span><div><h2>Khách hàng và thiết bị</h2><p>Chọn đúng dòng máy để xem các dịch vụ đã được cấu hình.</p></div></div>
           <div className="form-grid">
             <label className="field"><span>Họ tên khách hàng</span><input required placeholder="Nhập họ tên khách hàng" value={fullName} onChange={event => setFullName(event.target.value)} /></label>
-            <label className="field"><span>Số điện thoại</span><input required type="tel" placeholder="Ví dụ: 0901234567" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} /></label>
+            <label className="field"><span>Số điện thoại</span><input required type="tel" placeholder="Nhập số điện thoại" inputMode="tel" value={phone} onChange={event => setPhone(event.target.value)} /></label>
             <label className="field"><span>Chi nhánh tiếp nhận</span><select required value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Chọn chi nhánh</option>{branches.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="field"><span>Loại thiết bị</span><select required value={typeId ?? ''} onChange={event => { setTypeId(Number(event.target.value) || undefined); setModelId(undefined); setIssueId(undefined); resetService() }}><option value="">Chọn loại thiết bị</option>{types.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="field"><span>Dòng máy</span><select required disabled={!typeId} value={modelId ?? ''} onChange={event => { setModelId(Number(event.target.value) || undefined); setIssueId(undefined); resetService() }}><option value="">Chọn dòng máy</option>{models.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -158,6 +162,8 @@ export function IntakePage() {
           </div>
         </section>
 
+        <label className="field"><span>Vấn đề khách mô tả ban đầu</span><textarea placeholder="Nhập triệu chứng hoặc vấn đề khách gặp phải" maxLength={5000} value={reportedIssue} onChange={event => setReportedIssue(event.target.value)} /><small>Thông tin này được lưu riêng với tình trạng khi nhận máy và phương án của kỹ thuật viên.</small></label>
+        <label className="field"><span>Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phương án, giới hạn chi phí và điều kiện khách đã đồng ý khi giao máy" maxLength={5000} value={authorizedScope} onChange={event => setAuthorizedScope(event.target.value)} /><small>Kỹ thuật viên có thể xử lý trong phạm vi này; phát sinh ngoài phạm vi cần trao đổi lại với khách.</small></label>
         <section className="intake-section intake-section--service">
           <div className="intake-section__heading"><span>02</span><div><h2>Dịch vụ dự kiến</h2><p>Có thể để trống và xác định dịch vụ sau khi kỹ thuật viên kiểm tra.</p></div></div>
           {catalog.isLoading && issueId && <LoadingState label="Đang tải dịch vụ phù hợp…" />}
@@ -190,17 +196,17 @@ export function IntakePage() {
         </section>
       </>}
 
-      <section className="intake-section">
+      {(mode === 'walk-in' || selectedBooking) && <section className="intake-section">
         <div className="intake-section__heading"><span>03</span><div><h2>Thông tin khi nhận máy</h2><p>Ghi nhận tình trạng ban đầu để đối chiếu trong quá trình xử lý.</p></div></div>
         <div className="form-grid">
-          <label className="field"><span>Số sê-ri <i>Không bắt buộc</i></span><input placeholder="Ví dụ: F2LX…" maxLength={255} value={serialNumber} onChange={event => setSerialNumber(event.target.value)} /></label>
-          <label className="field"><span>Dung lượng lưu trữ <i>Không bắt buộc</i></span><input placeholder="Ví dụ: 128 GB" maxLength={255} value={storage} onChange={event => setStorage(event.target.value)} /></label>
+          <label className="field"><span>Số sê-ri <i>Không bắt buộc</i></span><input placeholder="Nhập số sê-ri thiết bị" maxLength={255} value={serialNumber} onChange={event => setSerialNumber(event.target.value)} /></label>
+          <label className="field"><span>Dung lượng lưu trữ <i>Không bắt buộc</i></span><input placeholder="Nhập dung lượng lưu trữ" maxLength={255} value={storage} onChange={event => setStorage(event.target.value)} /></label>
         </div>
-        <label className="field"><span>Tình trạng khi tiếp nhận</span><textarea placeholder="Mô tả ngoại quan, lỗi hiện tại và phụ kiện khách giao kèm" required maxLength={5000} value={condition} onChange={event => setCondition(event.target.value)} /></label>
-      </section>
+        <label className="field"><span>Tình trạng khi tiếp nhận</span><textarea placeholder="Nhập tình trạng máy và phụ kiện khách giao kèm" required maxLength={5000} value={condition} onChange={event => setCondition(event.target.value)} /></label>
+      </section>}
 
       {create.isError && <ErrorState error={create.error} />}
-      <div className="panel-actions"><button className="button button--primary" disabled={!valid || create.isPending}>{create.isPending ? 'Đang tạo phiếu…' : 'Tạo phiếu dịch vụ'}</button></div>
+      {(mode === 'walk-in' || selectedBooking) && <div className="panel-actions"><button className="button button--primary" disabled={!valid || create.isPending}>{create.isPending ? 'Đang tạo phiếu…' : 'Tạo phiếu dịch vụ'}</button></div>}
     </form>
   </div>
 }

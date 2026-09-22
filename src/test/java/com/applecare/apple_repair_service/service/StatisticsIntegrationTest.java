@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Transactional
 class StatisticsIntegrationTest {
     @Autowired EntityManager em;
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.url}") String datasourceUrl;
     @Autowired StatisticsService statistics;
     final LocalDate day=LocalDate.of(2026,9,11);
     String prefix;
@@ -100,6 +101,7 @@ class StatisticsIntegrationTest {
         var result=statistics.overview(day,lastDay,isolated.getId(),firstType.getId());
         assertEquals(2,result.totalTickets());
         assertEquals(new BigDecimal("30.00"),result.paidRevenue());
-        assertEquals("apple_repair_service",em.createNativeQuery("select database()",String.class).getSingleResult());
+        var database = em.createNativeQuery("select database()", String.class).getSingleResult();
+        assertTrue(datasourceUrl.split("\\?")[0].endsWith("/" + database), "Statistics must use the configured test database");
     }
 }

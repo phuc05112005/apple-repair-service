@@ -14,7 +14,9 @@ export type AssignmentStatus = 'ACTIVE' | 'ENDED'
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'OTHER'
 export type ServiceTypeCode = 'REPAIR' | 'REPLACEMENT' | 'WARRANTY'
 export type TransferStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED'
-export type PartUsageStatus = 'USED' | 'REVERSED'
+export type PartUsageStatus = 'ACTIVE' | 'REVERSED'
+export type ConfirmationMethod = 'DIRECT' | 'PHONE' | 'PRE_AUTHORIZED'
+export type WarrantyRemedy = 'REPAIR' | 'REPLACEMENT'
 
 export interface FieldErrorResponse { field: string; message: string }
 export interface ApiErrorResponse {
@@ -100,7 +102,7 @@ export interface ServiceTicketResponse {
   createdById: number; status: ServiceTicketStatus; receivedCondition: string; inspectionResult: string | null
   inspectedById: number | null; discountPercent: number; paymentStatus: PaymentStatus; paymentMethod: PaymentMethod | null
   paidAt: string | null; handedOverById: number | null; handedOverAt: string | null; cancelReason: string | null
-  receivedAt: string; updatedAt: string
+  receivedAt: string; updatedAt: string; authorizedScope: string | null; timing: TicketTiming
 }
 export interface RepairItemResponse {
   id: number; serviceTicketId: number; serviceCatalogItemId: number; itemNameSnapshot: string
@@ -108,6 +110,7 @@ export interface RepairItemResponse {
   approvalRecordedById: number | null; approvalDecisionAt: string | null; approvalNote: string | null
   warrantyStartDate: string | null; warrantyEndDate: string | null; warrantySourceItemId: number | null
   warrantyDecision: WarrantyDecision; warrantyDecisionNote: string | null; createdAt: string; updatedAt: string
+  confirmationMethod: ConfirmationMethod | null; warrantyRemedy: WarrantyRemedy | null; warrantyReplacementCatalogId: number | null; expectedPartId: number | null
 }
 export interface ServiceStatusHistoryResponse {
   id: number; serviceTicketId: number; fromStatus: ServiceTicketStatus | null; toStatus: ServiceTicketStatus
@@ -126,7 +129,7 @@ export interface OperationalTicketResponse {
   ticketId: number; ticketCode: string; customerFullName: string; customerPhone: string; customerDeviceId: number
   deviceModelId: number; deviceModelName: string; serviceIssues: string[]; requestedServices: string[]
   branchId: number; branchName: string; status: ServiceTicketStatus; receivedAt: string; estimatedDurationMinutes: number
-  activeAssignmentId: number | null; activeTechnicianId: number | null; activeTechnicianName: string | null
+  activeAssignmentId: number | null; activeTechnicianId: number | null; activeTechnicianName: string | null; assignedAt: string | null; timing: TicketTiming
 }
 export interface TechnicianRecommendationResponse {
   technicianId: number; technicianName: string; branchId: number; estimatedWorkloadMinutes: number
@@ -149,7 +152,7 @@ export interface AvailablePartResponse {
 }
 export interface PartUsageResponse {
   id: number; repairItemId: number; partId: number; quantity: number; status: PartUsageStatus
-  recordedById: number; usedAt: string; reversedById: number | null; reversedAt: string | null; reversalNote: string | null
+  recordedById: number; usedAt: string; reversedById: number | null; reversedAt: string | null; reversalNote: string | null; defectiveReturnNote: string | null
 }
 export interface TicketPaymentSummaryResponse {
   serviceTicketId: number; totalAmount: number; paymentStatus: PaymentStatus; paymentMethod: PaymentMethod | null; paidAt: string | null
@@ -179,3 +182,20 @@ export interface InventoryTransactionResponse {
 }
 export type TechnicianScheduleStatus = 'WORKING' | 'OFF' | 'CANCELLED'
 export interface TechnicianScheduleResponse { id: number; technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: TechnicianScheduleStatus; createdAt: string; updatedAt: string }
+
+export interface TicketTiming {
+ assignmentDueAt: string | null; initialEstimatedStartAt: string | null; estimatedStartAt: string | null
+ initialEstimatedCompletionAt: string | null; estimatedCompletionAt: string | null; estimatedDurationMinutes: number | null
+ actualRepairStartedAt: string | null; actualRepairCompletedAt: string | null; estimateSource: 'STANDARD' | 'MANUAL' | null
+}
+export interface TimeEstimateHistory {
+ id: number; technicianId: number | null; estimatedStartAt: string | null; estimatedCompletionAt: string | null
+ estimatedDurationMinutes: number | null; estimateSource: 'STANDARD' | 'MANUAL'; reason: string; breakMinutesSnapshot: number
+ approvedPriceSnapshot: number | null; createdAt: string; createdById: number | null
+}
+export type DefectivePartStatus = 'IN_STOCK' | 'SENT_TO_SUPPLIER' | 'RESOLVED' | 'DISPOSED'
+export interface DefectivePartReturn {
+ id: number; branchId: number; branchName: string; partId: number; partName: string; sourcePartUsageId: number
+ repairItemId: number; ticketId: number; ticketCode: string; quantity: number; status: DefectivePartStatus
+ reason: string; note: string | null; recordedById: number; receivedAt: string; statusChangedAt: string | null
+}

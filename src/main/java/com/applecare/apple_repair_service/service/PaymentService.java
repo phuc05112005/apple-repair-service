@@ -14,7 +14,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,8 +30,13 @@ public class PaymentService {
 
     public BigDecimal calculateTicketTotal(Long id) {
         access.get(ServiceTicket.class, id);
-        return items.findAllByServiceTicket_Id(id).stream().filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED).map(RepairItem::getFinalPrice)
-                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        var approved = items.findAllByServiceTicket_Id(id).stream()
+                .filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED).toList();
+        BusinessRules.require(approved.stream().allMatch(item -> item.getFinalPrice() != null),
+                "Phiếu còn hạng mục chưa xác định giá. Vui lòng cập nhật giá trước khi thanh toán.");
+        // Explicit zero prices, including approved warranty decisions, remain valid.
+        return approved.stream().map(RepairItem::getFinalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
     }
 
     public TicketPaymentSummaryResponse getSummary(Long id) {

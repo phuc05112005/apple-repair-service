@@ -21,6 +21,12 @@ public class TechnicianOperationsService {
     private final InventoryService inventory;
     private final RepairDurationService durations;
     private final WarrantyService warranties;
+    private final RepairItemService repairItems;
+
+    public RepairItemResponse approval(Long itemId, ApprovalCommand request) {
+        policy.requireItem(itemId);
+        return repairItems.recordApprovalDecision(itemId, new ApprovalDecisionRequest(request.decision(), actor.id(), request.note(), request.confirmationMethod()));
+    }
 
     public ServiceTicketDetailResponse startInspection(Long id) {
         policy.requireActiveTechnician(id);
@@ -29,7 +35,7 @@ public class TechnicianOperationsService {
     public ServiceTicketDetailResponse inspect(Long id, InspectionCommand request) {
         policy.requireActiveTechnician(id);
         return tickets.recordInspection(id,new RecordInspectionRequest(request.inspectionResult(),actor.id(),
-                request.requiresCustomerApproval(),request.items()));
+                request.requiresCustomerApproval(),request.items(),request.confirmationMethod(),request.confirmationNote()));
     }
     public ServiceTicketDetailResponse waitForPart(Long id, NoteCommand request) {
         policy.requireActiveTechnician(id);
@@ -49,7 +55,7 @@ public class TechnicianOperationsService {
     }
     public PartUsageResponse usePart(Long itemId, PartUsageCommand request) {
         policy.requireItem(itemId);
-        return inventory.usePart(new UsePartRequest(itemId,request.partId(),request.quantity(),actor.id()));
+        return inventory.usePart(new UsePartRequest(itemId,request.partId(),request.quantity(),actor.id(),request.defectiveReturnNote(),request.defectivePartId()));
     }
     public PartUsageResponse reverseUsage(Long usageId, NoteCommand request) {
         policy.requireUsage(usageId);

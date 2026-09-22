@@ -7,13 +7,13 @@ import { publicApi } from '../../../api/publicApi'
 import { EmptyState, ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { appointmentStatusLabels, appointmentStatusTones } from '../../../types/labels'
-import { formatDateTime, formatMoney } from '../../../utils/format'
+import { businessDate, formatDateTime, formatMoney } from '../../../utils/format'
 
 const statuses: AppointmentStatus[] = ['PENDING_CONFIRMATION', 'CONFIRMED', 'ARRIVED', 'CANCELLED', 'EXPIRED']
 
 export function AppointmentsPage() {
   const queryClient = useQueryClient()
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const today = useMemo(() => businessDate(), [])
   const [branchId, setBranchId] = useState<number>()
   const [date, setDate] = useState(today)
   const [status, setStatus] = useState<AppointmentStatus>()

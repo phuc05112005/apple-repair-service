@@ -78,19 +78,25 @@ class ReceptionistApiIntegrationTest {
     }
     @Test void technicianCannotTakeReceptionistPaymentOrAppointmentCommands() throws Exception {
         String bearer="Bearer "+login(f.technician);
+        mvc.perform(get("/api/v1/internal/appointments/ready-for-intake").header("Authorization",bearer))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/internal/service-tickets/1/payment").header("Authorization",bearer)
                 .contentType("application/json").content("{\"paymentMethod\":\"CASH\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/internal/appointments/1/confirm").header("Authorization",bearer)).andExpect(status().isForbidden());
     }
 
     @Test void arrivedBookingCanChangeRepairToReplacementAndKeepOnlineDiscount() throws Exception {
-        var replacementType = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
-                .setParameter("code", ServiceTypeCode.REPLACEMENT).getSingleResult();
+        var replacementType = new ServiceType();
+        replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName(f.prefix + "replacement type");
+        em.persist(replacementType);
+        var part = new Part(); part.setName(f.prefix + "part"); part.setPartCode(f.prefix + "part");
+        part.setSalePrice(new BigDecimal("200.00")); em.persist(part);
         var replacement = new ServiceCatalogItem();
         replacement.setName(f.prefix + " replacement");
         replacement.setDeviceModel(f.model);
         replacement.setServiceIssue(f.issue);
         replacement.setServiceType(replacementType);
+        replacement.setPart(part);
         replacement.setConfiguredPrice(new BigDecimal("200.00"));
         replacement.setWarrantyDays(30);
         em.persist(replacement);
@@ -163,6 +169,7 @@ class ReceptionistApiIntegrationTest {
         replacement.setDeviceModel(f.model);
         replacement.setServiceIssue(f.issue);
         replacement.setServiceType(replacementType);
+        replacement.setPart(part);
         replacement.setPart(part);
         replacement.setWarrantyDays(0);
         em.persist(replacement);

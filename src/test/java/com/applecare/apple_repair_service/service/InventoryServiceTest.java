@@ -36,7 +36,7 @@ class InventoryServiceTest {
     final PartUsageRepository usages = mock(PartUsageRepository.class);
     final InventoryTransactionRepository transactions = mock(InventoryTransactionRepository.class);
     final DomainAccess access = mock(DomainAccess.class);
-    final InventoryService service = new InventoryService(inventory, usages, transactions, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK);
+    final InventoryService service = new InventoryService(inventory, usages, transactions, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK, mock(DefectiveInventoryService.class));
     final Part part = new Part();
     final BranchInventory stock = new BranchInventory();
     final Branch branch = TestData.branch(1);

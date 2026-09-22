@@ -20,3 +20,9 @@ export const ticketStatusTones: Record<ServiceTicketStatus, StatusTone> = {
   WAITING_HANDOVER: 'cyan', HANDED_OVER: 'success', CANCELLED: 'neutral',
 }
 export const paymentStatusLabels: Record<PaymentStatus, string> = { PENDING: 'Chưa thanh toán', PAID: 'Đã thanh toán' }
+
+export const confirmationLabels: Record<import('../api/contracts').ConfirmationMethod, string> = {
+  DIRECT: 'Trao đổi trực tiếp', PHONE: 'Qua điện thoại', PRE_AUTHORIZED: 'Trong phạm vi đã cho phép',
+}
+
+export const defectiveStatusLabels: Record<import('../api/contracts').DefectivePartStatus, string> = { IN_STOCK: 'Đang giữ tại chi nhánh', SENT_TO_SUPPLIER: 'Đã gửi nhà cung cấp', RESOLVED: 'Đã xử lý', DISPOSED: 'Đã tiêu hủy' }
