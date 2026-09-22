@@ -43,6 +43,10 @@ public class RepairItemService {
         var item = access.lock(RepairItem.class, id);
         BusinessRules.require(t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL && item.getApprovalStatus() == ApprovalStatus.PENDING, "Approval is no longer pending");
         var actor = access.get(User.class, r.recordedByUserId());
+        BusinessRules.require(r.confirmationMethod() != null, "Chọn hình thức ghi nhận ý kiến khách hàng.");
+        if (r.confirmationMethod() == com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED)
+            BusinessRules.required(t.getAuthorizedScope(), "Phiếu chưa có phạm vi cho phép trước");
+        item.setConfirmationMethod(r.confirmationMethod());
         item.setApprovalStatus(r.decision());
         item.setApprovalRecordedBy(actor);
         item.setApprovalDecisionAt(LocalDateTime.now(clock));

@@ -34,7 +34,7 @@ public class ReceptionistController {
             @RequestParam(required=false) LocalDate date, @RequestParam(required=false) AppointmentStatus status) {
         return appointments.list(branchId,date,status);
     }
-    @GetMapping("/appointments/{id}")
+    @GetMapping("/appointments/{id:[0-9]+}")
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
     public AppointmentDetailResponse appointment(@PathVariable @Positive Long id) { return appointments.getById(id); }
     @GetMapping("/appointments/ready-for-intake")
@@ -79,7 +79,7 @@ public class ReceptionistController {
     }
     @PostMapping("/repair-items/{id}/approval")
     public RepairItemResponse approval(@PathVariable @Positive Long id, @Valid @RequestBody ApprovalCommand request) {
-        return items.recordApprovalDecision(id,new ApprovalDecisionRequest(request.decision(),actor.id(),request.note()));
+        return items.recordApprovalDecision(id,new ApprovalDecisionRequest(request.decision(),actor.id(),request.note(),request.confirmationMethod()));
     }
     @GetMapping("/service-tickets/{id}/payment-summary")
     public TicketPaymentSummaryResponse paymentSummary(@PathVariable @Positive Long id) { return payments.getSummary(id); }

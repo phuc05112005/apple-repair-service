@@ -28,7 +28,7 @@ export function AdminDataTable<T>({
   rowKey,
   columns,
   searchableText,
-  searchPlaceholder = 'Tìm kiếm...',
+  searchPlaceholder = 'Nhập nội dung cần tìm',
   filters = [],
   sortOptions = [],
   emptyText = 'Không tìm thấy dữ liệu phù hợp.',

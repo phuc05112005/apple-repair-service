@@ -38,6 +38,7 @@ public class TransferService {
     private final TechnicianEligibility eligibility;
     private final EntityResponses mapper;
     private final Clock clock;
+    private final ServiceTimingService timing;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public TransferResponse requestTransfer(CreateTransferRequest r) {
@@ -146,6 +147,7 @@ public class TransferService {
         next.setSource(AssignmentSource.TRANSFER);
         next.setAssignedAt(LocalDateTime.now(clock));
         assignments.save(next);
+        timing.transferred(old.getServiceTicket(), actor);
         t.setStatus(TransferStatus.ACCEPTED);
         t.setRespondedBy(actor);
         t.setRespondedAt(LocalDateTime.now(clock));

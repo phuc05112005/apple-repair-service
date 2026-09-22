@@ -66,7 +66,7 @@ public class AppointmentService {
         PricePolicy.discounted(null, discount);
         // Validate the complete plan before resolving/creating the customer.
         for (var d : r.devices()) {
-            access.get(DeviceModel.class, d.deviceModelId());
+            CatalogPolicy.requireModel(access.get(DeviceModel.class, d.deviceModelId()));
             var seen = new HashSet<Long>();
             for (var i : d.serviceItems()) {
                 BusinessRules.require(seen.add(i.serviceCatalogItemId()), "Duplicate service for booking device");
@@ -113,6 +113,8 @@ public class AppointmentService {
 
     private AppointmentSlot validSlot(Long id) {
         var s = access.get(AppointmentSlot.class, id);
+        BusinessRules.require(s.getBranch() != null && s.getBranch().getStatus() == ActiveStatus.ACTIVE,
+                "Chi nhánh của khung giờ đã ngừng hoạt động. Vui lòng chọn khung giờ khác.");
         BusinessRules.require(s.getStatus() == AppointmentSlotStatus.OPEN, "Slot is closed");
         BusinessRules.require(!LocalDateTime.of(s.getAppointmentDate(), s.getStartTime()).isBefore(LocalDateTime.now(clock)), "Slot is in the past");
         return s;
@@ -120,8 +122,7 @@ public class AppointmentService {
 
     private ServiceCatalogItem validCatalog(Long id, Long modelId) {
         var c = access.get(ServiceCatalogItem.class, id);
-        BusinessRules.require(c.getStatus() == ActiveStatus.ACTIVE, "Catalog is inactive");
-        BusinessRules.require(c.getDeviceModel().getId().equals(modelId), "Catalog does not match device model");
+        CatalogPolicy.requireUsable(c, modelId);
         return c;
     }
 

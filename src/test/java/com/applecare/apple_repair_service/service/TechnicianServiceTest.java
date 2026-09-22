@@ -182,7 +182,7 @@ class TechnicianServiceTest {
             when(access.lock(Transfer.class, 9L)).thenReturn(t);
             return t;
         });
-        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(), TestData.CLOCK);
+        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(), TestData.CLOCK, mock(ServiceTimingService.class));
         var request = new CreateTransferRequest(5L, 2L, 1L, direct ? TransferMode.DIRECT : TransferMode.REQUEST, null);
         var result = direct ? service.directTransfer(request) : service.requestTransfer(request);
         if (!direct) {

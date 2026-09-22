@@ -56,7 +56,7 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler({MissingServletRequestParameterException.class,MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ApiErrorResponse> invalidParameter(Exception ex,HttpServletRequest r) {
-        return error(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR","Missing or invalid request parameter",r,List.of());
+        return error(HttpStatus.BAD_REQUEST,"VALIDATION_ERROR","Thông tin gửi lên chưa đầy đủ hoặc chưa đúng định dạng. Vui lòng kiểm tra và thử lại.",r,List.of());
     }
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiErrorResponse> authentication(AuthenticationException ex,HttpServletRequest r) {
@@ -91,4 +91,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(new ApiErrorResponse(clock.instant(),status.value(),status.getReasonPhrase(),code,message,r.getRequestURI(),fields));
     }
 }
-

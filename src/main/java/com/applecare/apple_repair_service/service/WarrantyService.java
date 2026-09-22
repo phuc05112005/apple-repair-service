@@ -50,6 +50,8 @@ public class WarrantyService {
         var item = access.lock(RepairItem.class, id);
         BusinessRules.require(ticket.getPaymentStatus() != PaymentStatus.PAID && (ticket.getStatus() == ServiceTicketStatus.REPAIRING || ticket.getStatus() == ServiceTicketStatus.WAITING_APPROVAL), "Warranty decision requires an inspected, unsettled repair");
         if (item.getWarrantyDecision() != null) throw new ConflictException("Warranty decision already recorded");
+        BusinessRules.require(item.getApprovalStatus() != com.applecare.apple_repair_service.enums.ApprovalStatus.REJECTED,
+                "Hạng mục không còn nằm trong phương án thực hiện.");
         var source = item.getWarrantySourceItem();
         BusinessRules.require(source != null, "Warranty source is required");
         policy.checkChain(item);
@@ -58,6 +60,17 @@ public class WarrantyService {
         BusinessRules.require(item.getServiceCatalogItem().getServiceType().getCode() == ServiceTypeCode.WARRANTY, "Warranty service catalog required");
         if (r.decision() == WarrantyDecision.APPROVED) {
             BusinessRules.require(policy.eligible(source, LocalDate.now(clock)), "Warranty is not eligible");
+            var remedy = r.remedy() == null ? com.applecare.apple_repair_service.enums.WarrantyRemedy.REPAIR : r.remedy();
+            if (remedy == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT) {
+                BusinessRules.require(r.replacementCatalogItemId() != null, "Chọn phương án linh kiện thay bảo hành.");
+                var replacement = access.get(com.applecare.apple_repair_service.entity.ServiceCatalogItem.class, r.replacementCatalogItemId());
+                CatalogPolicy.requireUsable(replacement, ticket.getCustomerDevice().getDeviceModel().getId());
+                BusinessRules.require(replacement.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
+                        && replacement.getServiceIssue().getId().equals(source.getServiceCatalogItem().getServiceIssue().getId()),
+                        "Phương án thay bảo hành phải đúng hạng mục gốc và dòng máy.");
+                item.setWarrantyReplacementCatalog(replacement);
+            } else BusinessRules.require(r.replacementCatalogItemId() == null, "Sửa bảo hành không chọn phương án thay linh kiện.");
+            item.setWarrantyRemedy(remedy);
             item.setFinalPrice(new BigDecimal("0.00"));
         } else BusinessRules.required(r.note(), "Warranty rejection reason");
         item.setWarrantyDecision(r.decision());

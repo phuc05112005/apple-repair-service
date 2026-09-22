@@ -10,7 +10,8 @@ public class AdminReferenceRepository {
     private final EntityManager entityManager;
 
     public boolean branchIsReferenced(Long id) {
-        return exists("select count(s) from AppointmentSlot s where s.branch.id = :id", id)
+        return exists("select count(d) from DefectivePartReturn d where d.branch.id = :id", id)
+                || exists("select count(s) from AppointmentSlot s where s.branch.id = :id", id)
                 || exists("select count(s) from TechnicianSchedule s where s.branch.id = :id", id)
                 || exists("select count(i) from BranchInventory i where i.branch.id = :id", id)
                 || exists("select count(t) from InventoryTransaction t where t.sourceBranch.id = :id or t.destinationBranch.id = :id", id)
@@ -37,11 +38,13 @@ public class AdminReferenceRepository {
 
     public boolean serviceCatalogItemIsReferenced(Long id) {
         return exists("select count(i) from AppointmentServiceItem i where i.serviceCatalogItem.id = :id", id)
-                || exists("select count(i) from RepairItem i where i.serviceCatalogItem.id = :id", id);
+                || exists("select count(i) from RepairItem i where i.serviceCatalogItem.id = :id", id)
+                || exists("select count(i) from RepairItem i where i.warrantyReplacementCatalog.id = :id", id);
     }
 
     public boolean partIsReferenced(Long id) {
-        return exists("select count(c) from ServiceCatalogItem c where c.part.id = :id", id)
+        return exists("select count(d) from DefectivePartReturn d where d.part.id = :id", id)
+                || exists("select count(c) from ServiceCatalogItem c where c.part.id = :id", id)
                 || exists("select count(i) from BranchInventory i where i.part.id = :id", id)
                 || exists("select count(u) from PartUsage u where u.part.id = :id", id)
                 || exists("select count(t) from InventoryTransaction t where t.part.id = :id", id);

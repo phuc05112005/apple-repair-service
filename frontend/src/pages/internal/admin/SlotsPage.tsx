@@ -5,10 +5,10 @@ import { adminApi } from '../../../api/adminApi'
 import { ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toast } from '../../../components/Toast'
-import { formatDate, formatTime } from '../../../utils/format'
+import { businessDate, formatDate, formatTime } from '../../../utils/format'
 
 const days = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật']
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => businessDate()
 const newSlot = (): SlotRule => ({ startTime: '09:00', endTime: '10:00', enabled: true })
 
 function RuleEditor({ slots, onChange }: { slots: SlotRule[]; onChange: (slots: SlotRule[]) => void }) {

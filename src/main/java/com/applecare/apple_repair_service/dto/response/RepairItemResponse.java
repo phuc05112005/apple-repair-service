@@ -24,6 +24,7 @@ public record RepairItemResponse(
         WarrantyDecision warrantyDecision,
         String warrantyDecisionNote,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt, com.applecare.apple_repair_service.enums.ConfirmationMethod confirmationMethod,
+        com.applecare.apple_repair_service.enums.WarrantyRemedy warrantyRemedy, Long warrantyReplacementCatalogId, Long expectedPartId
 ) {
 }

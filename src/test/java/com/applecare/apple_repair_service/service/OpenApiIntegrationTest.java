@@ -57,8 +57,10 @@ class OpenApiIntegrationTest {
                 }
             }
             for(var path:mapping.getPatternValues()) for(var method:mapping.getMethodsCondition().getMethods()) {
-                assertNotNull(docs.get("paths").get(path),"Endpoint missing from OpenAPI: "+path);
-                assertNotNull(docs.get("paths").get(path).get(method.name().toLowerCase(Locale.ROOT)));
+                // OpenAPI uses {id}; Spring may additionally constrain that path variable with a regex.
+                var documentedPath = path.replaceAll("\\{([^}:]+):[^}]+}", "{$1}");
+                assertNotNull(docs.get("paths").get(documentedPath),"Endpoint missing from OpenAPI: "+path);
+                assertNotNull(docs.get("paths").get(documentedPath).get(method.name().toLowerCase(Locale.ROOT)));
                 inventory.add(new Endpoint(method.name(),path,handler.getBeanType().getSimpleName(),handler.getMethod().getName(),
                         access,request,handler.getMethod().getGenericReturnType().getTypeName()));
             }
@@ -70,4 +72,3 @@ class OpenApiIntegrationTest {
     }
     record Endpoint(String method,String path,String controller,String handler,String access,String request,String response) {}
 }
-

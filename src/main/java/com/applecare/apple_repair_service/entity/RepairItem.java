@@ -78,6 +78,19 @@ public class RepairItem {
     @Column(name = "approval_note", columnDefinition = "TEXT")
     private String approvalNote;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "confirmation_method")
+    private com.applecare.apple_repair_service.enums.ConfirmationMethod confirmationMethod;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "warranty_remedy")
+    private com.applecare.apple_repair_service.enums.WarrantyRemedy warrantyRemedy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warranty_replacement_catalog_id", foreignKey = @ForeignKey(name = "fk_repair_items_warranty_replacement_catalog"))
+    private ServiceCatalogItem warrantyReplacementCatalog;
+
+
     @Column(name = "warranty_start_date")
     private LocalDate warrantyStartDate;
 

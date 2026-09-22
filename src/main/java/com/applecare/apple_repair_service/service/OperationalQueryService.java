@@ -43,17 +43,20 @@ public class OperationalQueryService {
 
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
     public List<OperationalTicketResponse> queue(Long branchId, ServiceTicketStatus status, String query) {
-        return tickets.findOperationalTickets(branchId, status, BusinessRules.text(query)).stream()
-                .map(ticket -> operational(ticket, active(ticket.getId())))
-                .toList();
+        var selected = tickets.findOperationalTickets(branchId, status, BusinessRules.text(query));
+        var itemMap = batchedItems(selected.stream().map(ServiceTicket::getId).toList());
+        var activeMap = assignments.findTimingAssignments().stream().collect(java.util.stream.Collectors.toMap(a -> a.getServiceTicket().getId(), a -> a));
+        return selected.stream().map(ticket -> operational(ticket, activeMap.get(ticket.getId()), itemMap.getOrDefault(ticket.getId(), List.of()))).toList();
     }
 
     @PreAuthorize("hasRole('TECHNICIAN')")
     public List<OperationalTicketResponse> myWork(ServiceTicketStatus status) {
-        return assignments.findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(actor.id(), AssignmentStatus.ACTIVE).stream()
-                .filter(assignment -> status == null || assignment.getServiceTicket().getStatus() == status)
-                .map(assignment -> operational(assignment.getServiceTicket(), assignment))
-                .toList();
+        var selected = assignments.findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(actor.id(), AssignmentStatus.ACTIVE).stream()
+                .filter(a -> status == null || a.getServiceTicket().getStatus() == status)
+                .sorted(java.util.Comparator.comparingInt((Assignment a) -> a.getServiceTicket().getStatus() == ServiceTicketStatus.REPAIRING ? 0 : 1)
+                        .thenComparing(Assignment::getAssignedAt).thenComparing(Assignment::getId)).toList();
+        var itemMap = batchedItems(selected.stream().map(a -> a.getServiceTicket().getId()).toList());
+        return selected.stream().map(a -> operational(a.getServiceTicket(), a, itemMap.getOrDefault(a.getServiceTicket().getId(), List.of()))).toList();
     }
 
     @PreAuthorize("hasRole('TECHNICIAN')")
@@ -94,16 +97,25 @@ public class OperationalQueryService {
     }
 
     private OperationalTicketResponse operational(ServiceTicket ticket, Assignment assignment) {
+        return operational(ticket, assignment, repairItems.findAllByServiceTicket_Id(ticket.getId()));
+    }
+
+    private java.util.Map<Long,List<com.applecare.apple_repair_service.entity.RepairItem>> batchedItems(List<Long> ids) {
+        if(ids.isEmpty()) return java.util.Map.of();
+        return repairItems.findTimingItems(ids).stream().collect(java.util.stream.Collectors.groupingBy(i -> i.getServiceTicket().getId()));
+    }
+
+    private OperationalTicketResponse operational(ServiceTicket ticket, Assignment assignment, List<com.applecare.apple_repair_service.entity.RepairItem> items) {
         var device = ticket.getCustomerDevice();
         var customer = device.getCustomer();
-        var items = repairItems.findAllByServiceTicket_Id(ticket.getId());
         var issueNames = items.stream().map(item -> item.getServiceCatalogItem().getServiceIssue().getName()).distinct().toList();
         var serviceNames = items.stream().map(item -> item.getItemNameSnapshot()).distinct().toList();
         return new OperationalTicketResponse(ticket.getId(), ticket.getTicketCode(), customer.getFullName(), customer.getPhone(),
                 device.getId(), device.getDeviceModel().getId(), device.getDeviceModel().getName(), issueNames, serviceNames,
                 ticket.getBranch().getId(), ticket.getBranch().getName(), ticket.getStatus(), ticket.getReceivedAt(),
-                recommendations.estimate(ticket.getId()), assignment == null ? null : assignment.getId(),
+                ticket.getEstimatedDurationMinutes() == null ? TechnicianRecommendationService.DEFAULT_JOB_MINUTES : ticket.getEstimatedDurationMinutes(), assignment == null ? null : assignment.getId(),
                 assignment == null ? null : assignment.getTechnician().getId(),
-                assignment == null ? null : assignment.getTechnician().getFullName());
+                assignment == null ? null : assignment.getTechnician().getFullName(), assignment == null ? null : assignment.getAssignedAt(),
+                com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(ticket));
     }
 }

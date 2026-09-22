@@ -107,6 +107,8 @@ class ApplicationTransactionsIntegrationTest {
     @Autowired
     FeedbackService feedback;
     @Autowired
+    RepairItemService repairItemService;
+    @Autowired
     MlPredictionService predictions;
     @Autowired
     TransferService transfers;
@@ -167,6 +169,8 @@ class ApplicationTransactionsIntegrationTest {
             modelId = model.getId();
             var issue = new ServiceIssue();
             issue.setName(prefix);
+            issue.getDeviceTypes().add(type);
+            issue.setMappingInitialized(true);
             persist(issue);
             var types = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class).setParameter("code", ServiceTypeCode.REPAIR).getResultList();
             ServiceType serviceType;
@@ -260,6 +264,8 @@ class ApplicationTransactionsIntegrationTest {
         tx(() -> {
             var branchIds = List.of(branchId, otherBranchId);
             for (var entry : List.of(
+                    new String[]{"DefectivePartReturn", "e.branch.id"},
+                    new String[]{"ServiceTimeEstimateHistory", "e.serviceTicket.branch.id"},
                     new String[]{"ServiceFeedback", "e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction", "e.serviceTicket.branch.id"},
                     new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
@@ -281,6 +287,9 @@ class ApplicationTransactionsIntegrationTest {
             em.createQuery("delete from Customer e where e.phone like :prefix").setParameter("prefix", prefix + "%").executeUpdate();
             em.createQuery("delete from ServiceCatalogItem e where e.deviceModel.id=:id").setParameter("id", modelId).executeUpdate();
             em.createQuery("delete from DeviceModel e where e.id=:id").setParameter("id", modelId).executeUpdate();
+            em.createQuery("select i from ServiceIssue i where i.name=:name", ServiceIssue.class)
+                    .setParameter("name", prefix).getResultList().forEach(i -> i.getDeviceTypes().clear());
+            em.flush();
             for (var entity : List.of("DeviceType", "ServiceIssue", "ServiceType"))
                 em.createQuery("delete from " + entity + " e where e.name=:name").setParameter("name", prefix).executeUpdate();
             em.createQuery("delete from Part e where e.id=:id").setParameter("id", partId).executeUpdate();
@@ -311,7 +320,10 @@ class ApplicationTransactionsIntegrationTest {
         var id = received.ticket().id();
         assignments.assignTechnician(id, new AssignTechnicianRequest(techId, userId, AssignmentSource.MANUAL_OVERRIDE));
         tickets.startInspection(id, userId);
-        tickets.recordInspection(id, new RecordInspectionRequest("Confirmed plan", userId, false, List.of(new InspectionRepairItemRequest(catalogId, new BigDecimal("100"), new BigDecimal("90"), null))));
+        var revised = tickets.recordInspection(id, new RecordInspectionRequest("Confirmed plan", userId, false,
+                List.of(new InspectionRepairItemRequest(catalogId, new BigDecimal("100"), new BigDecimal("90"), null)),
+                com.applecare.apple_repair_service.enums.ConfirmationMethod.DIRECT, "Khách đồng ý phạm vi mới tại cửa hàng"));
+        assertEquals(ServiceTicketStatus.REPAIRING, revised.ticket().status());
         inventory.usePart(new UsePartRequest(tickets.getById(id).repairItems().stream().filter(i -> i.approvalStatus() == ApprovalStatus.APPROVED).findFirst().orElseThrow().id(), partId, 1, userId));
         assertEquals(new BigDecimal("90.00"), payments.calculateTicketTotal(id));
         tickets.finishRepair(id, userId);

@@ -58,8 +58,36 @@ class ClosureServiceTest {
         var pending = TestData.item(3, ticket, ApprovalStatus.PENDING);
         var unknown = TestData.item(4, ticket, ApprovalStatus.APPROVED);
         unknown.setFinalPrice(null);
-        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(approved, rejected, pending, unknown));
+        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(approved, rejected, pending));
         assertEquals(new BigDecimal("100.00"), payments.calculateTicketTotal(1L));
+    }
+
+    @Test
+    void unknownApprovedPriceBlocksPaymentZeroSettlementAndHandover() {
+        var unknown = TestData.item(4, ticket, ApprovalStatus.APPROVED);
+        unknown.setFinalPrice(null);
+        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(unknown));
+        var error = assertThrows(BusinessRuleViolationException.class, () -> payments.recordPayment(1L, new RecordPaymentRequest(PaymentMethod.CASH)));
+        assertTrue(error.getMessage().contains("chưa xác định giá"));
+        assertThrows(BusinessRuleViolationException.class, () -> payments.settleZeroAmountTicket(1L));
+        assertThrows(BusinessRuleViolationException.class, () -> ticketService().handover(1L, new HandoverRequest(1L)));
+        assertEquals(PaymentStatus.PENDING, ticket.getPaymentStatus());
+        assertNull(unknown.getFinalPrice());
+    }
+
+    @Test
+    void explicitFreeAndApprovedWarrantyPricesSettleNormally() {
+        var free = TestData.item(1, ticket, ApprovalStatus.APPROVED);
+        free.setFinalPrice(BigDecimal.ZERO);
+        var warranty = TestData.item(2, ticket, ApprovalStatus.APPROVED);
+        warranty.getServiceCatalogItem().getServiceType().setCode(ServiceTypeCode.WARRANTY);
+        warranty.setWarrantySourceItem(source());
+        warranty.setWarrantyDecision(WarrantyDecision.APPROVED);
+        warranty.setFinalPrice(BigDecimal.ZERO);
+        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(free, warranty));
+        payments.settleZeroAmountTicket(1L);
+        assertEquals(PaymentStatus.PAID, ticket.getPaymentStatus());
+        assertEquals(new BigDecimal("0.00"), payments.calculateTicketTotal(1L));
     }
 
     @Test
@@ -106,7 +134,7 @@ class ClosureServiceTest {
         var histories = mock(ServiceStatusHistoryRepository.class);
         var assignments = mock(AssignmentRepository.class);
         when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
-        return new ServiceTicketService(mock(ServiceTicketRepository.class), repairs, mock(AppointmentServiceItemRepository.class), histories, mock(CustomerIdentity.class), access, rules, new EntityResponses(), new ServiceStatusService(histories, assignments, TestData.CLOCK), mock(TicketCodeGenerator.class), new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), payments);
+        return new ServiceTicketService(mock(ServiceTicketRepository.class), repairs, mock(AppointmentServiceItemRepository.class), histories, mock(CustomerIdentity.class), access, rules, new EntityResponses(), new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class)), mock(TicketCodeGenerator.class), new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), payments, mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
     }
 
     RepairItem source() {

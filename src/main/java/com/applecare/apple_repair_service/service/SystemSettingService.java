@@ -73,6 +73,12 @@ public class SystemSettingService {
                 throw new BusinessRuleViolationException("Invalid grace minutes");
             }
         }
+        if (java.util.Set.of(TimingSettings.BREAK, TimingSettings.ASSIGNMENT, TimingSettings.DEFAULT).contains(key)) {
+            try {
+                int minutes = Integer.parseInt(r.settingValue().trim());
+                BusinessRules.require(minutes >= 0 && minutes <= 10080 && (!key.equals(TimingSettings.DEFAULT) || minutes > 0), "Số phút phải từ 0 đến 10080; thời lượng mặc định phải lớn hơn 0.");
+            } catch (NumberFormatException ex) { throw new BusinessRuleViolationException("Vui lòng nhập số phút nguyên."); }
+        }
         var e = repository.findBySettingKey(key).orElseGet(SystemSetting::new);
         e.setSettingKey(key);
         e.setSettingValue(r.settingValue());

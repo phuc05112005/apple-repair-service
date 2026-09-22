@@ -53,6 +53,9 @@ final class TestData {
         d.setCustomer(c);
         var model = new DeviceModel();
         model.setId(1L);
+        var deviceType = new com.applecare.apple_repair_service.entity.DeviceType();
+        deviceType.setId(1L);
+        model.setDeviceType(deviceType);
         d.setDeviceModel(model);
         t.setCustomerDevice(d);
         return t;
@@ -66,6 +69,13 @@ final class TestData {
         c.setStandardDurationMinutes(30);
         var m = new DeviceModel();
         m.setId(1L);
+        var deviceType = new com.applecare.apple_repair_service.entity.DeviceType();
+        deviceType.setId(1L);
+        m.setDeviceType(deviceType);
+        var issue = new com.applecare.apple_repair_service.entity.ServiceIssue();
+        issue.setId(1L);
+        issue.getDeviceTypes().add(deviceType);
+        c.setServiceIssue(issue);
         c.setDeviceModel(m);
         var st = new ServiceType();
         st.setCode(ServiceTypeCode.REPAIR);

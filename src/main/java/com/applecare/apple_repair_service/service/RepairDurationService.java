@@ -34,7 +34,7 @@ public class RepairDurationService {
         return calculate(histories.findAllByServiceTicket_IdOrderByChangedAtAsc(id), LocalDateTime.now(clock));
     }
 
-    long calculate(List<ServiceStatusHistory> input, LocalDateTime now) {
+    static long calculate(List<ServiceStatusHistory> input, LocalDateTime now) {
         var records = new ArrayList<>(input);
         for (var record : records)
             BusinessRules.require(record != null && record.getChangedAt() != null && record.getToStatus() != null, "Incomplete status history");

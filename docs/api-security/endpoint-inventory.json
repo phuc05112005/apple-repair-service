@@ -152,6 +152,22 @@
   "response" : "com.applecare.apple_repair_service.dto.response.BranchResponse"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/admin/defective-part-returns",
+  "controller" : "DefectiveInventoryController",
+  "handler" : "list",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.DefectivePartReturnResponse>"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/admin/defective-part-returns/{id}/status",
+  "controller" : "DefectiveInventoryController",
+  "handler" : "status",
+  "access" : "hasRole('ADMIN')",
+  "request" : "DefectiveStatusCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.DefectivePartReturnResponse"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/admin/device-models",
   "controller" : "AdminDeviceModelController",
   "handler" : "list",
@@ -728,7 +744,7 @@
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.AppointmentDetailResponse>"
 }, {
   "method" : "GET",
-  "path" : "/api/v1/internal/appointments/{id}",
+  "path" : "/api/v1/internal/appointments/{id:[0-9]+}",
   "controller" : "ReceptionistController",
   "handler" : "appointment",
   "access" : "hasAnyRole('ADMIN','RECEPTIONIST')",
@@ -879,6 +895,22 @@
   "request" : "ReasonCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
 }, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets/{id}/defective-part-returns",
+  "controller" : "DefectiveInventoryController",
+  "handler" : "ticket",
+  "access" : "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.DefectivePartReturnResponse>"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/internal/service-tickets/{id}/eta",
+  "controller" : "ServiceTimingController",
+  "handler" : "manual",
+  "access" : "hasAnyRole('ADMIN','RECEPTIONIST')",
+  "request" : "ManualEtaCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.TicketTimingResponse"
+}, {
   "method" : "POST",
   "path" : "/api/v1/internal/service-tickets/{id}/finish-repair",
   "controller" : "TechnicianController",
@@ -960,6 +992,14 @@
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.TechnicianRecommendationResponse>"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets/{id}/time-estimates",
+  "controller" : "ServiceTimingController",
+  "handler" : "history",
+  "access" : "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.ServiceTimeEstimateResponse>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/internal/service-tickets/{id}/transfer-candidates",
   "controller" : "TechnicianController",
   "handler" : "transferCandidates",
@@ -998,6 +1038,14 @@
   "access" : "hasRole('TECHNICIAN')",
   "request" : "TransferCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.TransferResponse"
+}, {
+  "method" : "POST",
+  "path" : "/api/v1/internal/technician/repair-items/{id}/approval",
+  "controller" : "TechnicianController",
+  "handler" : "approval",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "ApprovalCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.RepairItemResponse"
 }, {
   "method" : "GET",
   "path" : "/api/v1/internal/technician/work",
