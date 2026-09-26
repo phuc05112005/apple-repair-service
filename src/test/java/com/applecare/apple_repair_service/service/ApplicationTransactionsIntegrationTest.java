@@ -114,6 +114,8 @@ class ApplicationTransactionsIntegrationTest {
     TransferService transfers;
     @MockitoSpyBean
     TicketCodeGenerator codeGenerator;
+    @MockitoSpyBean
+    com.applecare.apple_repair_service.repository.DefectivePartReturnRepository defectiveReturns;
     private String prefix;
     private Long branchId, otherBranchId, partId, modelId, catalogId, secondCatalogId, customerId, userId, techId, otherTechId, ticketId, itemId, slotId;
 
@@ -125,6 +127,53 @@ class ApplicationTransactionsIntegrationTest {
 
     void persist(Object value) {
         em.persist(value);
+    }
+
+    @Test void failedDefectiveReceiptRollsBackUsageMovementAndUsableStock() {
+        tx(() -> {
+            var type = new ServiceType(); type.setCode(ServiceTypeCode.REPLACEMENT); type.setName(prefix + "replacement"); em.persist(type);
+            var catalog = em.find(ServiceCatalogItem.class, catalogId); catalog.setServiceType(type); catalog.setPart(em.find(Part.class,partId));
+            em.find(ServiceTicket.class,ticketId).setStatus(ServiceTicketStatus.REPAIRING);
+            return null;
+        });
+        org.mockito.Mockito.doThrow(new IllegalStateException("Injected receipt failure"))
+                .when(defectiveReturns).saveAndFlush(org.mockito.ArgumentMatchers.any());
+        try {
+            assertThrows(IllegalStateException.class, () -> inventory.usePart(new UsePartRequest(itemId,partId,1,techId,"Collected defective battery")));
+            tx(() -> {
+                assertEquals(1, inventory.getInventory(branchId,partId).quantity());
+                assertEquals(0L, em.createQuery("select count(u) from PartUsage u where u.repairItem.id=:id",Long.class).setParameter("id",itemId).getSingleResult());
+                assertEquals(0L, em.createQuery("select count(t) from InventoryTransaction t where t.part.id=:id",Long.class).setParameter("id",partId).getSingleResult());
+                assertEquals(0L, defectiveReturns.onHand(branchId,partId));
+                return null;
+            });
+        } finally { org.mockito.Mockito.reset(defectiveReturns); }
+    }
+
+    @Test void warrantyReceiptFailureRollsBackAllFourWrites() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("Injected warranty receipt failure"))
+                .when(defectiveReturns).saveAndFlush(org.mockito.ArgumentMatchers.any());
+        try {
+            assertThrows(IllegalStateException.class, () -> tx(() -> {
+                var original = em.find(RepairItem.class,itemId);
+                original.getServiceTicket().setStatus(ServiceTicketStatus.HANDED_OVER);
+                var replacementType = new ServiceType(); replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName(prefix+"replacement"); em.persist(replacementType);
+                var replacement = em.find(ServiceCatalogItem.class,catalogId); replacement.setServiceType(replacementType); replacement.setPart(em.find(Part.class,partId));
+                var warrantyType = new ServiceType(); warrantyType.setCode(ServiceTypeCode.WARRANTY); warrantyType.setName(prefix+"warranty"); em.persist(warrantyType);
+                var catalog = new ServiceCatalogItem(); catalog.setName(prefix+"warranty"); catalog.setDeviceModel(replacement.getDeviceModel()); catalog.setServiceIssue(replacement.getServiceIssue()); catalog.setServiceType(warrantyType); catalog.setStandardDurationMinutes(30); em.persist(catalog);
+                var warrantyTicket = new ServiceTicket(); warrantyTicket.setTicketCode(prefix+"warranty"); warrantyTicket.setReceivedCondition("Defective display received"); warrantyTicket.setCustomerDevice(original.getServiceTicket().getCustomerDevice()); warrantyTicket.setBranch(original.getServiceTicket().getBranch()); warrantyTicket.setCreatedBy(original.getServiceTicket().getCreatedBy()); warrantyTicket.setReceivedAt(LocalDateTime.now(TestData.CLOCK)); warrantyTicket.setStatus(ServiceTicketStatus.REPAIRING); em.persist(warrantyTicket);
+                var warranty = new RepairItem(); warranty.setServiceTicket(warrantyTicket); warranty.setServiceCatalogItem(catalog); warranty.setItemNameSnapshot(prefix+"warranty"); warranty.setApprovalStatus(ApprovalStatus.APPROVED); warranty.setFinalPrice(BigDecimal.ZERO); warranty.setWarrantySourceItem(original); warranty.setWarrantyDecision(com.applecare.apple_repair_service.enums.WarrantyDecision.APPROVED); warranty.setWarrantyRemedy(com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT); warranty.setWarrantyReplacementCatalog(replacement); em.persist(warranty); em.flush();
+                inventory.usePart(new UsePartRequest(warranty.getId(),partId,1,techId,"Warranty part collected"));
+                return null;
+            }));
+            tx(() -> {
+                assertEquals(1,inventory.getInventory(branchId,partId).quantity());
+                assertEquals(0L,em.createQuery("select count(u) from PartUsage u where u.part.id=:id",Long.class).setParameter("id",partId).getSingleResult());
+                assertEquals(0L,em.createQuery("select count(t) from InventoryTransaction t where t.part.id=:id",Long.class).setParameter("id",partId).getSingleResult());
+                assertEquals(0L,defectiveReturns.onHand(branchId,partId));
+                return null;
+            });
+        } finally { org.mockito.Mockito.reset(defectiveReturns); }
     }
 
     @BeforeEach
@@ -291,7 +340,7 @@ class ApplicationTransactionsIntegrationTest {
                     .setParameter("name", prefix).getResultList().forEach(i -> i.getDeviceTypes().clear());
             em.flush();
             for (var entity : List.of("DeviceType", "ServiceIssue", "ServiceType"))
-                em.createQuery("delete from " + entity + " e where e.name=:name").setParameter("name", prefix).executeUpdate();
+                em.createQuery("delete from " + entity + " e where e.name like :name").setParameter("name", prefix + "%").executeUpdate();
             em.createQuery("delete from Part e where e.id=:id").setParameter("id", partId).executeUpdate();
             em.createQuery("delete from User e where e.username like :prefix").setParameter("prefix", prefix + "%").executeUpdate();
             em.createQuery("delete from Branch e where e.id in :ids").setParameter("ids", branchIds).executeUpdate();

@@ -220,8 +220,22 @@ public class ServiceTicketService {
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public ServiceTicketDetailResponse resumeRepair(Long id, Long userId) {
         var ticket = access.lock(ServiceTicket.class, id);
-        BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_PART, "Chỉ tiếp tục bằng thao tác này khi đang chờ linh kiện. Nếu chờ khách, hãy ghi nhận xác nhận của khách.");
+        BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_PART || ticket.getStatus() == ServiceTicketStatus.WAITING_APPROVAL,
+                "Chỉ tiếp tục phiếu đang chờ linh kiện hoặc chờ khách xác nhận.");
+        BusinessRules.require(statuses.currentWaitResolved(ticket), "Điều kiện chờ chưa được ghi nhận kết thúc.");
+        if (ticket.getStatus() == ServiceTicketStatus.WAITING_APPROVAL)
+            BusinessRules.require(repairItems.findAllByServiceTicket_Id(id).stream().noneMatch(x -> x.getApprovalStatus() == ApprovalStatus.PENDING),
+                    "Phiếu vẫn còn hạng mục chờ ý kiến khách hàng.");
         return move(id, userId, ServiceTicketStatus.REPAIRING, null);
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public ServiceTicketDetailResponse resolveWait(Long id, Long userId, LocalDateTime resolvedAt, String note) {
+        var ticket = access.lock(ServiceTicket.class, id);
+        BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_PART,
+                "Chờ xác nhận khách hàng được giải quyết bằng thao tác ghi nhận quyết định từng hạng mục.");
+        statuses.resolveWait(ticket, resolvedAt, access.get(User.class, userId), note);
+        return detail(ticket);
     }
 
     private ServiceTicketDetailResponse move(Long id, Long userId, ServiceTicketStatus next, String note) {

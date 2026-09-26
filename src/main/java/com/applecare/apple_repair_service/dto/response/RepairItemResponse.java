@@ -17,6 +17,7 @@ public record RepairItemResponse(
         BigDecimal finalPrice,
         Long approvalRecordedById,
         LocalDateTime approvalDecisionAt,
+        LocalDateTime approvalResolvedAt,
         String approvalNote,
         LocalDate warrantyStartDate,
         LocalDate warrantyEndDate,

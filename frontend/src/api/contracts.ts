@@ -107,14 +107,15 @@ export interface ServiceTicketResponse {
 export interface RepairItemResponse {
   id: number; serviceTicketId: number; serviceCatalogItemId: number; itemNameSnapshot: string
   approvalStatus: ApprovalStatus; basePrice: number | null; finalPrice: number | null
-  approvalRecordedById: number | null; approvalDecisionAt: string | null; approvalNote: string | null
+  approvalRecordedById: number | null; approvalDecisionAt: string | null; approvalResolvedAt: string | null; approvalNote: string | null
   warrantyStartDate: string | null; warrantyEndDate: string | null; warrantySourceItemId: number | null
   warrantyDecision: WarrantyDecision; warrantyDecisionNote: string | null; createdAt: string; updatedAt: string
   confirmationMethod: ConfirmationMethod | null; warrantyRemedy: WarrantyRemedy | null; warrantyReplacementCatalogId: number | null; expectedPartId: number | null
 }
 export interface ServiceStatusHistoryResponse {
   id: number; serviceTicketId: number; fromStatus: ServiceTicketStatus | null; toStatus: ServiceTicketStatus
-  changedById: number; note: string | null; changedAt: string
+  changedById: number; note: string | null; changedAt: string; resolvedAt: string | null
+  resolutionRecordedAt: string | null; resolvedById: number | null; resolutionNote: string | null
 }
 export interface ServiceTicketDetailResponse {
   ticket: ServiceTicketResponse; repairItems: RepairItemResponse[]; history: ServiceStatusHistoryResponse[]
@@ -178,8 +179,14 @@ export interface BranchInventoryResponse { id: number; branchId: number; partId:
 export interface InventoryTransactionResponse {
   id: number; partId: number; transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER'
   sourceBranchId: number | null; destinationBranchId: number | null; quantity: number; partUsageId: number | null
+  inventoryLotId: number | null; lotCode: string | null
   recordedById: number; note: string | null; createdAt: string
 }
+export interface InventoryLotResponse {
+  id: number; lotCode: string; branchId: number; partId: number; receivedQuantity: number
+  receivedAt: string; receivedById: number; sourceNote: string | null; createdAt: string
+}
+export interface StockInResponse { lot: InventoryLotResponse; inventory: BranchInventoryResponse; transaction: InventoryTransactionResponse }
 export type TechnicianScheduleStatus = 'WORKING' | 'OFF' | 'CANCELLED'
 export interface TechnicianScheduleResponse { id: number; technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: TechnicianScheduleStatus; createdAt: string; updatedAt: string }
 

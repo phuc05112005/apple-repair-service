@@ -12,7 +12,7 @@ import java.util.*;
 public class TimingMetricsService {
  private final DomainAccess access;private final TicketAccessPolicy policy;private final ServiceStatusHistoryRepository histories;
  private final AssignmentRepository assignments;private final TransferRepository transfers;private final ServiceTimeEstimateHistoryRepository estimates;
- private final RepairDurationService duration;private final Clock clock;
+ private final Clock clock;
  public TicketTimingMetricsResponse metrics(Long id) {
   policy.requireRead(id);return calculate(id);
  }

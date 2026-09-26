@@ -147,7 +147,7 @@ class ClosureServiceTest {
     }
 
     WarrantyService warranty() {
-        return new WarrantyService(access, rules, new WarrantyPolicy(), new EntityResponses(), TestData.CLOCK);
+        return new WarrantyService(access, rules, new WarrantyPolicy(), new EntityResponses(), TestData.CLOCK, org.mockito.Mockito.mock(ServiceTimingService.class));
     }
 
     @Test

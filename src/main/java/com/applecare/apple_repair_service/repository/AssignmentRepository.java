@@ -21,6 +21,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
     List<Assignment> findAllByTechnician_IdAndStatus(Long technicianId, AssignmentStatus status);
 
+    @org.springframework.data.jpa.repository.Query("select count(a)>0 from Assignment a where a.technician.id=:technicianId and a.status=com.applecare.apple_repair_service.enums.AssignmentStatus.ACTIVE and a.serviceTicket.status=com.applecare.apple_repair_service.enums.ServiceTicketStatus.REPAIRING and a.serviceTicket.id<>:ticketId")
+    boolean hasOtherActiveRepair(Long technicianId, Long ticketId);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"serviceTicket.customerDevice.customer","serviceTicket.customerDevice.deviceModel","serviceTicket.branch","technician"})
     List<Assignment> findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(Long technicianId, AssignmentStatus status);
 }

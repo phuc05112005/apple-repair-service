@@ -33,6 +33,7 @@ class PhaseOneWorkflowIntegrationTest {
     @Autowired Clock clock;
     @Autowired ServiceTicketService tickets;
     @Autowired InventoryService inventory;
+    @Autowired DefectiveInventoryService defective;
     ApiFixture f;
 
     @BeforeEach void setup() {
@@ -120,6 +121,7 @@ class PhaseOneWorkflowIntegrationTest {
     @Test void replacementUsageReturnAndReissueMaintainInventoryAndCompletion() {
         var item = replacement(); long partId = f.catalog.getPart().getId();
         var used = inventory.usePart(new UsePartRequest(item.getId(), partId, 1, f.technician.getId()));
+        assertEquals(0, defective.onHand(f.branch.getId(), partId));
         assertEquals(2, inventory.getInventory(f.branch.getId(), partId).quantity());
         inventory.reversePartUsage(new ReversePartUsageRequest(used.id(), f.technician.getId(), "Đổi linh kiện"));
         assertEquals(3, inventory.getInventory(f.branch.getId(), partId).quantity());
@@ -131,6 +133,33 @@ class PhaseOneWorkflowIntegrationTest {
         var history = inventory.getTransactionHistory(partId);
         assertEquals(2, history.stream().filter(tx -> tx.transactionType() == InventoryTransactionType.USAGE_OUT).count());
         assertEquals(1, history.stream().filter(tx -> tx.transactionType() == InventoryTransactionType.USAGE_RETURN).count());
+    }
+
+    @Test void timingAndDefectiveEndpointsEnforceRolesAndTicketOwnership() throws Exception {
+        var ticket = f.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT); em.flush();
+        var path = "/api/v1/internal/service-tickets/" + ticket.getId();
+        mvc.perform(get(path + "/time-estimates").header("Authorization", login(f.receptionist)))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        mvc.perform(get(path + "/timing-metrics").header("Authorization", login(f.receptionist)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completeStatusHistory").value(false));
+        mvc.perform(get(path + "/defective-part-returns").header("Authorization", login(f.otherTechnician))).andExpect(status().isForbidden());
+        mvc.perform(get(path + "/time-estimates").header("Authorization", login(f.otherTechnician))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/defective-part-returns").header("Authorization", login(f.receptionist))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/defective-part-returns").header("Authorization", login(f.admin))).andExpect(status().isOk());
+        var manual = "{\"estimatedStartAt\":\"2099-01-01T09:00:00\",\"estimatedCompletionAt\":\"2099-01-01T10:00:00\",\"estimatedDurationMinutes\":60,\"reason\":\"Customer request\"}";
+        mvc.perform(put(path + "/eta").header("Authorization", login(f.technician)).contentType("application/json").content(manual)).andExpect(status().isForbidden());
+        mvc.perform(put(path + "/eta").header("Authorization", login(f.receptionist)).contentType("application/json").content(manual))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.estimateSource").value("MANUAL"));
+    }
+
+    @Test void normalReplacementCreatesDefectiveStockOnlyWhenCollected() {
+        var item = replacement(); long partId = f.catalog.getPart().getId();
+        inventory.usePart(new UsePartRequest(item.getId(), partId, 1, f.technician.getId(), "Battery collected"));
+        inventory.usePart(new UsePartRequest(item.getId(), partId, 1, f.technician.getId(), "Second battery collected"));
+        assertEquals(2, defective.onHand(f.branch.getId(), partId));
+        assertEquals(1, inventory.getInventory(f.branch.getId(), partId).quantity());
+        assertEquals(0, defective.onHand(f.branch.getId(), Long.MAX_VALUE));
+        assertEquals(2, defective.list(f.branch.getId(), partId, DefectivePartStatus.IN_STOCK, item.getServiceTicket().getId()).size());
     }
 
     @Test void replacementRejectsAnotherPartEvenWhenItIsInStock() {

@@ -29,7 +29,7 @@ export const receptionistApi = {
   ticket: (id: number, signal?: AbortSignal) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}`, { auth: true, signal }),
   recommendations: (id: number, signal?: AbortSignal) => apiRequest<TechnicianRecommendationResponse[]>(`/api/v1/internal/service-tickets/${id}/technician-recommendations`, { auth: true, signal }),
   assign: (id: number, technicianId: number, source: AssignmentSource) => apiRequest<AssignmentResponse>(`/api/v1/internal/service-tickets/${id}/assignments`, { auth: true, method: 'POST', body: { technicianId, source } }),
-  approval: (itemId: number, decision: ApprovalStatus, note?: string, confirmationMethod: ConfirmationMethod = 'DIRECT') => apiRequest<RepairItemResponse>(`/api/v1/internal/repair-items/${itemId}/approval`, { auth: true, method: 'POST', body: { decision, note, confirmationMethod } }),
+  approval: (itemId: number, decision: ApprovalStatus, note?: string, confirmationMethod: ConfirmationMethod = 'DIRECT', resolvedAt?: string) => apiRequest<RepairItemResponse>(`/api/v1/internal/repair-items/${itemId}/approval`, { auth: true, method: 'POST', body: { decision, note, confirmationMethod, resolvedAt } }),
   paymentSummary: (id: number, signal?: AbortSignal) => apiRequest<TicketPaymentSummaryResponse>(`/api/v1/internal/service-tickets/${id}/payment-summary`, { auth: true, signal }),
   payment: (id: number, paymentMethod: PaymentMethod) => apiRequest<TicketPaymentSummaryResponse>(`/api/v1/internal/service-tickets/${id}/payment`, { auth: true, method: 'POST', body: { paymentMethod } }),
   settleZero: (id: number) => apiRequest<TicketPaymentSummaryResponse>(`/api/v1/internal/service-tickets/${id}/payment/settle-zero`, { auth: true, method: 'POST' }),

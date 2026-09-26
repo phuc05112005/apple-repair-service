@@ -30,6 +30,7 @@ public class WarrantyService {
     private final WarrantyPolicy policy;
     private final EntityResponses mapper;
     private final Clock clock;
+    private final ServiceTimingService timing;
 
     public WarrantyEligibilityResponse checkEligibility(Long id) {
         return checkEligibility(id, LocalDate.now(clock));
@@ -75,6 +76,7 @@ public class WarrantyService {
         } else BusinessRules.required(r.note(), "Warranty rejection reason");
         item.setWarrantyDecision(r.decision());
         item.setWarrantyDecisionNote(BusinessRules.text(r.note()));
+        timing.planChanged(ticket, null);
         return mapper.map(item);
     }
 }

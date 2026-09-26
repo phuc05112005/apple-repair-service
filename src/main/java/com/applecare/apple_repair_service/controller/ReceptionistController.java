@@ -79,7 +79,7 @@ public class ReceptionistController {
     }
     @PostMapping("/repair-items/{id}/approval")
     public RepairItemResponse approval(@PathVariable @Positive Long id, @Valid @RequestBody ApprovalCommand request) {
-        return items.recordApprovalDecision(id,new ApprovalDecisionRequest(request.decision(),actor.id(),request.note(),request.confirmationMethod()));
+        return items.recordApprovalDecision(id,new ApprovalDecisionRequest(request.decision(),actor.id(),request.note(),request.confirmationMethod(),request.resolvedAt()));
     }
     @GetMapping("/service-tickets/{id}/payment-summary")
     public TicketPaymentSummaryResponse paymentSummary(@PathVariable @Positive Long id) { return payments.getSummary(id); }

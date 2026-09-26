@@ -2,14 +2,18 @@ package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.dto.request.ReversePartUsageRequest;
 import com.applecare.apple_repair_service.dto.request.StockAdjustmentRequest;
+import com.applecare.apple_repair_service.dto.request.StockInRequest;
 import com.applecare.apple_repair_service.dto.request.TransferStockRequest;
 import com.applecare.apple_repair_service.dto.request.UsePartRequest;
 import com.applecare.apple_repair_service.dto.response.BranchInventoryResponse;
 import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
+import com.applecare.apple_repair_service.dto.response.InventoryLotResponse;
+import com.applecare.apple_repair_service.dto.response.StockInResponse;
 import com.applecare.apple_repair_service.dto.response.PartUsageResponse;
 import com.applecare.apple_repair_service.entity.Branch;
 import com.applecare.apple_repair_service.entity.BranchInventory;
 import com.applecare.apple_repair_service.entity.InventoryTransaction;
+import com.applecare.apple_repair_service.entity.InventoryLot;
 import com.applecare.apple_repair_service.entity.Part;
 import com.applecare.apple_repair_service.entity.PartUsage;
 import com.applecare.apple_repair_service.entity.RepairItem;
@@ -26,6 +30,7 @@ import com.applecare.apple_repair_service.exception.InsufficientStockException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.BranchInventoryRepository;
 import com.applecare.apple_repair_service.repository.InventoryTransactionRepository;
+import com.applecare.apple_repair_service.repository.InventoryLotRepository;
 import com.applecare.apple_repair_service.repository.PartUsageRepository;
 
 import java.time.Clock;
@@ -44,6 +49,7 @@ public class InventoryService {
     private final BranchInventoryRepository inventory;
     private final PartUsageRepository usages;
     private final InventoryTransactionRepository transactions;
+    private final InventoryLotRepository lots;
     private final DomainAccess access;
     private final BusinessRules rules;
     private final EntityResponses mapper;
@@ -51,15 +57,34 @@ public class InventoryService {
     private final DefectiveInventoryService defectiveInventory;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
+    public StockInResponse stockIn(StockInRequest r) {
         rules.validate(r);
+        BusinessRules.require(!r.receivedAt().isAfter(LocalDateTime.now(clock)), "Thời điểm nhận lô không được ở tương lai.");
+        var code = r.lotCode().trim();
+        if (lots.existsByLotCodeIgnoreCase(code)) throw new ConflictException("Mã lô đã tồn tại.");
         var part = lockPart(r.partId());
         var branch = branch(r.branchId());
-        var actor = access.get(User.class, r.recordedByUserId());
+        var actor = access.get(User.class, r.receivedByUserId());
+        var lot = new InventoryLot();
+        lot.setLotCode(code);
+        lot.setBranch(branch);
+        lot.setPart(part);
+        lot.setReceivedQuantity(r.quantity());
+        lot.setReceivedAt(r.receivedAt());
+        lot.setReceivedBy(actor);
+        lot.setSourceNote(BusinessRules.text(r.sourceNote()));
+        lots.saveAndFlush(lot);
         var stock = lockedStock(branch, part);
         increase(stock, r.quantity());
-        movement(part, InventoryTransactionType.STOCK_IN, null, branch, r.quantity(), null, actor, r.note());
-        return mapper.map(stock);
+        var movement = movement(part, InventoryTransactionType.STOCK_IN, null, branch, r.quantity(), null, lot, actor, r.sourceNote());
+        return new StockInResponse(mapper.map(lot), mapper.map(stock), mapper.map(movement));
+    }
+
+    /** Compatibility helper for isolated fixtures; HTTP stock-in always requires explicit lot data. */
+    public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
+        var result = stockIn(new StockInRequest("TEST-" + java.util.UUID.randomUUID(), r.branchId(), r.partId(),
+                r.quantity(), LocalDateTime.now(clock), r.recordedByUserId(), r.note()));
+        return result.inventory();
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -70,7 +95,7 @@ public class InventoryService {
         var actor = access.get(User.class, r.recordedByUserId());
         var stock = lockedStock(branch, part);
         decrease(stock, r.quantity());
-        movement(part, InventoryTransactionType.STOCK_OUT, branch, null, r.quantity(), null, actor, r.note());
+        movement(part, InventoryTransactionType.STOCK_OUT, branch, null, r.quantity(), null, null, actor, r.note());
         return mapper.map(stock);
     }
 
@@ -110,7 +135,7 @@ public class InventoryService {
         usage.setUsedAt(LocalDateTime.now(clock));
         usage.setDefectiveReturnNote(BusinessRules.text(r.defectiveReturnNote()));
         usages.saveAndFlush(usage);
-        movement(part, InventoryTransactionType.USAGE_OUT, branch, null, r.quantity(), usage, actor, null);
+        movement(part, InventoryTransactionType.USAGE_OUT, branch, null, r.quantity(), usage, null, actor, null);
         if (usage.getDefectiveReturnNote() != null) {
             var original = item.getWarrantySourceItem() == null ? null : item.getWarrantySourceItem().getServiceCatalogItem().getPart();
             var removed = r.defectivePartId() != null ? access.get(Part.class,r.defectivePartId()) : original != null ? original : part;
@@ -138,7 +163,7 @@ public class InventoryService {
         usage.setReversedBy(actor);
         usage.setReversedAt(LocalDateTime.now(clock));
         usage.setReversalNote(BusinessRules.text(r.reversalNote()));
-        movement(part, InventoryTransactionType.USAGE_RETURN, null, branch, usage.getQuantity(), usage, actor, r.reversalNote());
+        movement(part, InventoryTransactionType.USAGE_RETURN, null, branch, usage.getQuantity(), usage, null, actor, r.reversalNote());
         return mapper.map(usage);
     }
 
@@ -161,7 +186,7 @@ public class InventoryService {
         }
         decrease(from, r.quantity());
         increase(to, r.quantity());
-        return mapper.map(movement(part, InventoryTransactionType.TRANSFER, source, destination, r.quantity(), null, actor, r.note()));
+        return mapper.map(movement(part, InventoryTransactionType.TRANSFER, source, destination, r.quantity(), null, null, actor, r.note()));
     }
 
     public BranchInventoryResponse getInventory(Long branchId, Long partId) {
@@ -180,6 +205,12 @@ public class InventoryService {
     public List<InventoryTransactionResponse> getTransactionHistory(Long partId) {
         access.get(Part.class, partId);
         return transactions.findAllByPart_IdOrderByCreatedAtDesc(partId).stream().map(mapper::map).toList();
+    }
+
+    public List<InventoryLotResponse> listLots(Long branchId, Long partId) {
+        if (branchId != null) access.get(Branch.class, branchId);
+        if (partId != null) access.get(Part.class, partId);
+        return lots.search(branchId, partId).stream().map(mapper::map).toList();
     }
 
     private Branch branch(Long id) {
@@ -216,7 +247,7 @@ public class InventoryService {
         stock.setQuantity(stock.getQuantity() - amount);
     }
 
-    private InventoryTransaction movement(Part part, InventoryTransactionType type, Branch source, Branch destination, int quantity, PartUsage usage, User actor, String note) {
+    private InventoryTransaction movement(Part part, InventoryTransactionType type, Branch source, Branch destination, int quantity, PartUsage usage, InventoryLot lot, User actor, String note) {
         var tx = new InventoryTransaction();
         tx.setPart(part);
         tx.setTransactionType(type);
@@ -224,6 +255,7 @@ public class InventoryService {
         tx.setDestinationBranch(destination);
         tx.setQuantity(quantity);
         tx.setPartUsage(usage);
+        tx.setInventoryLot(lot);
         tx.setRecordedBy(actor);
         tx.setNote(BusinessRules.text(note));
         tx.setCreatedAt(LocalDateTime.now(clock));

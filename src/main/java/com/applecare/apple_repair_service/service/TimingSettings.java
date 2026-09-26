@@ -14,7 +14,7 @@ public class TimingSettings {
  }
  private int value(java.util.Map<String,String> values,String key,int fallback) {
   if(!values.containsKey(key))return fallback;
-  try {int n=Integer.parseInt(values.get(key));BusinessRules.require(n>=0 && n<=10080 && (!key.equals(DEFAULT)||n>0),"Cấu hình thời gian không hợp lệ: "+key);return n;}
+  try {int n=Integer.parseInt(values.get(key).trim());BusinessRules.require(n>=0 && n<=10080 && (!key.equals(DEFAULT)||n>0),"Cấu hình thời gian không hợp lệ: "+key);return n;}
   catch(NumberFormatException ex){throw new com.applecare.apple_repair_service.exception.BusinessRuleViolationException("Cấu hình thời gian phải là số phút nguyên: "+key);}
  }
 }

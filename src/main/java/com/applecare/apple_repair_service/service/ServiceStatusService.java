@@ -26,6 +26,7 @@ public class ServiceStatusService {
     private final AssignmentRepository assignments;
     private final Clock clock;
     private final ServiceTimingService timing;
+    private final DomainAccess access;
 
     void planChanged(ServiceTicket ticket, User actor) { timing.planChanged(ticket, actor); }
 
@@ -51,6 +52,20 @@ public class ServiceStatusService {
             default -> false;
         };
         if (!allowed) throw new InvalidStateTransitionException(old + " -> " + next);
+        if (next == ServiceTicketStatus.REPAIRING) {
+            if (old == ServiceTicketStatus.WAITING_PART || old == ServiceTicketStatus.WAITING_APPROVAL) {
+                var wait = currentWait(ticket);
+                BusinessRules.require(wait.getResolvedAt() != null,
+                        old == ServiceTicketStatus.WAITING_PART
+                                ? "Ghi nhận linh kiện đã sẵn sàng trước khi tiếp tục sửa."
+                                : "Ghi nhận đầy đủ quyết định khách hàng trước khi tiếp tục sửa.");
+            }
+            var assignment = assignments.findFirstByServiceTicket_IdAndStatus(ticket.getId(), AssignmentStatus.ACTIVE)
+                    .orElseThrow(() -> new InvalidStateTransitionException("Ticket has no ACTIVE assignment"));
+            access.lock(User.class, assignment.getTechnician().getId());
+            BusinessRules.require(!assignments.hasOtherActiveRepair(assignment.getTechnician().getId(), ticket.getId()),
+                    "Kỹ thuật viên đang sửa một phiếu khác. Hãy hoàn tất hoặc đưa phiếu đó về trạng thái chờ trước khi bắt đầu phiếu này.");
+        }
         ticket.setStatus(next);
         var eventAt = history(ticket, old, next, actor, note);
         if (next == ServiceTicketStatus.REPAIRING && ticket.getActualRepairStartedAt() == null) ticket.setActualRepairStartedAt(eventAt);
@@ -62,6 +77,35 @@ public class ServiceStatusService {
             });
         }
         timing.statusChanged(ticket, old, actor);
+    }
+
+    void resolveWait(ServiceTicket ticket, LocalDateTime resolvedAt, User actor, String note) {
+        BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.WAITING_PART
+                        || ticket.getStatus() == ServiceTicketStatus.WAITING_APPROVAL,
+                "Phiếu hiện không ở trạng thái chờ cần ghi nhận kết thúc.");
+        var wait = currentWait(ticket);
+        BusinessRules.require(wait.getResolvedAt() == null, "Điều kiện chờ đã được ghi nhận kết thúc.");
+        var now = LocalDateTime.now(clock);
+        var actual = resolvedAt == null ? now : resolvedAt;
+        BusinessRules.require(!actual.isBefore(wait.getChangedAt()) && !actual.isAfter(now),
+                "Thời điểm kết thúc chờ phải từ lúc bắt đầu chờ đến hiện tại.");
+        wait.setResolvedAt(actual);
+        wait.setResolutionRecordedAt(now);
+        wait.setResolvedBy(actor);
+        wait.setResolutionNote(BusinessRules.text(note));
+        timing.planChanged(ticket, actor);
+    }
+
+    boolean currentWaitResolved(ServiceTicket ticket) {
+        return (ticket.getStatus() == ServiceTicketStatus.WAITING_PART || ticket.getStatus() == ServiceTicketStatus.WAITING_APPROVAL)
+                && currentWait(ticket).getResolvedAt() != null;
+    }
+
+    private ServiceStatusHistory currentWait(ServiceTicket ticket) {
+        var record = histories.findFirstByServiceTicket_IdOrderByChangedAtDescIdDesc(ticket.getId())
+                .orElseThrow(() -> new InvalidStateTransitionException("Ticket status history is missing"));
+        BusinessRules.require(record.getToStatus() == ticket.getStatus(), "Ticket status history does not match current state");
+        return record;
     }
 
     private LocalDateTime history(ServiceTicket ticket, ServiceTicketStatus old, ServiceTicketStatus next, User actor, String note) {
