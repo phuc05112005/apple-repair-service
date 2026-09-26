@@ -4,6 +4,7 @@ import com.applecare.apple_repair_service.entity.ServiceStatusHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ServiceStatusHistoryRepository extends JpaRepository<ServiceStatusHistory, Long> {
  @org.springframework.data.jpa.repository.Query("select h from ServiceStatusHistory h where h.serviceTicket.id in :ids order by h.changedAt,h.id")
@@ -11,4 +12,6 @@ public interface ServiceStatusHistoryRepository extends JpaRepository<ServiceSta
 
 
     List<ServiceStatusHistory> findAllByServiceTicket_IdOrderByChangedAtAsc(Long serviceTicketId);
+
+    Optional<ServiceStatusHistory> findFirstByServiceTicket_IdOrderByChangedAtDescIdDesc(Long serviceTicketId);
 }

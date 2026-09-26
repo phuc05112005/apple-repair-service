@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
+import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryLotResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, StockInResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
 
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
@@ -22,7 +22,9 @@ export const adminApi = {
   inventory: (branchId: number, partId: number, signal?: AbortSignal) => apiRequest<BranchInventoryResponse>('/api/v1/internal/inventory', { auth: true, query: { branchId, partId }, signal }),
   inventories: (filters: { branchId?: number; partId?: number } = {}, signal?: AbortSignal) => apiRequest<BranchInventoryResponse[]>('/api/v1/admin/inventory', { auth: true, query: filters, signal }),
   inventoryTransactions: (partId: number, signal?: AbortSignal) => apiRequest<InventoryTransactionResponse[]>(`/api/v1/admin/parts/${partId}/inventory-transactions`, { auth: true, signal }),
-  adjustStock: (direction: 'stock-in' | 'stock-out', body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>(`/api/v1/admin/inventory/${direction}`, { auth: true, method: 'POST', body }),
+  inventoryLots: (filters: { branchId?: number; partId?: number } = {}, signal?: AbortSignal) => apiRequest<InventoryLotResponse[]>('/api/v1/admin/inventory/lots', { auth: true, query: filters, signal }),
+  stockIn: (body: { lotCode: string; branchId: number; partId: number; quantity: number; receivedAt: string; sourceNote?: string }) => apiRequest<StockInResponse>('/api/v1/admin/inventory/stock-in', { auth: true, method: 'POST', body }),
+  stockOut: (body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>('/api/v1/admin/inventory/stock-out', { auth: true, method: 'POST', body }),
   transferStock: (body: { partId: number; sourceBranchId: number; destinationBranchId: number; quantity: number; note?: string }) => apiRequest('/api/v1/admin/inventory/transfer', { auth: true, method: 'POST', body }),
   slots: (branchId: number, date: string, signal?: AbortSignal) => apiRequest<SlotAvailabilityResponse[]>('/api/v1/admin/appointment-slots', { auth: true, query: { branchId, date }, signal }),
   weeklySchedules: (branchId: number, signal?: AbortSignal) => apiRequest<WeeklyScheduleResponse[]>('/api/v1/admin/appointment-weekly-schedules', { auth: true, query: { branchId }, signal }),

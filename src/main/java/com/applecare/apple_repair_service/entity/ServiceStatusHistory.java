@@ -60,4 +60,17 @@ public class ServiceStatusHistory {
     @NotNull
     @Column(name = "changed_at", nullable = false)
     private LocalDateTime changedAt;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
+    @Column(name = "resolution_recorded_at")
+    private LocalDateTime resolutionRecordedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by", foreignKey = @ForeignKey(name = "fk_status_history_resolved_by"))
+    private User resolvedBy;
+
+    @Column(name = "resolution_note", columnDefinition = "TEXT")
+    private String resolutionNote;
 }

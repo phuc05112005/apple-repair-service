@@ -9,6 +9,7 @@ import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.RepairItemRepository;
+import com.applecare.apple_repair_service.repository.ServiceStatusHistoryRepository;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RepairItemService {
     private final RepairItemRepository repository;
+    private final ServiceStatusHistoryRepository histories;
     private final DomainAccess access;
     private final BusinessRules rules;
     private final ServiceStatusService statuses;
@@ -49,13 +51,21 @@ public class RepairItemService {
         item.setConfirmationMethod(r.confirmationMethod());
         item.setApprovalStatus(r.decision());
         item.setApprovalRecordedBy(actor);
-        item.setApprovalDecisionAt(LocalDateTime.now(clock));
+        var recordedAt = LocalDateTime.now(clock);
+        var resolvedAt = r.resolvedAt() == null ? recordedAt : r.resolvedAt();
+        var wait = histories.findFirstByServiceTicket_IdOrderByChangedAtDescIdDesc(t.getId())
+                .orElseThrow(() -> new com.applecare.apple_repair_service.exception.InvalidStateTransitionException("Ticket status history is missing"));
+        BusinessRules.require(!resolvedAt.isBefore(wait.getChangedAt()) && !resolvedAt.isAfter(recordedAt),
+                "Thời điểm khách phản hồi phải từ lúc bắt đầu chờ đến hiện tại.");
+        item.setApprovalDecisionAt(recordedAt);
+        item.setApprovalResolvedAt(resolvedAt);
         item.setApprovalNote(BusinessRules.text(r.note()));
         repository.flush();
         var all = repository.findAllByServiceTicket_Id(t.getId());
         if (all.stream().noneMatch(x -> x.getApprovalStatus() == ApprovalStatus.PENDING)) {
-            var next = all.stream().anyMatch(x -> x.getApprovalStatus() == ApprovalStatus.APPROVED) ? ServiceTicketStatus.REPAIRING : ServiceTicketStatus.WAITING_HANDOVER;
-            statuses.changeStatus(t, next, actor, "Approval decisions resolved");
+            var resolved = all.stream().map(RepairItem::getApprovalResolvedAt).filter(java.util.Objects::nonNull)
+                    .max(LocalDateTime::compareTo).orElse(recordedAt);
+            statuses.resolveWait(t, resolved, actor, "Đã ghi nhận đầy đủ quyết định của khách hàng");
         }
         return mapper.map(item);
     }

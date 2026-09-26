@@ -54,6 +54,10 @@ public class TechnicianController {
     }
     @PostMapping("/service-tickets/{id}/resume-repair")
     public ServiceTicketDetailResponse resume(@PathVariable @Positive Long id) { return operations.resumeRepair(id); }
+    @PostMapping("/service-tickets/{id}/wait/resolve")
+    public ServiceTicketDetailResponse resolveWait(@PathVariable @Positive Long id, @Valid @RequestBody WaitResolutionCommand request) {
+        return operations.resolveWait(id, request);
+    }
     @PostMapping("/service-tickets/{id}/finish-repair")
     public ServiceTicketDetailResponse finish(@PathVariable @Positive Long id) { return operations.finishRepair(id); }
     @GetMapping("/service-tickets/{id}/repair-duration")

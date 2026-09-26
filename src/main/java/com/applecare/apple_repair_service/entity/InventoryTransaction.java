@@ -67,6 +67,11 @@ public class InventoryTransaction {
             foreignKey = @ForeignKey(name = "fk_inventory_transactions_part_usage"))
     private PartUsage partUsage;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inventory_lot_id",
+            foreignKey = @ForeignKey(name = "fk_inventory_transactions_lot"))
+    private InventoryLot inventoryLot;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "recorded_by", nullable = false,

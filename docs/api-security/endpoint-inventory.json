@@ -1000,6 +1000,14 @@
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.ServiceTimeEstimateResponse>"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/internal/service-tickets/{id}/timing-metrics",
+  "controller" : "ServiceTimingController",
+  "handler" : "metrics",
+  "access" : "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.TicketTimingMetricsResponse"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/internal/service-tickets/{id}/transfer-candidates",
   "controller" : "TechnicianController",
   "handler" : "transferCandidates",

@@ -166,6 +166,24 @@ CREATE TABLE `device_types` (
   UNIQUE KEY `uk_device_types_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `inventory_lots` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `lot_code` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `branch_id` bigint NOT NULL,
+  `part_id` bigint NOT NULL,
+  `received_quantity` int NOT NULL,
+  `received_at` datetime(6) NOT NULL,
+  `received_by` bigint NOT NULL,
+  `source_note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_inventory_lots_lot_code` (`lot_code`),
+  KEY `idx_inventory_lots_branch_part_received` (`branch_id`,`part_id`,`received_at`),
+  KEY `fk_inventory_lots_part` (`part_id`),
+  KEY `fk_inventory_lots_received_by` (`received_by`),
+  CONSTRAINT `ck_inventory_lots_positive_quantity` CHECK (`received_quantity` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `inventory_transactions` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `created_at` datetime(6) NOT NULL,
@@ -175,12 +193,14 @@ CREATE TABLE `inventory_transactions` (
   `destination_branch_id` bigint DEFAULT NULL,
   `part_id` bigint NOT NULL,
   `part_usage_id` bigint DEFAULT NULL,
+  `inventory_lot_id` bigint DEFAULT NULL,
   `recorded_by` bigint NOT NULL,
   `source_branch_id` bigint DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_inventory_transactions_part_created_at` (`part_id`,`created_at`),
   KEY `fk_inventory_transactions_destination_branch` (`destination_branch_id`),
   KEY `fk_inventory_transactions_part_usage` (`part_usage_id`),
+  KEY `fk_inventory_transactions_lot` (`inventory_lot_id`),
   KEY `fk_inventory_transactions_recorded_by` (`recorded_by`),
   KEY `fk_inventory_transactions_source_branch` (`source_branch_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -235,6 +255,7 @@ CREATE TABLE `parts` (
 CREATE TABLE `repair_items` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `approval_decision_at` datetime(6) DEFAULT NULL,
+  `approval_resolved_at` datetime(6) DEFAULT NULL,
   `approval_note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `confirmation_method` enum('DIRECT','PHONE','PRE_AUTHORIZED') DEFAULT NULL,
   `warranty_remedy` enum('REPAIR','REPLACEMENT') DEFAULT NULL,
@@ -311,6 +332,10 @@ CREATE TABLE `service_issues` (
 CREATE TABLE `service_status_histories` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `changed_at` datetime(6) NOT NULL,
+  `resolved_at` datetime(6) DEFAULT NULL,
+  `resolution_recorded_at` datetime(6) DEFAULT NULL,
+  `resolution_note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `resolved_by` bigint DEFAULT NULL,
   `from_status` enum('ASSIGNED','CANCELLED','HANDED_OVER','INSPECTING','REPAIRING','WAITING_APPROVAL','WAITING_ASSIGNMENT','WAITING_HANDOVER','WAITING_PART') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `to_status` enum('ASSIGNED','CANCELLED','HANDED_OVER','INSPECTING','REPAIRING','WAITING_APPROVAL','WAITING_ASSIGNMENT','WAITING_HANDOVER','WAITING_PART') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -319,6 +344,7 @@ CREATE TABLE `service_status_histories` (
   PRIMARY KEY (`id`),
   KEY `idx_service_status_histories_ticket_changed_at` (`service_ticket_id`,`changed_at`),
   KEY `fk_service_status_histories_changed_by` (`changed_by`)
+  ,KEY `fk_status_history_resolved_by` (`resolved_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `service_tickets` (
@@ -497,6 +523,10 @@ ALTER TABLE `customer_devices` ADD CONSTRAINT `fk_customer_devices_customer` FOR
 ALTER TABLE `customer_devices` ADD CONSTRAINT `fk_customer_devices_device_model` FOREIGN KEY (`device_model_id`) REFERENCES `device_models` (`id`);
 ALTER TABLE `device_models` ADD CONSTRAINT `fk_device_models_device_type` FOREIGN KEY (`device_type_id`) REFERENCES `device_types` (`id`);
 ALTER TABLE `inventory_transactions` ADD CONSTRAINT `fk_inventory_transactions_destination_branch` FOREIGN KEY (`destination_branch_id`) REFERENCES `branches` (`id`);
+ALTER TABLE `inventory_lots` ADD CONSTRAINT `fk_inventory_lots_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
+ALTER TABLE `inventory_lots` ADD CONSTRAINT `fk_inventory_lots_part` FOREIGN KEY (`part_id`) REFERENCES `parts` (`id`);
+ALTER TABLE `inventory_lots` ADD CONSTRAINT `fk_inventory_lots_received_by` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`);
+ALTER TABLE `inventory_transactions` ADD CONSTRAINT `fk_inventory_transactions_lot` FOREIGN KEY (`inventory_lot_id`) REFERENCES `inventory_lots` (`id`);
 ALTER TABLE `inventory_transactions` ADD CONSTRAINT `fk_inventory_transactions_part` FOREIGN KEY (`part_id`) REFERENCES `parts` (`id`);
 ALTER TABLE `inventory_transactions` ADD CONSTRAINT `fk_inventory_transactions_part_usage` FOREIGN KEY (`part_usage_id`) REFERENCES `part_usages` (`id`);
 ALTER TABLE `inventory_transactions` ADD CONSTRAINT `fk_inventory_transactions_recorded_by` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`);
@@ -518,6 +548,7 @@ ALTER TABLE `service_feedbacks` ADD CONSTRAINT `fk_service_feedbacks_service_tic
 ALTER TABLE `service_issue_device_types` ADD CONSTRAINT `FK8ofnlysdl7mab9y7l5c2oejaj` FOREIGN KEY (`device_type_id`) REFERENCES `device_types` (`id`);
 ALTER TABLE `service_issue_device_types` ADD CONSTRAINT `FKn4ysgewlapc95jjkiht4gsm0p` FOREIGN KEY (`service_issue_id`) REFERENCES `service_issues` (`id`);
 ALTER TABLE `service_status_histories` ADD CONSTRAINT `fk_service_status_histories_changed_by` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`);
+ALTER TABLE `service_status_histories` ADD CONSTRAINT `fk_status_history_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`);
 ALTER TABLE `service_status_histories` ADD CONSTRAINT `fk_service_status_histories_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`);
 ALTER TABLE `service_tickets` ADD CONSTRAINT `fk_service_tickets_appointment_device` FOREIGN KEY (`appointment_device_id`) REFERENCES `appointment_devices` (`id`);
 ALTER TABLE `service_tickets` ADD CONSTRAINT `fk_service_tickets_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);

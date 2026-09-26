@@ -12,6 +12,7 @@ import com.applecare.apple_repair_service.dto.response.CustomerResponse;
 import com.applecare.apple_repair_service.dto.response.DeviceModelResponse;
 import com.applecare.apple_repair_service.dto.response.DeviceTypeResponse;
 import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
+import com.applecare.apple_repair_service.dto.response.InventoryLotResponse;
 import com.applecare.apple_repair_service.dto.response.MlPredictionResponse;
 import com.applecare.apple_repair_service.dto.response.PartResponse;
 import com.applecare.apple_repair_service.dto.response.PartUsageResponse;
@@ -38,6 +39,7 @@ import com.applecare.apple_repair_service.entity.CustomerDevice;
 import com.applecare.apple_repair_service.entity.DeviceModel;
 import com.applecare.apple_repair_service.entity.DeviceType;
 import com.applecare.apple_repair_service.entity.InventoryTransaction;
+import com.applecare.apple_repair_service.entity.InventoryLot;
 import com.applecare.apple_repair_service.entity.MlPrediction;
 import com.applecare.apple_repair_service.entity.Part;
 import com.applecare.apple_repair_service.entity.PartUsage;
@@ -104,7 +106,12 @@ public class EntityResponses {
     }
 
     public InventoryTransactionResponse map(InventoryTransaction e) {
-        return new InventoryTransactionResponse(e.getId(), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getNote(), e.getCreatedAt());
+        return new InventoryTransactionResponse(e.getId(), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getNote(), e.getCreatedAt());
+    }
+
+    public InventoryLotResponse map(InventoryLot e) {
+        return new InventoryLotResponse(e.getId(), e.getLotCode(), e.getBranch().getId(), e.getPart().getId(),
+                e.getReceivedQuantity(), e.getReceivedAt(), e.getReceivedBy().getId(), e.getSourceNote(), e.getCreatedAt());
     }
 
     public MlPredictionResponse map(MlPrediction e) {
@@ -120,7 +127,7 @@ public class EntityResponses {
     }
 
     public RepairItemResponse map(RepairItem e) {
-        return new RepairItemResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getServiceCatalogItem() == null ? null : e.getServiceCatalogItem().getId(), e.getItemNameSnapshot(), e.getApprovalStatus(), e.getBasePrice(), e.getFinalPrice(), e.getApprovalRecordedBy() == null ? null : e.getApprovalRecordedBy().getId(), e.getApprovalDecisionAt(), e.getApprovalNote(), e.getWarrantyStartDate(), e.getWarrantyEndDate(), e.getWarrantySourceItem() == null ? null : e.getWarrantySourceItem().getId(), e.getWarrantyDecision(), e.getWarrantyDecisionNote(), e.getCreatedAt(), e.getUpdatedAt(), e.getConfirmationMethod(), e.getWarrantyRemedy(),
+        return new RepairItemResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getServiceCatalogItem() == null ? null : e.getServiceCatalogItem().getId(), e.getItemNameSnapshot(), e.getApprovalStatus(), e.getBasePrice(), e.getFinalPrice(), e.getApprovalRecordedBy() == null ? null : e.getApprovalRecordedBy().getId(), e.getApprovalDecisionAt(), e.getApprovalResolvedAt(), e.getApprovalNote(), e.getWarrantyStartDate(), e.getWarrantyEndDate(), e.getWarrantySourceItem() == null ? null : e.getWarrantySourceItem().getId(), e.getWarrantyDecision(), e.getWarrantyDecisionNote(), e.getCreatedAt(), e.getUpdatedAt(), e.getConfirmationMethod(), e.getWarrantyRemedy(),
                 e.getWarrantyReplacementCatalog() == null ? null : e.getWarrantyReplacementCatalog().getId(),
                 (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart() == null ? null
                 : (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart().getId());
@@ -141,7 +148,7 @@ public class EntityResponses {
     }
 
     public ServiceStatusHistoryResponse map(ServiceStatusHistory e) {
-        return new ServiceStatusHistoryResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getFromStatus(), e.getToStatus(), e.getChangedBy() == null ? null : e.getChangedBy().getId(), e.getNote(), e.getChangedAt());
+        return new ServiceStatusHistoryResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getFromStatus(), e.getToStatus(), e.getChangedBy() == null ? null : e.getChangedBy().getId(), e.getNote(), e.getChangedAt(), e.getResolvedAt(), e.getResolutionRecordedAt(), e.getResolvedBy() == null ? null : e.getResolvedBy().getId(), e.getResolutionNote());
     }
 
     public ServiceTicketResponse map(ServiceTicket e) {

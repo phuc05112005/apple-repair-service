@@ -24,3 +24,16 @@
 Test: BusinessTimeTest và frontend/tests/business-time.test.mjs bao gồm 23:59:59 →
 00:00:00 giờ Việt Nam, trình duyệt UTC/UTC+7/Los Angeles, đổi tháng/năm và lịch sử
 REPAIRING qua nửa đêm (completed=20, current=25).
+
+## Bổ sung Phase 1.1
+
+Các cột ETA/deadline/actual dùng LocalDateTime theo Asia/Ho_Chi_Minh, giống receivedAt.
+`actualRepairStartedAt` ghi lần đầu vào REPAIRING; resume không reset. Hoàn tất kỹ
+thuật là WAITING_HANDOVER; bàn giao không kéo dài thời gian sửa. ETA history là
+snapshot append-only theo thời gian tính, không phải thời gian trạng thái.
+
+Countdown chỉ tính trên trình duyệt mỗi 15 giây, không ghi database hoặc gọi API
+định kỳ. Timestamp không offset được diễn giải +07:00. Các ca tích hợp Phase 1.1
+chạy với JVM khởi tạo UTC và đồng hồ kiểm thử theo Việt Nam.
+
+Chi tiết tại [quy tắc thời gian](../phase11/SERVICE_TIMING_RULES.md).

@@ -12,6 +12,8 @@ public record InventoryTransactionResponse(
         Long destinationBranchId,
         Integer quantity,
         Long partUsageId,
+        Long inventoryLotId,
+        String lotCode,
         Long recordedById,
         String note,
         LocalDateTime createdAt

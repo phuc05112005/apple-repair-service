@@ -19,7 +19,6 @@ public class ServiceTimingService {
  private final RepairItemRepository items;
  private final ServiceStatusHistoryRepository statusHistory;
  private final ServiceTimeEstimateHistoryRepository estimates;
- private final RepairDurationService durations;
  private final TimingSettings settings;
  private final Clock clock;
 
@@ -77,6 +76,8 @@ public class ServiceTimingService {
     var earliest=cursors.getOrDefault(workerId,now);boolean isTrigger=t.getId().equals(trigger.getId());
     if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING)earliest=now;
     var range=blocked.contains(workerId)?new WorkCalendar.Estimate(null,null):WorkCalendar.allocate(earliest,remaining,windows(shifts,workerId,t.getBranch().getId()));
+    if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING && (reason.equals("ACTUAL_START") || reason.equals("RESUME")))
+     range=new WorkCalendar.Estimate(now,range.completion());
     if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING && !reason.equals("ACTUAL_START") && !reason.equals("RESUME"))
      range=new WorkCalendar.Estimate(t.getEstimatedStartAt()!=null?t.getEstimatedStartAt():t.getActualRepairStartedAt(),range.completion());
     if(isTrigger && reason.startsWith("MANUAL:"))range=new WorkCalendar.Estimate(t.getEstimatedStartAt(),t.getEstimatedCompletionAt());

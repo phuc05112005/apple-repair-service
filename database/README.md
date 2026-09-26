@@ -1,6 +1,6 @@
 # Khởi tạo schema
 
-`schema.sql` là schema canonical cho database **trống**: 29 bảng, có đủ lịch tuần,
+`schema.sql` là schema canonical cho database **trống**: 31 bảng, có đủ lịch tuần,
 ngày ngoại lệ, mapping issue–device type và các trường Phase 1:
 - `service_tickets.customer_reported_issue`, `authorized_scope` (TEXT nullable).
 - `repair_items.confirmation_method` (DIRECT/PHONE/PRE_AUTHORIZED), `warranty_remedy`
@@ -22,3 +22,25 @@ Tạo một database test riêng, import schema vào database trống đó rồi
 `SPRING_DATASOURCE_URL` hoặc `TEST_DATABASE_URL` khi chạy Maven. Các test transaction
 rollback; test concurrency/HTTP commit tự cleanup đúng fixture trong database test.
 Không chạy các test này với URL database chứa dữ liệu người dùng.
+
+## Phase 1.1 — kho lỗi và thời gian dự kiến
+
+Thêm `defective_part_returns` và `service_time_estimate_histories`. `service_tickets`
+nhận 9 cột nullable: hạn phân công, dự kiến bắt đầu/hoàn thành ban đầu và hiện tại,
+ngày bắt đầu/hoàn thành sửa thực tế, thời lượng dự kiến và nguồn dự kiến.
+
+`phase11-additive.sql` dành cho database đã có schema Phase 1, chạy **một lần** khi
+chưa có các cột/bảng tương ứng. Script được cung cấp để quản trị viên áp dụng; lượt
+này không thực thi trên database nghiệp vụ. Nếu Hibernate đã tạo cột/bảng thì cần
+đối chiếu schema trước, không chạy lại script nguyên khối. MySQL DDL có implicit
+commit; nên sao lưu và áp dụng khi ngừng ghi nghiệp vụ theo quy trình triển khai.
+
+Không suy diễn defective quantity từ các note cũ. Biên nhận mới là nguồn số lượng
+kho lỗi. Không sinh ETA ban đầu giả cho ticket cũ. Các lần tính trong tương lai
+có thể ghi current ETA/history thật từ thời điểm tính, còn initial ETA vẫn null.
+
+Mặc định tập trung khi chưa có setting: nghỉ 10 phút, hạn phân công 15 phút,
+thời lượng kiểm tra tạm 30 phút. Không cần seed setting để ứng dụng khởi động.
+Admin lưu cấu hình sẽ dùng API system_settings hiện có.
+
+Quy tắc: [SERVICE_TIMING_RULES.md](../docs/phase11/SERVICE_TIMING_RULES.md).

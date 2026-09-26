@@ -75,6 +75,9 @@ public class RepairItem {
     @Column(name = "approval_decision_at")
     private LocalDateTime approvalDecisionAt;
 
+    @Column(name = "approval_resolved_at")
+    private LocalDateTime approvalResolvedAt;
+
     @Column(name = "approval_note", columnDefinition = "TEXT")
     private String approvalNote;
 

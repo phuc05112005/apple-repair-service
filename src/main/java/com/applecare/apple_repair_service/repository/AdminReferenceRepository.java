@@ -14,6 +14,7 @@ public class AdminReferenceRepository {
                 || exists("select count(s) from AppointmentSlot s where s.branch.id = :id", id)
                 || exists("select count(s) from TechnicianSchedule s where s.branch.id = :id", id)
                 || exists("select count(i) from BranchInventory i where i.branch.id = :id", id)
+                || exists("select count(l) from InventoryLot l where l.branch.id = :id", id)
                 || exists("select count(t) from InventoryTransaction t where t.sourceBranch.id = :id or t.destinationBranch.id = :id", id)
                 || exists("select count(t) from ServiceTicket t where t.branch.id = :id", id);
     }
@@ -46,6 +47,7 @@ public class AdminReferenceRepository {
         return exists("select count(d) from DefectivePartReturn d where d.part.id = :id", id)
                 || exists("select count(c) from ServiceCatalogItem c where c.part.id = :id", id)
                 || exists("select count(i) from BranchInventory i where i.part.id = :id", id)
+                || exists("select count(l) from InventoryLot l where l.part.id = :id", id)
                 || exists("select count(u) from PartUsage u where u.part.id = :id", id)
                 || exists("select count(t) from InventoryTransaction t where t.part.id = :id", id);
     }

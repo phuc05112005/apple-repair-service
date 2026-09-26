@@ -24,6 +24,7 @@ class PhaseOneWarrantyIntegrationTest {
     @Autowired InventoryService inventory;
     @Autowired PaymentService payments;
     @Autowired com.applecare.apple_repair_service.repository.AdminReferenceRepository references;
+    @Autowired DefectiveInventoryService defective;
     ApiFixture f;
     @BeforeEach void setup() { f = new ApiFixture(em, clock); f.create(); }
 
@@ -69,6 +70,13 @@ class PhaseOneWarrantyIntegrationTest {
         assertEquals(3, inventory.getInventory(f.branch.getId(), replacement.getPart().getId()).quantity());
         assertThrows(BusinessRuleViolationException.class, () -> inventory.usePart(new UsePartRequest(i.getId(), replacement.getPart().getId(), 1, f.technician.getId())));
         var used = inventory.usePart(new UsePartRequest(i.getId(), replacement.getPart().getId(), 1, f.technician.getId(), "Màn hình gốc sọc, thu hồi khay BH-01"));
+        assertEquals(1, defective.onHand(f.branch.getId(), replacement.getPart().getId()));
+        var receipt = defective.list(f.branch.getId(), replacement.getPart().getId(), null, i.getServiceTicket().getId()).getFirst();
+        assertEquals(used.id(), receipt.sourcePartUsageId());
+        assertEquals(receipt.id(), defective.record(em.find(PartUsage.class, used.id()), replacement.getPart(), "Retry same receipt").getId());
+        assertEquals(1, defective.onHand(f.branch.getId(), replacement.getPart().getId()));
+        defective.changeStatus(receipt.id(), new com.applecare.apple_repair_service.dto.command.DefectiveStatusCommand(DefectivePartStatus.SENT_TO_SUPPLIER, "Sent for warranty"), f.admin.getId());
+        assertEquals(0, defective.onHand(f.branch.getId(), replacement.getPart().getId()));
         assertNotNull(used.defectiveReturnNote()); assertEquals(f.technician.getId(), used.recordedById()); assertNotNull(used.usedAt());
         assertEquals(2, inventory.getInventory(f.branch.getId(), replacement.getPart().getId()).quantity());
         assertThrows(BusinessRuleViolationException.class, () -> inventory.reversePartUsage(new ReversePartUsageRequest(used.id(), f.technician.getId(), "Không được nhập linh kiện lỗi")));

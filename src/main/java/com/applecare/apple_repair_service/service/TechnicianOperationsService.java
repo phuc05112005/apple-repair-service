@@ -25,7 +25,7 @@ public class TechnicianOperationsService {
 
     public RepairItemResponse approval(Long itemId, ApprovalCommand request) {
         policy.requireItem(itemId);
-        return repairItems.recordApprovalDecision(itemId, new ApprovalDecisionRequest(request.decision(), actor.id(), request.note(), request.confirmationMethod()));
+        return repairItems.recordApprovalDecision(itemId, new ApprovalDecisionRequest(request.decision(), actor.id(), request.note(), request.confirmationMethod(), request.resolvedAt()));
     }
 
     public ServiceTicketDetailResponse startInspection(Long id) {
@@ -44,6 +44,10 @@ public class TechnicianOperationsService {
     public ServiceTicketDetailResponse resumeRepair(Long id) {
         policy.requireActiveTechnician(id);
         return tickets.resumeRepair(id,actor.id());
+    }
+    public ServiceTicketDetailResponse resolveWait(Long id, WaitResolutionCommand request) {
+        policy.requireActiveTechnician(id);
+        return tickets.resolveWait(id, actor.id(), request.resolvedAt(), request.note());
     }
     public ServiceTicketDetailResponse finishRepair(Long id) {
         policy.requireActiveTechnician(id);

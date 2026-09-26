@@ -11,6 +11,10 @@ public record ServiceStatusHistoryResponse(
         ServiceTicketStatus toStatus,
         Long changedById,
         String note,
-        LocalDateTime changedAt
+        LocalDateTime changedAt,
+        LocalDateTime resolvedAt,
+        LocalDateTime resolutionRecordedAt,
+        Long resolvedById,
+        String resolutionNote
 ) {
 }
