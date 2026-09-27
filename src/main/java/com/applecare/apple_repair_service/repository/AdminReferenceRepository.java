@@ -40,7 +40,8 @@ public class AdminReferenceRepository {
     public boolean serviceCatalogItemIsReferenced(Long id) {
         return exists("select count(i) from AppointmentServiceItem i where i.serviceCatalogItem.id = :id", id)
                 || exists("select count(i) from RepairItem i where i.serviceCatalogItem.id = :id", id)
-                || exists("select count(i) from RepairItem i where i.warrantyReplacementCatalog.id = :id", id);
+                || exists("select count(i) from RepairItem i where i.warrantyReplacementCatalog.id = :id", id)
+                || exists("select count(c) from ServiceCatalogItem c where c.warrantyReplacementCatalog.id = :id", id);
     }
 
     public boolean partIsReferenced(Long id) {

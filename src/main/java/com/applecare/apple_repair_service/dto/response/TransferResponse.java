@@ -18,6 +18,9 @@ public record TransferResponse(
         Long requestedById,
         Long respondedById,
         String note,
+        String workDone,
+        String currentCondition,
+        String responseNote,
         LocalDateTime requestedAt,
         LocalDateTime respondedAt
 ) {

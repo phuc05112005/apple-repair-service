@@ -81,6 +81,7 @@ public class InventoryService {
     }
 
     /** Compatibility helper for isolated fixtures; HTTP stock-in always requires explicit lot data. */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
         var result = stockIn(new StockInRequest("TEST-" + java.util.UUID.randomUUID(), r.branchId(), r.partId(),
                 r.quantity(), LocalDateTime.now(clock), r.recordedByUserId(), r.note()));
@@ -109,7 +110,8 @@ public class InventoryService {
         BusinessRules.require(ticket.getStatus() == ServiceTicketStatus.REPAIRING || ticket.getStatus() == ServiceTicketStatus.WAITING_PART, "Part usage requires an ongoing repair");
         var part = lockPart(r.partId());
         var branch = branch(ticket.getBranch().getId());
-        if (item.getServiceCatalogItem().getServiceType().getCode() == com.applecare.apple_repair_service.enums.ServiceTypeCode.REPLACEMENT) {
+        if (item.getWarrantySourceItem() == null
+                && item.getServiceCatalogItem().getServiceType().getCode() == com.applecare.apple_repair_service.enums.ServiceTypeCode.REPLACEMENT) {
             var expected = item.getServiceCatalogItem().getPart();
             BusinessRules.require(expected != null && expected.getId().equals(part.getId()),
                     "Linh kiện sử dụng phải khớp với phương án thay thế đã được duyệt.");

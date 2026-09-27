@@ -21,12 +21,14 @@ public class TransferOperationsService {
     @PreAuthorize("hasRole('TECHNICIAN')")
     public TransferResponse request(Long ticketId, TransferCommand request) {
         var active=policy.requireActiveTechnician(ticketId);
-        return transfers.requestTransfer(new CreateTransferRequest(active.getId(),request.targetTechnicianId(),actor.id(),TransferMode.REQUEST,request.note()));
+        return transfers.requestTransfer(new CreateTransferRequest(active.getId(), request.targetTechnicianId(), actor.id(), TransferMode.REQUEST,
+                request.note(), request.workDone(), request.currentCondition()));
     }
     @PreAuthorize("hasRole('RECEPTIONIST')")
     public TransferResponse direct(Long ticketId, TransferCommand request) {
         var active=policy.activeAssignment(ticketId);
-        return transfers.directTransfer(new CreateTransferRequest(active.getId(),request.targetTechnicianId(),actor.id(),TransferMode.DIRECT,request.note()));
+        return transfers.directTransfer(new CreateTransferRequest(active.getId(), request.targetTechnicianId(), actor.id(), TransferMode.DIRECT,
+                request.note(), request.workDone(), request.currentCondition()));
     }
     @PreAuthorize("hasRole('TECHNICIAN')")
     public TransferResponse accept(Long transferId, NoteCommand request) {
@@ -44,4 +46,3 @@ public class TransferOperationsService {
         return transfers.cancelTransfer(transferId,new TransferDecisionRequest(actor.id(),request.note()));
     }
 }
-

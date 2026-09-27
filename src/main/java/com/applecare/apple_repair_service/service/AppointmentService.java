@@ -20,6 +20,8 @@ import com.applecare.apple_repair_service.enums.AppointmentSlotStatus;
 import com.applecare.apple_repair_service.enums.AppointmentStatus;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.exception.InvalidStateTransitionException;
+import com.applecare.apple_repair_service.exception.AppointmentExpiredException;
+import com.applecare.apple_repair_service.exception.AppointmentTooEarlyException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AppointmentDeviceRepository;
 import com.applecare.apple_repair_service.repository.AppointmentRepository;
@@ -62,14 +64,14 @@ public class AppointmentService {
     private AppointmentDetailResponse createInTransaction(CreateAppointmentRequest r) {
         rules.validate(r);
         var slot = validSlot(r.appointmentSlotId());
-        var discount = settings.getDecimal("ONLINE_DISCOUNT_PERCENT", PricePolicy.DEFAULT_ONLINE_DISCOUNT);
+        var discount = settings.getDecimal(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT, PricePolicy.DEFAULT_ONLINE_DISCOUNT);
         PricePolicy.discounted(null, discount);
         // Validate the complete plan before resolving/creating the customer.
         for (var d : r.devices()) {
             CatalogPolicy.requireModel(access.get(DeviceModel.class, d.deviceModelId()));
             var seen = new HashSet<Long>();
             for (var i : d.serviceItems()) {
-                BusinessRules.require(seen.add(i.serviceCatalogItemId()), "Duplicate service for booking device");
+                BusinessRules.require(seen.add(i.serviceCatalogItemId()), "Thiết bị có dịch vụ bị chọn trùng.");
                 validCatalog(i.serviceCatalogItemId(), d.deviceModelId());
             }
         }
@@ -115,8 +117,8 @@ public class AppointmentService {
         var s = access.get(AppointmentSlot.class, id);
         BusinessRules.require(s.getBranch() != null && s.getBranch().getStatus() == ActiveStatus.ACTIVE,
                 "Chi nhánh của khung giờ đã ngừng hoạt động. Vui lòng chọn khung giờ khác.");
-        BusinessRules.require(s.getStatus() == AppointmentSlotStatus.OPEN, "Slot is closed");
-        BusinessRules.require(!LocalDateTime.of(s.getAppointmentDate(), s.getStartTime()).isBefore(LocalDateTime.now(clock)), "Slot is in the past");
+        BusinessRules.require(s.getStatus() == AppointmentSlotStatus.OPEN, "Khung giờ đã đóng. Vui lòng chọn khung giờ khác.");
+        BusinessRules.require(!LocalDateTime.of(s.getAppointmentDate(), s.getStartTime()).isBefore(LocalDateTime.now(clock)), "Khung giờ đã bắt đầu hoặc đã qua.");
         return s;
     }
 
@@ -187,25 +189,41 @@ public class AppointmentService {
     public AppointmentDetailResponse expireAppointment(Long id) {
         var a = access.lock(Appointment.class, id);
         requireOpen(a);
-        int grace = settings.getInteger("APPOINTMENT_GRACE_MINUTES");
-        BusinessRules.require(grace >= 0, "Grace minutes cannot be negative");
-        var deadline = LocalDateTime.of(a.getAppointmentSlot().getAppointmentDate(), a.getAppointmentSlot().getStartTime()).plusMinutes(grace);
-        BusinessRules.require(LocalDateTime.now(clock).isAfter(deadline), "Appointment has not exceeded grace");
+        var slotEnd = LocalDateTime.of(a.getAppointmentSlot().getAppointmentDate(), a.getAppointmentSlot().getEndTime());
+        BusinessRules.require(!LocalDateTime.now(clock).isBefore(slotEnd),
+                "Lịch hẹn chưa kết thúc nên chưa thể đánh dấu hết hiệu lực.");
         transition(a, AppointmentStatus.EXPIRED);
         return detail(a);
     }
 
-    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED,
+            noRollbackFor = AppointmentExpiredException.class)
     public AppointmentDetailResponse markArrived(Long id) {
         var a = access.lock(Appointment.class, id);
         if (a.getStatus() == AppointmentStatus.ARRIVED) return detail(a);
+        if (a.getStatus() != AppointmentStatus.CONFIRMED)
+            throw new InvalidStateTransitionException("Lịch hẹn cần được xác nhận trước khi ghi nhận khách đến.");
+        var now = LocalDateTime.now(clock);
+        var slot = a.getAppointmentSlot();
+        var start = LocalDateTime.of(slot.getAppointmentDate(), slot.getStartTime());
+        var end = LocalDateTime.of(slot.getAppointmentDate(), slot.getEndTime());
+        var label = slot.getStartTime().toString().substring(0, 5) + "–" + slot.getEndTime().toString().substring(0, 5);
+        if (now.isBefore(start))
+            throw new AppointmentTooEarlyException("Chưa đến khung giờ tiếp nhận. Lịch hẹn có hiệu lực từ " + label + ".");
+        if (!now.isBefore(end)) {
+            transition(a, AppointmentStatus.EXPIRED);
+            appointments.flush();
+            throw new AppointmentExpiredException("Đã quá khung giờ " + label
+                    + ". Lịch hẹn không còn đủ điều kiện hưởng ưu đãi đặt lịch.");
+        }
         transition(a, AppointmentStatus.ARRIVED);
+        a.setArrivedAt(now);
         return detail(a);
     }
 
     private void requireOpen(Appointment a) {
         if (a.getStatus() != AppointmentStatus.PENDING_CONFIRMATION && a.getStatus() != AppointmentStatus.CONFIRMED)
-            throw new InvalidStateTransitionException("Appointment is no longer open");
+            throw new InvalidStateTransitionException("Lịch hẹn không còn ở trạng thái có thể thao tác.");
     }
 
     private void transition(Appointment a, AppointmentStatus next) {

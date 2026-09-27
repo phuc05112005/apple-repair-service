@@ -16,7 +16,7 @@ Kỹ thuật viên đang được phân công có thể cập nhật phương á
 
 ## 3. Walk-in chưa có dịch vụ
 
-Tiếp nhận chấp nhận danh sách dịch vụ rỗng. Lưu riêng vấn đề khách mô tả, tình trạng khi nhận và phạm vi cho phép trước. Kỹ thuật viên mở phiếu, bắt đầu INSPECTING rồi chọn catalog REPAIR/REPLACEMENT phù hợp. Test đi qua walk-in → phân công → inspection bằng API; test khác xác minh phương án theo PRE_AUTHORIZED đi thẳng REPAIRING và sau đó đổi từ sửa sang thay trong phạm vi đã ghi nhận. Mô tả gốc không bị ghi đè bởi kết luận kỹ thuật.
+Contract hiện hành yêu cầu tiếp nhận chọn ít nhất một catalog REPAIR/REPLACEMENT cụ thể. Vấn đề khách mô tả, tình trạng khi nhận và phạm vi cho phép trước vẫn được lưu riêng; đổi phương án sau kiểm tra không ghi đè mô tả gốc.
 
 ## 4. Bảo hành theo RepairItem
 
@@ -58,7 +58,7 @@ Các test bao phủ thiếu usage, sai part, reverse rồi xuất lại, không 
 
 ## 12. Duration
 
-Backend giữ semantics: completedRepairMinutes là các khoảng đã đóng; currentRepairMinutes đã gồm phần đã đóng và khoảng REPAIRING đang mở. Frontend chỉ hiện currentRepairMinutes. Test: completed = 20, current = 25; hiển thị tổng 25, không cộng thành 45. Thời gian chờ không được cộng vào active repair duration.
+Contract hiện hành: completedRepairMinutes là các khoảng active technical đã đóng; currentRepairMinutes đã gồm phần đã đóng và khoảng INSPECTING/REPAIRING đang mở. Frontend chỉ hiện currentRepairMinutes. Thời gian chờ/queue/break/transfer gap/bàn giao không được cộng.
 
 ## 13. Booking validation
 
@@ -110,7 +110,7 @@ Bằng chứng local: `target/phase1-user-db-before.txt`, `phase1-user-db-after.
 
 ## 20. Khung ml/
 
-Giữ notebooks/, data/raw/, data/processed/, data/synthetic/, src/, models/, api/, tests/, requirements.txt, README.md, .gitignore. Các thư mục rỗng có .gitkeep. README mô tả Spring Boot sở hữu authorization/validation/business rules/DB writes/quyết định cuối; Python tương lai chỉ nhận features và trả prediction. Regression dự kiến thời lượng REPAIRING theo kỹ thuật viên; classification dự kiến nguy cơ không hài lòng, không dùng feedback làm feature.
+Giữ notebooks/, data/raw/, data/processed/, data/synthetic/, src/, models/, api/, tests/, requirements.txt, README.md, .gitignore. README mô tả Spring Boot sở hữu authorization/validation/business rules/DB writes/quyết định cuối; Python tương lai chỉ nhận features và trả prediction. Regression dự kiến Active Technical Duration (`INSPECTING + REPAIRING`) theo kỹ thuật viên; classification dự kiến nguy cơ không hài lòng, không dùng feedback làm feature.
 
 ## 21. Những gì cố ý chưa làm
 
@@ -122,7 +122,7 @@ Chưa training, sinh dataset lớn/synthetic, tạo notebook thực nghiệm/mod
 - **Warranty mixed billing:** đúng theo kiểm thử 0 + 900.000 = 900.000, bảo toàn hạng mục nguồn và trừ đúng linh kiện.
 - **Customer confirmation:** không yêu cầu bất kỳ thao tác website nào của khách. Nhân viên ghi nhận DIRECT/PHONE/PRE_AUTHORIZED.
 - **Inventory:** thay thông thường và thay bảo hành đều yêu cầu usage thật; thu hồi lỗi không trở lại usable stock. Giới hạn cơ chế thu hồi nêu ở mục 9.
-- **Blocker dữ liệu trước ML:** lịch sử hiện có quá ít để đánh giá mô hình thực tế; cần chốt đơn vị mẫu theo ticket/assignment, prediction time, nhãn, history thiếu, phiếu nhiều kỹ thuật viên và split chống leakage. Không giả lập nhãn thật hoặc tự điền lịch sử cũ. REPAIRING là thời gian trạng thái, chưa phải timer thao tác theo từng item.
+- **Blocker dữ liệu trước ML:** lịch sử hiện có quá ít để đánh giá mô hình thực tế; cần chốt đơn vị mẫu theo ticket/assignment, prediction time, nhãn, history thiếu, phiếu nhiều kỹ thuật viên và split chống leakage. Không giả lập nhãn thật hoặc tự điền lịch sử cũ. Active Technical Duration là thời gian state hợp lệ, chưa phải timer thao tác theo từng item.
 - **Có thể bắt đầu dataset contract + synthetic data + notebook ở phase kế tiếp:** có. Synthetic chỉ chứng minh pipeline, không chứng minh độ chính xác vận hành. Môi trường Python/dependency phải được kiểm chứng và pin tại Phase 2. Chưa đủ căn cứ để huấn luyện/triển khai mô hình dựa trên dữ liệu thực tế.
 
 Dừng ở Phase 1. Không tự động bắt đầu Phase 2.

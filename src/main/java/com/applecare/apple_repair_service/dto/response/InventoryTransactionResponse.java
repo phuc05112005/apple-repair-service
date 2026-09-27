@@ -15,6 +15,7 @@ public record InventoryTransactionResponse(
         Long inventoryLotId,
         String lotCode,
         Long recordedById,
+        String recordedByName,
         String note,
         LocalDateTime createdAt
 ) {

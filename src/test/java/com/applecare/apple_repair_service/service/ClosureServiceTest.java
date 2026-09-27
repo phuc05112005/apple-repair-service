@@ -134,7 +134,7 @@ class ClosureServiceTest {
         var histories = mock(ServiceStatusHistoryRepository.class);
         var assignments = mock(AssignmentRepository.class);
         when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
-        return new ServiceTicketService(mock(ServiceTicketRepository.class), repairs, mock(AppointmentServiceItemRepository.class), histories, mock(CustomerIdentity.class), access, rules, new EntityResponses(), new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class)), mock(TicketCodeGenerator.class), new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), payments, mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
+        return new ServiceTicketService(mock(ServiceTicketRepository.class), repairs, mock(AppointmentServiceItemRepository.class), histories, mock(CustomerIdentity.class), access, rules, new EntityResponses(), new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class), access), mock(TicketCodeGenerator.class), new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), payments, mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
     }
 
     RepairItem source() {

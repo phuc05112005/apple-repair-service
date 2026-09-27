@@ -36,5 +36,7 @@ final class CatalogPolicy {
                 "Dịch vụ thay thế chưa được cấu hình linh kiện.");
         BusinessRules.require(part == null || part.getStatus() == ActiveStatus.ACTIVE,
                 "Linh kiện của dịch vụ hiện đã ngừng sử dụng.");
+        BusinessRules.require(catalog.getStandardDurationMinutes() != null && catalog.getStandardDurationMinutes() > 0,
+                "Dịch vụ chưa có thời lượng kỹ thuật tiêu chuẩn hợp lệ.");
     }
 }

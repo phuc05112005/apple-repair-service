@@ -58,7 +58,7 @@ public class SystemSettingService {
         rules.validate(r);
         key = BusinessRules.required(key, "Setting key");
         BusinessRules.require(key.length() <= 255, "Setting key too long");
-        if (key.equals("ONLINE_DISCOUNT_PERCENT")) {
+        if (key.equals(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT)) {
             try {
                 var n = new BigDecimal(r.settingValue().trim());
                 PricePolicy.discounted(null, n);
@@ -66,17 +66,10 @@ public class SystemSettingService {
                 throw new BusinessRuleViolationException("Invalid discount");
             }
         }
-        if (key.equals("APPOINTMENT_GRACE_MINUTES")) {
-            try {
-                BusinessRules.require(Integer.parseInt(r.settingValue().trim()) >= 0, "Grace must not be negative");
-            } catch (NumberFormatException e) {
-                throw new BusinessRuleViolationException("Invalid grace minutes");
-            }
-        }
-        if (java.util.Set.of(TimingSettings.BREAK, TimingSettings.ASSIGNMENT, TimingSettings.DEFAULT).contains(key)) {
+        if (java.util.Set.of(TimingSettings.BREAK, TimingSettings.ASSIGNMENT).contains(key)) {
             try {
                 int minutes = Integer.parseInt(r.settingValue().trim());
-                BusinessRules.require(minutes >= 0 && minutes <= 10080 && (!key.equals(TimingSettings.DEFAULT) || minutes > 0), "Số phút phải từ 0 đến 10080; thời lượng mặc định phải lớn hơn 0.");
+                BusinessRules.require(minutes >= 0 && minutes <= 10080, "Số phút phải từ 0 đến 10080.");
             } catch (NumberFormatException ex) { throw new BusinessRuleViolationException("Vui lòng nhập số phút nguyên."); }
         }
         var e = repository.findBySettingKey(key).orElseGet(SystemSetting::new);

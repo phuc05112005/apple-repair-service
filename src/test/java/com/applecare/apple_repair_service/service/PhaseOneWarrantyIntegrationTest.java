@@ -20,7 +20,9 @@ class PhaseOneWarrantyIntegrationTest {
     @Autowired EntityManager em;
     @Autowired Clock clock;
     @Autowired ServiceTicketService tickets;
+    @Autowired AssignmentService assignments;
     @Autowired WarrantyService warranties;
+    @Autowired WarrantyClaimService warrantyClaims;
     @Autowired InventoryService inventory;
     @Autowired PaymentService payments;
     @Autowired com.applecare.apple_repair_service.repository.AdminReferenceRepository references;
@@ -35,7 +37,7 @@ class PhaseOneWarrantyIntegrationTest {
         else type = types.getFirst();
         var c = new ServiceCatalogItem(); c.setName(f.prefix + suffix); c.setDeviceModel(f.model);
         c.setServiceType(type); c.setServiceIssue(issue); c.setConfiguredPrice(new BigDecimal("900000.00"));
-        c.setStandardDurationMinutes(30); c.setWarrantyDays(30);
+        c.setStandardDurationMinutes(30); c.setWarrantyDays(30); c.setWarrantyRemedy(WarrantyRemedy.REPAIR);
         if (code == ServiceTypeCode.REPLACEMENT) {
             var part = new Part(); part.setName(f.prefix + suffix); part.setPartCode(f.prefix + suffix); part.setSalePrice(new BigDecimal("900000.00")); em.persist(part); c.setPart(part);
             inventory.stockIn(new StockAdjustmentRequest(f.branch.getId(), part.getId(), 3, f.admin.getId(), "Isolated test stock"));
@@ -112,8 +114,13 @@ class PhaseOneWarrantyIntegrationTest {
         tickets.finishRepair(free.getServiceTicket().getId(), f.technician.getId());
         assertEquals(new BigDecimal("900000.00"), payments.calculateTicketTotal(free.getServiceTicket().getId()));
     }
-    @Test void emptyWalkInCanUsePreauthorizedScopeWithoutWaitingOrLosingOriginalProblem() {
-        var created = tickets.createWalkInTicket(new WalkInIntakeRequest("Khách test", f.prefix, f.branch.getId(), f.model.getId(), null, null, "Trầy vỏ", List.of(), "Máy mất nguồn", "Nếu sửa không được thì thay, tối đa 1 triệu"), f.receptionist.getId());
+    @Test void walkInCanUsePreauthorizedScopeWithoutWaitingOrLosingOriginalProblem() {
+        var created = tickets.createWalkInTicket(new WalkInIntakeRequest("Khách test", f.prefix, f.branch.getId(), f.model.getId(), null, null, "Trầy vỏ", List.of(f.catalog.getId()), "Máy mất nguồn", "Nếu sửa không được thì thay, tối đa 1 triệu"), f.receptionist.getId());
+        var shift = new TechnicianSchedule();
+        shift.setTechnician(f.technician); shift.setBranch(f.branch); shift.setWorkDate(LocalDate.now(clock));
+        shift.setStartTime(LocalTime.MIN); shift.setEndTime(LocalTime.MAX); em.persist(shift); em.flush();
+        assignments.assignTechnician(created.ticket().id(), new AssignTechnicianRequest(
+                f.technician.getId(), f.receptionist.getId(), AssignmentSource.MANUAL_OVERRIDE));
         var t = em.find(ServiceTicket.class, created.ticket().id()); t.setStatus(ServiceTicketStatus.INSPECTING);
         var result = tickets.recordInspection(t.getId(), new RecordInspectionRequest("Sửa nguồn", f.technician.getId(), false,
                 List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.valueOf(100), BigDecimal.valueOf(100), null)), ConfirmationMethod.PRE_AUTHORIZED, "Trong phạm vi khách đã cho phép"));
@@ -134,5 +141,61 @@ class PhaseOneWarrantyIntegrationTest {
         assertThrows(BusinessRuleViolationException.class, () -> tickets.recordInspection(t.getId(), new RecordInspectionRequest("Lỗi nguồn", f.technician.getId(), false, draft)));
         assertThrows(BusinessRuleViolationException.class, () -> tickets.recordInspection(t.getId(), new RecordInspectionRequest("Lỗi nguồn", f.technician.getId(), false, draft, ConfirmationMethod.PRE_AUTHORIZED, "Tự ghi")));
         assertEquals(ServiceTicketStatus.INSPECTING, t.getStatus());
+    }
+
+    @Test void receptionistCreatesLinkedWarrantyRepairAndHistoryIsDerivedWithoutResettingExpiry() {
+        var source = f.item(f.ticket(ServiceTicketStatus.HANDED_OVER));
+        var originalStart = LocalDate.now(clock).minusDays(2);
+        var originalEnd = LocalDate.now(clock).plusDays(28);
+        source.setWarrantyStartDate(originalStart);
+        source.setWarrantyEndDate(originalEnd);
+        f.catalog.setWarrantyRemedy(WarrantyRemedy.REPAIR);
+        em.flush();
+
+        var created = warrantyClaims.create(source.getId(), new CreateWarrantyClaimRequest(
+                f.branch.getId(), "Máy và phụ kiện đã tiếp nhận", "Lỗi nguồn tái diễn", "Khách yêu cầu kiểm tra bảo hành", null), f.receptionist.getId());
+        var claim = em.find(RepairItem.class, created.repairItems().getFirst().id());
+        assertEquals(source.getId(), claim.getWarrantySourceItem().getId());
+        assertEquals(WarrantyRemedy.REPAIR, claim.getWarrantyRemedy());
+        assertEquals(BigDecimal.ZERO.setScale(2), claim.getFinalPrice().setScale(2));
+        assertEquals(originalStart, claim.getWarrantyStartDate());
+        assertEquals(originalEnd, claim.getWarrantyEndDate());
+
+        claim.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
+        tickets.finishRepair(claim.getServiceTicket().getId(), f.technician.getId());
+        assertEquals(originalEnd, claim.getWarrantyEndDate());
+        var history = warrantyClaims.history(source.getServiceTicket().getCustomerDevice().getCustomer().getPhone(), null);
+        var sourceHistory = history.items().stream().filter(item -> item.repairItemId().equals(source.getId())).findFirst().orElseThrow();
+        assertEquals(1, sourceHistory.claimCount());
+        assertEquals(claim.getId(), sourceHistory.claims().getFirst().repairItemId());
+        assertNotNull(sourceHistory.lastClaimAt());
+    }
+
+    @Test void configuredWarrantyReplacementUsesTargetCatalogAndStillRequiresPartUsage() {
+        var replacement = catalog(ServiceTypeCode.REPLACEMENT, f.issue, "configured-warranty-replacement");
+        f.catalog.setWarrantyRemedy(WarrantyRemedy.REPLACEMENT);
+        f.catalog.setWarrantyReplacementCatalog(replacement);
+        var source = f.item(f.ticket(ServiceTicketStatus.HANDED_OVER));
+        source.setWarrantyStartDate(LocalDate.now(clock).minusDays(1));
+        source.setWarrantyEndDate(LocalDate.now(clock).plusDays(20));
+        em.flush();
+
+        var created = warrantyClaims.create(source.getId(), new CreateWarrantyClaimRequest(
+                f.branch.getId(), "Đã nhận máy", "Linh kiện lỗi lại", null, null), f.receptionist.getId());
+        var claim = em.find(RepairItem.class, created.repairItems().getFirst().id());
+        assertEquals(WarrantyRemedy.REPLACEMENT, claim.getWarrantyRemedy());
+        assertEquals(replacement.getId(), claim.getWarrantyReplacementCatalog().getId());
+        claim.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
+        assertThrows(BusinessRuleViolationException.class,
+                () -> tickets.finishRepair(claim.getServiceTicket().getId(), f.technician.getId()));
+    }
+
+    @Test void expiredSourceCannotCreateWarrantyClaim() {
+        var source = f.item(f.ticket(ServiceTicketStatus.HANDED_OVER));
+        source.setWarrantyStartDate(LocalDate.now(clock).minusDays(30));
+        source.setWarrantyEndDate(LocalDate.now(clock).minusDays(1));
+        em.flush();
+        assertThrows(BusinessRuleViolationException.class, () -> warrantyClaims.create(source.getId(),
+                new CreateWarrantyClaimRequest(f.branch.getId(), "Đã nhận máy", "Lỗi tái diễn", null, null), f.receptionist.getId()));
     }
 }

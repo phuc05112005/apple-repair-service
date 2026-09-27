@@ -116,10 +116,24 @@ class HttpWorkflowIntegrationTest {
     String login(User user) throws Exception {
         return "Bearer "+postJson("/api/v1/auth/login",null,new LoginRequest(user.getUsername(),ApiFixture.PASSWORD),200).get("accessToken").asString();
     }
+    void openArrivalWindow() {
+        var now = LocalDateTime.now(clock);
+        tx(() -> {
+            var slot = em.find(AppointmentSlot.class, f.slot.getId());
+            slot.setAppointmentDate(now.toLocalDate());
+            slot.setStartTime(now.toLocalTime().minusMinutes(30));
+            slot.setEndTime(now.toLocalTime().plusMinutes(30));
+            return null;
+        });
+        f.slot.setAppointmentDate(now.toLocalDate());
+        f.slot.setStartTime(now.toLocalTime().minusMinutes(30));
+        f.slot.setEndTime(now.toLocalTime().plusMinutes(30));
+    }
     long bookAndIntake(String receptionist) throws Exception {
         var booking=postJson("/api/v1/appointments",null,new CreateAppointmentRequest(f.prefix,f.prefix,f.slot.getId(),null,
                 List.of(new AppointmentDeviceRequest(f.model.getId(),"symptom",List.of(new AppointmentServiceItemRequest(f.catalog.getId(),null))))),201);
         long appointmentId=booking.get("appointmentId").asLong();
+        openArrivalWindow();
         var list=mvc.perform(get("/api/v1/internal/appointments").header("Authorization",receptionist)
                 .param("branchId",f.branch.getId().toString()).param("date",f.slot.getAppointmentDate().toString())).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -214,7 +228,7 @@ class HttpWorkflowIntegrationTest {
         try {
             var mutation=technicianExecutor.submit(()->postJson(path+"/inspection/start",a,null,200));
             assertTrue(checked.await(10,TimeUnit.SECONDS));
-            var transfer=transferExecutor.submit(()->postJson(path+"/transfers/direct",reception,new TransferCommand(f.otherTechnician.getId(),"Concurrent"),200));
+            var transfer=transferExecutor.submit(()->postJson(path+"/transfers/direct",reception,new TransferCommand(f.otherTechnician.getId(),"Concurrent","Inspected","Ready for next technician"),200));
             assertTrue(transferAttempt.await(10,TimeUnit.SECONDS));
             assertThrows(TimeoutException.class,()->transfer.get(300,TimeUnit.MILLISECONDS),"Transfer must wait while the authorized transaction holds the ticket lock");
             release.countDown();mutation.get(15,TimeUnit.SECONDS);transfer.get(15,TimeUnit.SECONDS);

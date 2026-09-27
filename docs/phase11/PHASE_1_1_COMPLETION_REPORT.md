@@ -44,7 +44,7 @@ Snapshot gồm ticket, optional technician, start/completion/duration, STANDARD/
 
 ## 9. Provisional ETA khi tạo phiếu
 
-Cộng duration của các item APPROVED có catalog ACTIVE; không cộng REJECTED/PENDING. Warranty replacement ưu tiên duration catalog thay. Không có dịch vụ/thời lượng hữu ích dùng DEFAULT_INSPECTION_ESTIMATE_MINUTES mặc định 30. Tạo snapshot đầu và initial/current trong cùng transaction tạo phiếu.
+Contract hiện hành cộng duration của phương án chưa bị REJECTED và ưu tiên catalog thay bảo hành. Phiếu mới thiếu dịch vụ/duration hợp lệ bị từ chối; không còn default duration cố định.
 
 ## 10. ETA chưa assigned
 
@@ -56,7 +56,7 @@ assignmentDueAt = receivedAt + UNASSIGNED_TICKET_TARGET_MINUTES, mặc định 1
 
 ## 12. Queue algorithm
 
-REPAIRING trước, phần còn lại FIFO assignedAt rồi assignment ID. WAITING_PART/WAITING_APPROVAL không giữ active worker time. Giờ hoàn tất kỹ thuật gần nhất có thể tạo break trước việc kế tiếp. Tính lại các phiếu ảnh hưởng theo sự kiện. Hàng đợi KTV hiển thị thứ tự bỏ qua các phiếu tạm chờ.
+Phiếu active technical (`INSPECTING`/`REPAIRING`) đứng trước, phần còn lại FIFO assignedAt rồi assignment ID. WAITING_PART/WAITING_APPROVAL không giữ active worker time. Giờ hoàn tất kỹ thuật gần nhất có thể tạo break trước việc kế tiếp. Tính lại các phiếu ảnh hưởng theo sự kiện. Hàng đợi KTV hiển thị thứ tự bỏ qua các phiếu tạm chờ.
 
 ## 13. Remaining workload
 
@@ -72,7 +72,7 @@ Break là scheduling allowance giữa hai thiết bị, không thuộc active du
 
 ## 16. Actual repair start
 
-ServiceStatusService ghi actualRepairStartedAt tại lần đầu transition REPAIRING, dùng cùng event time với status history. Không dùng receivedAt/assignedAt/estimatedStartAt thay actual. Test B initial 10:30–11:10, actual 10:40: current completion 11:20, initial vẫn 11:10 và active từ 10:40.
+ServiceStatusService ghi actualRepairStartedAt tại lần đầu transition INSPECTING, dùng cùng event time với status history. Không dùng receivedAt/assignedAt/estimatedStartAt thay actual; resume và đổi phương án không reset mốc này.
 
 ## 17. Waiting part/approval
 
@@ -92,9 +92,9 @@ Sự kiện trực tiếp luôn ghi snapshot; phiếu trong cascade ghi khi ETA/
 
 ## 21. Delay metrics
 
-Endpoint đọc có assignment wait, queue wait, start delay so initial, estimated/actual repair, completion delay so initial và current, waiting part/approval, accepted transfer count, plan-change count, approved-price change, active duration theo KTV. Active theo KTV = REPAIRING interval ∩ Assignment interval; test chuyển KTV cho 20 phút người trước + 15 phút người sau, không reset first actual start.
+Endpoint đọc có assignment wait, queue wait, start delay so initial, estimated/actual technical duration, completion delay so initial và current, waiting part/approval, accepted transfer count, plan-change count, approved-price change, active duration theo KTV. Active theo KTV = (`INSPECTING` + `REPAIRING`) interval ∩ Assignment interval.
 
-Queue wait hiện là khoảng ASSIGNED trước first actual start; inspection không được gộp vào active repair. Có thể phân tích những kỳ vọng start trung gian qua history; startDelayMinutes trả trực tiếp hiện so initial. Nếu status history thiếu/đứt đoạn, metrics trả unknown cho active/waiting cùng completeStatusHistory=false. Không gắn delay với nhãn “không hài lòng”.
+Queue wait hiện là khoảng ASSIGNED trước first actual start; inspection thuộc active technical duration. Có thể phân tích những kỳ vọng start trung gian qua history; startDelayMinutes trả trực tiếp hiện so initial. Nếu status history thiếu/đứt đoạn, metrics trả unknown cho active/waiting cùng completeStatusHistory=false. Không gắn delay với nhãn “không hài lòng”.
 
 ## 22. Receptionist UI
 

@@ -45,7 +45,7 @@ public class ServiceCatalogService {
     public ServiceCatalogItemResponse create(CreateServiceCatalogItemRequest r) {
         rules.validate(r);
         var e = new ServiceCatalogItem();
-        apply(e, new UpdateServiceCatalogItemRequest(r.deviceModelId(), r.serviceTypeId(), r.serviceIssueId(), r.partId(), r.name(), r.configuredPrice(), r.standardDurationMinutes(), r.warrantyDays()));
+        apply(e, new UpdateServiceCatalogItemRequest(r.deviceModelId(), r.serviceTypeId(), r.serviceIssueId(), r.partId(), r.name(), r.configuredPrice(), r.standardDurationMinutes(), r.warrantyDays(), r.warrantyRemedy(), r.warrantyReplacementCatalogId()));
         return save(e);
     }
 
@@ -94,10 +94,30 @@ public class ServiceCatalogService {
         e.setConfiguredPrice(r.configuredPrice());
         e.setStandardDurationMinutes(r.standardDurationMinutes());
         e.setWarrantyDays(r.warrantyDays());
+        e.setWarrantyRemedy(r.warrantyDays() > 0 ? r.warrantyRemedy() : null);
+        e.setWarrantyReplacementCatalog(r.warrantyDays() > 0 && r.warrantyReplacementCatalogId() != null
+                ? access.get(ServiceCatalogItem.class, r.warrantyReplacementCatalogId()) : null);
         BusinessRules.require(e.getServiceType().getCode() != ServiceTypeCode.REPLACEMENT || e.getPart() != null, "Replacement requires part");
         BusinessRules.require(e.getServiceIssue().getDeviceTypes().stream()
                 .anyMatch(type -> type.getId().equals(e.getDeviceModel().getDeviceType().getId())),
                 "Vấn đề dịch vụ không áp dụng cho loại thiết bị của model.");
+        BusinessRules.require(e.getWarrantyDays() == 0 || e.getWarrantyRemedy() != null,
+                "Dịch vụ có bảo hành phải cấu hình phương án kỹ thuật bảo hành.");
+        if (e.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT) {
+            var replacement = e.getWarrantyReplacementCatalog();
+            BusinessRules.require(replacement != null && replacement != e,
+                    "Bảo hành thay thế phải chọn một dịch vụ thay thế phù hợp.");
+            BusinessRules.require(replacement.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
+                            && replacement.getPart() != null
+                            && replacement.getStatus() == ActiveStatus.ACTIVE
+                            && replacement.getPart().getStatus() == ActiveStatus.ACTIVE
+                            && replacement.getStandardDurationMinutes() != null
+                            && replacement.getStandardDurationMinutes() > 0
+                            && replacement.getDeviceModel().getId().equals(e.getDeviceModel().getId())
+                            && replacement.getServiceIssue().getId().equals(e.getServiceIssue().getId()),
+                    "Dịch vụ thay thế bảo hành phải cùng model, vấn đề và có linh kiện.");
+        } else BusinessRules.require(e.getWarrantyReplacementCatalog() == null,
+                "Chỉ phương án bảo hành thay thế mới được gắn dịch vụ thay thế.");
     }
 
     private ServiceCatalogItemResponse save(ServiceCatalogItem e) {

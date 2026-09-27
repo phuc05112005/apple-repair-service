@@ -59,7 +59,7 @@ public class TransferService {
         var old = lockAssignment(r.fromAssignmentId());
         validateTarget(old, r.targetTechnicianId());
         var transfer = create(old, r);
-        complete(transfer, access.get(User.class, r.requestedByUserId()), r.note());
+        complete(transfer, access.get(User.class, r.requestedByUserId()), null);
         return mapper.map(transfers.saveAndFlush(transfer));
     }
 
@@ -94,7 +94,7 @@ public class TransferService {
         t.setStatus(next);
         t.setRespondedBy(access.get(User.class, r.respondedByUserId()));
         t.setRespondedAt(LocalDateTime.now(clock));
-        if (BusinessRules.text(r.note()) != null) t.setNote(r.note().trim());
+        if (BusinessRules.text(r.note()) != null) t.setResponseNote(r.note().trim());
         return mapper.map(t);
     }
 
@@ -133,6 +133,8 @@ public class TransferService {
         t.setMode(r.mode());
         t.setRequestedAt(LocalDateTime.now(clock));
         t.setNote(BusinessRules.text(r.note()));
+        t.setWorkDone(BusinessRules.required(r.workDone(), "Work completed is required"));
+        t.setCurrentCondition(BusinessRules.required(r.currentCondition(), "Current device condition is required"));
         return t;
     }
 
@@ -151,6 +153,6 @@ public class TransferService {
         t.setStatus(TransferStatus.ACCEPTED);
         t.setRespondedBy(actor);
         t.setRespondedAt(LocalDateTime.now(clock));
-        if (BusinessRules.text(note) != null) t.setNote(note.trim());
+        if (BusinessRules.text(note) != null) t.setResponseNote(note.trim());
     }
 }

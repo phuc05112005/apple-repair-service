@@ -287,13 +287,21 @@
   "request" : "none",
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.BranchInventoryResponse>"
 }, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/inventory/lots",
+  "controller" : "AdminInventoryController",
+  "handler" : "lots",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.InventoryLotResponse>"
+}, {
   "method" : "POST",
   "path" : "/api/v1/admin/inventory/stock-in",
   "controller" : "AdminInventoryController",
   "handler" : "stockIn",
   "access" : "hasRole('ADMIN')",
-  "request" : "StockAdjustmentCommand",
-  "response" : "com.applecare.apple_repair_service.dto.response.BranchInventoryResponse"
+  "request" : "StockInCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.StockInResponse"
 }, {
   "method" : "POST",
   "path" : "/api/v1/admin/inventory/stock-out",
@@ -839,6 +847,14 @@
   "request" : "WarrantyDecisionRequest",
   "response" : "com.applecare.apple_repair_service.dto.response.RepairItemResponse"
 }, {
+  "method" : "POST",
+  "path" : "/api/v1/internal/repair-items/{sourceItemId}/warranty-claims",
+  "controller" : "ReceptionistController",
+  "handler" : "createWarrantyClaim",
+  "access" : "hasRole('RECEPTIONIST')",
+  "request" : "CreateWarrantyClaimRequest",
+  "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
+}, {
   "method" : "GET",
   "path" : "/api/v1/internal/service-tickets",
   "controller" : "InternalTicketController",
@@ -1032,6 +1048,14 @@
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
 }, {
   "method" : "POST",
+  "path" : "/api/v1/internal/service-tickets/{id}/wait/resolve",
+  "controller" : "TechnicianController",
+  "handler" : "resolveWait",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "WaitResolutionCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
+}, {
+  "method" : "POST",
   "path" : "/api/v1/internal/service-tickets/{ticketId}/transfers/direct",
   "controller" : "TransferController",
   "handler" : "direct",
@@ -1094,6 +1118,14 @@
   "access" : "hasRole('TECHNICIAN')",
   "request" : "NoteCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.TransferResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/warranty-history",
+  "controller" : "ReceptionistController",
+  "handler" : "warrantyHistory",
+  "access" : "hasRole('RECEPTIONIST')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.WarrantyHistoryResponse"
 }, {
   "method" : "GET",
   "path" : "/api/v1/service-catalog-items",

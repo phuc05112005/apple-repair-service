@@ -52,7 +52,7 @@ public class ServiceStatusService {
             default -> false;
         };
         if (!allowed) throw new InvalidStateTransitionException(old + " -> " + next);
-        if (next == ServiceTicketStatus.REPAIRING) {
+        if (next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.REPAIRING) {
             if (old == ServiceTicketStatus.WAITING_PART || old == ServiceTicketStatus.WAITING_APPROVAL) {
                 var wait = currentWait(ticket);
                 BusinessRules.require(wait.getResolvedAt() != null,
@@ -63,8 +63,8 @@ public class ServiceStatusService {
             var assignment = assignments.findFirstByServiceTicket_IdAndStatus(ticket.getId(), AssignmentStatus.ACTIVE)
                     .orElseThrow(() -> new InvalidStateTransitionException("Ticket has no ACTIVE assignment"));
             access.lock(User.class, assignment.getTechnician().getId());
-            BusinessRules.require(!assignments.hasOtherActiveRepair(assignment.getTechnician().getId(), ticket.getId()),
-                    "Kỹ thuật viên đang sửa một phiếu khác. Hãy hoàn tất hoặc đưa phiếu đó về trạng thái chờ trước khi bắt đầu phiếu này.");
+            BusinessRules.require(!assignments.hasOtherActiveTechnicalWork(assignment.getTechnician().getId(), ticket.getId()),
+                    "Kỹ thuật viên đang xử lý kỹ thuật một phiếu khác. Hãy hoàn tất hoặc đưa phiếu đó về trạng thái chờ trước khi bắt đầu phiếu này.");
         }
         ticket.setStatus(next);
         var eventAt = history(ticket, old, next, actor, note);

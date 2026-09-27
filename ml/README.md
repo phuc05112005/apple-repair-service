@@ -57,21 +57,21 @@ python -m venv .venv
 
 Các lệnh cài môi trường trên là hướng dẫn cho phase tiếp theo, chưa chạy ở Phase 1.
 
-## Regression: active repair duration theo kỹ thuật viên
+## Regression: active technical duration theo kỹ thuật viên
 
-Target dự kiến: `actual_active_repair_minutes`.
+Target dự kiến: `actual_active_technical_minutes`.
 Cùng một ticket có thể nhận ước lượng khác nhau cho từng kỹ thuật viên.
 
-Không dùng `handedOverAt - receivedAt`. Cộng các khoảng `REPAIRING` từ
-`service_status_histories`, loại thời gian chờ linh kiện/chờ duyệt và các trạng thái khác.
+Không dùng `handedOverAt - receivedAt`. Cộng các khoảng `INSPECTING` và `REPAIRING`
+từ `service_status_histories`, loại wait, queue, break, transfer gap và chờ bàn giao.
 Với target theo người:
 
 ```text
-intersection(REPAIRING intervals, technician assignment interval)
+intersection((INSPECTING + REPAIRING) intervals, technician assignment interval)
 ```
 
-Đây là thời gian ở trạng thái sửa chữa, chưa phải đồng hồ đo thao tác thực tế.
-Giữ REPAIRING qua đêm vẫn tích lũy thời gian. Chưa có timer riêng từng repair item.
+Đây là active technical duration theo state hợp lệ, chưa phải timer từng thao tác.
+Giữ trạng thái active qua đêm vẫn tích lũy thời gian. Chưa có timer riêng từng repair item.
 Chốt đơn vị mẫu trước training: ticket một kỹ thuật viên hay đóng góp theo assignment.
 Không gán thời lượng toàn phiếu cho mọi kỹ thuật viên đã tham gia; thời gian đóng góp
 của một người ở ca chuyển giao không đồng nghĩa thời gian người đó hoàn tất cả ca sửa.
@@ -86,7 +86,8 @@ ML chỉ dự đoán duration. Spring Boot sau này kết hợp prediction, sche
 remaining shift, role và business rules để đề xuất. Không tự biến cảnh báo thời gian
 còn lại thành điều kiện bắt buộc ngăn phân công.
 
-Fallback dự kiến: tổng standardDurationMinutes của các hạng mục, rồi 60 phút nếu thiếu.
+Fallback dự kiến duy nhất: tổng `standardDurationMinutes` của phương án kỹ thuật hiện tại.
+Ticket mới không có duration catalog hợp lệ bị từ chối; không dùng giá trị 30/60 phút giả.
 Prediction theo ứng viên cần hợp đồng lưu kèm technician/context trong phase sau;
 Phase 1 không migrate ml_predictions.
 

@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public final class PricePolicy {
+    public static final String ONLINE_BOOKING_DISCOUNT_PERCENT = "ONLINE_BOOKING_DISCOUNT_PERCENT";
     public static final BigDecimal DEFAULT_ONLINE_DISCOUNT = new BigDecimal("10.00");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 

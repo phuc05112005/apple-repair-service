@@ -33,6 +33,9 @@ public class GlobalExceptionHandler {
         if(ex instanceof DuplicateResourceException){status=HttpStatus.CONFLICT;code="DUPLICATE_RESOURCE";}
         else if(ex instanceof InvalidStateTransitionException){status=HttpStatus.CONFLICT;code="INVALID_STATE_TRANSITION";}
         else if(ex instanceof InsufficientStockException){status=HttpStatus.CONFLICT;code="INSUFFICIENT_STOCK";}
+        else if(ex instanceof AppointmentTooEarlyException){status=HttpStatus.CONFLICT;code="APPOINTMENT_TOO_EARLY";}
+        else if(ex instanceof AppointmentExpiredException){status=HttpStatus.CONFLICT;code="APPOINTMENT_EXPIRED";}
+        else if(ex instanceof AppointmentSlotConflictException){status=HttpStatus.CONFLICT;code="APPOINTMENT_SLOT_OVERLAP";}
         else if(ex instanceof ConflictException){status=HttpStatus.CONFLICT;code="CONFLICT";}
         return error(status,code,ex.getMessage(),r,List.of());
     }
@@ -60,15 +63,15 @@ public class GlobalExceptionHandler {
     }
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiErrorResponse> authentication(AuthenticationException ex,HttpServletRequest r) {
-        return error(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_FAILED","Invalid credentials or inactive account",r,List.of());
+        return error(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_FAILED","Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản đã ngừng hoạt động.",r,List.of());
     }
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorResponse> denied(AccessDeniedException ex,HttpServletRequest r) {
-        return error(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Access denied",r,List.of());
+        return error(HttpStatus.FORBIDDEN,"ACCESS_DENIED","Bạn không có quyền thực hiện thao tác này.",r,List.of());
     }
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> integrity(DataIntegrityViolationException ex,HttpServletRequest r) {
-        return error(HttpStatus.CONFLICT,"CONFLICT","Resource conflicts with existing data",r,List.of());
+        return error(HttpStatus.CONFLICT,"CONFLICT","Dữ liệu đang được sử dụng hoặc xung đột với dữ liệu hiện có.",r,List.of());
     }
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiErrorResponse> noRoute(NoResourceFoundException ex,HttpServletRequest r) {
@@ -85,7 +88,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> unexpected(Exception ex,HttpServletRequest r) {
         LOG.error("Unhandled server error for {}",r.getRequestURI(),ex);
-        return error(HttpStatus.INTERNAL_SERVER_ERROR,"INTERNAL_ERROR","An unexpected server error occurred",r,List.of());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR,"INTERNAL_ERROR","Không thể hoàn tất thao tác. Vui lòng thử lại hoặc liên hệ quản trị viên.",r,List.of());
     }
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status,String code,String message,HttpServletRequest r,List<FieldErrorResponse> fields) {
         return ResponseEntity.status(status).body(new ApiErrorResponse(clock.instant(),status.value(),status.getReasonPhrase(),code,message,r.getRequestURI(),fields));

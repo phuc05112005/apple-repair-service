@@ -1,6 +1,7 @@
 package com.applecare.apple_repair_service.entity;
 
 import com.applecare.apple_repair_service.enums.ActiveStatus;
+import com.applecare.apple_repair_service.enums.WarrantyRemedy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -70,13 +71,23 @@ public class ServiceCatalogItem {
     private BigDecimal configuredPrice;
 
     @Positive
-    @Column(name = "standard_duration_minutes")
+    @NotNull
+    @Column(name = "standard_duration_minutes", nullable = false)
     private Integer standardDurationMinutes;
 
     @NotNull
     @PositiveOrZero
     @Column(name = "warranty_days", nullable = false)
     private Integer warrantyDays = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "warranty_remedy")
+    private WarrantyRemedy warrantyRemedy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warranty_replacement_catalog_id",
+            foreignKey = @ForeignKey(name = "fk_service_catalog_warranty_replacement"))
+    private ServiceCatalogItem warrantyReplacementCatalog;
 
     @NotNull
     @Enumerated(EnumType.STRING)

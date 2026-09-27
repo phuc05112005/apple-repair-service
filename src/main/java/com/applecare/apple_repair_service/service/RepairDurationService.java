@@ -46,12 +46,12 @@ public class RepairDurationService {
             BusinessRules.require(h.getFromStatus() == previous, "Discontinuous status history");
             BusinessRules.require(previousTime == null || !h.getChangedAt().isBefore(previousTime), "Invalid history time order");
             BusinessRules.require(h.getFromStatus() != h.getToStatus(), "Repeated history state");
-            if (h.getFromStatus() == ServiceTicketStatus.REPAIRING) {
+            if (active(h.getFromStatus())) {
                 BusinessRules.require(start != null, "Missing repair interval start");
                 total = total.plus(Duration.between(start, h.getChangedAt()));
                 start = null;
             }
-            if (h.getToStatus() == ServiceTicketStatus.REPAIRING) start = h.getChangedAt();
+            if (active(h.getToStatus())) start = h.getChangedAt();
             previous = h.getToStatus();
             previousTime = h.getChangedAt();
         }
@@ -60,5 +60,9 @@ public class RepairDurationService {
             total = total.plus(Duration.between(start, now));
         }
         return total.toMinutes();
+    }
+
+    private static boolean active(ServiceTicketStatus status) {
+        return status == ServiceTicketStatus.INSPECTING || status == ServiceTicketStatus.REPAIRING;
     }
 }

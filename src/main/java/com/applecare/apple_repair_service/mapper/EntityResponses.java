@@ -62,7 +62,11 @@ public class EntityResponses {
         return new AppointmentResponse(e.getId(), e.getCustomer() == null ? null : e.getCustomer().getId(),
                 e.getCustomer() == null ? null : e.getCustomer().getFullName(),
                 e.getCustomer() == null ? null : e.getCustomer().getPhone(),
-                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getId(), e.getStatus(), e.getDiscountPercent(), e.getConfirmedBy() == null ? null : e.getConfirmedBy().getId(), e.getConfirmedAt(), e.getNote(), e.getCancelReason(), e.getBookedAt(), e.getUpdatedAt());
+                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getId(), e.getStatus(), e.getDiscountPercent(), e.getConfirmedBy() == null ? null : e.getConfirmedBy().getId(), e.getConfirmedAt(),
+                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getAppointmentDate(),
+                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getStartTime(),
+                e.getAppointmentSlot() == null ? null : e.getAppointmentSlot().getEndTime(), e.getArrivedAt(),
+                e.getNote(), e.getCancelReason(), e.getBookedAt(), e.getUpdatedAt());
     }
 
     public AppointmentDeviceResponse map(AppointmentDevice e) {
@@ -106,12 +110,12 @@ public class EntityResponses {
     }
 
     public InventoryTransactionResponse map(InventoryTransaction e) {
-        return new InventoryTransactionResponse(e.getId(), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getNote(), e.getCreatedAt());
+        return new InventoryTransactionResponse(e.getId(), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getRecordedBy() == null ? null : e.getRecordedBy().getFullName(), e.getNote(), e.getCreatedAt());
     }
 
     public InventoryLotResponse map(InventoryLot e) {
         return new InventoryLotResponse(e.getId(), e.getLotCode(), e.getBranch().getId(), e.getPart().getId(),
-                e.getReceivedQuantity(), e.getReceivedAt(), e.getReceivedBy().getId(), e.getSourceNote(), e.getCreatedAt());
+                e.getReceivedQuantity(), e.getReceivedAt(), e.getReceivedBy().getId(), e.getReceivedBy().getFullName(), e.getSourceNote(), e.getCreatedAt());
     }
 
     public MlPredictionResponse map(MlPrediction e) {
@@ -134,7 +138,7 @@ public class EntityResponses {
     }
 
     public ServiceCatalogItemResponse map(ServiceCatalogItem e) {
-        return new ServiceCatalogItemResponse(e.getId(), e.getDeviceModel() == null ? null : e.getDeviceModel().getId(), e.getServiceType() == null ? null : e.getServiceType().getId(), e.getServiceIssue() == null ? null : e.getServiceIssue().getId(), e.getPart() == null ? null : e.getPart().getId(), e.getName(), e.getConfiguredPrice(), e.getStandardDurationMinutes(), e.getWarrantyDays(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+        return new ServiceCatalogItemResponse(e.getId(), e.getDeviceModel() == null ? null : e.getDeviceModel().getId(), e.getServiceType() == null ? null : e.getServiceType().getId(), e.getServiceIssue() == null ? null : e.getServiceIssue().getId(), e.getPart() == null ? null : e.getPart().getId(), e.getName(), e.getConfiguredPrice(), e.getStandardDurationMinutes(), e.getWarrantyDays(), e.getWarrantyRemedy(), e.getWarrantyReplacementCatalog() == null ? null : e.getWarrantyReplacementCatalog().getId(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
     }
 
     public ServiceFeedbackResponse map(ServiceFeedback e) {
@@ -168,7 +172,7 @@ public class EntityResponses {
     }
 
     public TransferResponse map(Transfer e) {
-        return new TransferResponse(e.getId(), e.getFromAssignment().getId(), e.getFromAssignment().getServiceTicket().getId(), e.getFromAssignment().getTechnician().getId(), e.getFromAssignment().getTechnician().getFullName(), e.getTargetTechnician().getId(), e.getTargetTechnician().getFullName(), e.getMode(), e.getStatus(), e.getRequestedBy() == null ? null : e.getRequestedBy().getId(), e.getRespondedBy() == null ? null : e.getRespondedBy().getId(), e.getNote(), e.getRequestedAt(), e.getRespondedAt());
+        return new TransferResponse(e.getId(), e.getFromAssignment().getId(), e.getFromAssignment().getServiceTicket().getId(), e.getFromAssignment().getTechnician().getId(), e.getFromAssignment().getTechnician().getFullName(), e.getTargetTechnician().getId(), e.getTargetTechnician().getFullName(), e.getMode(), e.getStatus(), e.getRequestedBy() == null ? null : e.getRequestedBy().getId(), e.getRespondedBy() == null ? null : e.getRespondedBy().getId(), e.getNote(), e.getWorkDone(), e.getCurrentCondition(), e.getResponseNote(), e.getRequestedAt(), e.getRespondedAt());
     }
 
     public UserResponse map(User e) {

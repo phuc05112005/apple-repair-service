@@ -18,7 +18,7 @@ class ReceptionistIntakeRoutingTest {
         when(appointments.readyForIntake()).thenReturn(List.of());
         var controller = new ReceptionistController(appointments, mock(ServiceTicketService.class),
                 mock(AssignmentService.class), mock(TechnicianRecommendationService.class),
-                mock(RepairItemService.class), mock(PaymentService.class), mock(CurrentActor.class));
+                mock(RepairItemService.class), mock(PaymentService.class), mock(WarrantyClaimService.class), mock(CurrentActor.class));
         var mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         mvc.perform(get("/api/v1/internal/appointments/ready-for-intake"))

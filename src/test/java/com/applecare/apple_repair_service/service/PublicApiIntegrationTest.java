@@ -58,10 +58,10 @@ class PublicApiIntegrationTest {
     @Test void catalogExposesConfiguredRepairAndReplacementOptions() throws Exception {
         var discountSetting = em.createQuery("select s from SystemSetting s where s.settingKey=:key",
                         com.applecare.apple_repair_service.entity.SystemSetting.class)
-                .setParameter("key", "ONLINE_DISCOUNT_PERCENT").getResultStream().findFirst()
+                .setParameter("key", PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT).getResultStream().findFirst()
                 .orElseGet(() -> {
                       var setting = new com.applecare.apple_repair_service.entity.SystemSetting();
-                      setting.setSettingKey("ONLINE_DISCOUNT_PERCENT");
+                      setting.setSettingKey(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT);
                       setting.setSettingValue("10.00");
                       em.persist(setting);
                     return setting;
@@ -113,7 +113,9 @@ class PublicApiIntegrationTest {
         var value = new com.applecare.apple_repair_service.entity.ServiceCatalogItem();
         value.setDeviceModel(f.model); value.setServiceIssue(f.issue); value.setServiceType(type); value.setPart(part);
         value.setName(f.prefix + name); value.setConfiguredPrice(price);
-        value.setStandardDurationMinutes(minutes); value.setWarrantyDays(warrantyDays); em.persist(value); return value;
+        value.setStandardDurationMinutes(minutes); value.setWarrantyDays(warrantyDays);
+        if (warrantyDays > 0) value.setWarrantyRemedy(WarrantyRemedy.REPAIR);
+        em.persist(value); return value;
     }
 
     @Test void anonymousBookingAndLookupUsePublicDtoAndClosedSlotsDisappear() throws Exception {

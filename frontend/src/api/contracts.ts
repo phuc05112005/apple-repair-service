@@ -82,6 +82,7 @@ export interface PublicFeedbackResponse { ticketCode: string; satisfied: boolean
 export interface AppointmentResponse {
   id: number; customerId: number; customerFullName: string; customerPhone: string; appointmentSlotId: number; status: AppointmentStatus
   discountPercent: number; confirmedById: number | null; confirmedAt: string | null
+  appointmentDate: string; slotStartTime: string; slotEndTime: string; arrivedAt: string | null
   note: string | null; cancelReason: string | null; bookedAt: string; updatedAt: string
 }
 export interface AppointmentServiceItemResponse {
@@ -129,7 +130,7 @@ export interface TicketContextResponse {
 export interface OperationalTicketResponse {
   ticketId: number; ticketCode: string; customerFullName: string; customerPhone: string; customerDeviceId: number
   deviceModelId: number; deviceModelName: string; serviceIssues: string[]; requestedServices: string[]
-  branchId: number; branchName: string; status: ServiceTicketStatus; receivedAt: string; estimatedDurationMinutes: number
+  branchId: number; branchName: string; status: ServiceTicketStatus; receivedAt: string; estimatedDurationMinutes: number | null
   activeAssignmentId: number | null; activeTechnicianId: number | null; activeTechnicianName: string | null; assignedAt: string | null; timing: TicketTiming
 }
 export interface TechnicianRecommendationResponse {
@@ -144,7 +145,8 @@ export interface AssignmentResponse {
 export interface TransferResponse {
   id: number; fromAssignmentId: number; ticketId: number; fromTechnicianId: number; fromTechnicianName: string
   targetTechnicianId: number; targetTechnicianName: string; mode: 'REQUEST' | 'DIRECT'; status: TransferStatus
-  requestedById: number; respondedById: number | null; note: string | null; requestedAt: string; respondedAt: string | null
+  requestedById: number; respondedById: number | null; note: string | null; workDone: string; currentCondition: string
+  responseNote: string | null; requestedAt: string; respondedAt: string | null
 }
 export interface IncomingTransferResponse { transfer: TransferResponse; ticket: OperationalTicketResponse }
 export interface AvailablePartResponse {
@@ -173,18 +175,30 @@ export interface DeviceTypeResponse { id: number; name: string; status: ActiveSt
 export interface DeviceModelResponse { id: number; deviceTypeId: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface ServiceIssueResponse { id: number; name: string; status: ActiveStatus; deviceTypeIds: number[]; createdAt: string; updatedAt: string }
 export interface ServiceTypeResponse { id: number; code: ServiceTypeCode; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
-export interface ServiceCatalogItemResponse { id: number; deviceModelId: number; serviceTypeId: number; serviceIssueId: number; partId: number | null; name: string; configuredPrice: number | null; standardDurationMinutes: number | null; warrantyDays: number; status: ActiveStatus; createdAt: string; updatedAt: string }
+export interface ServiceCatalogItemResponse { id: number; deviceModelId: number; serviceTypeId: number; serviceIssueId: number; partId: number | null; name: string; configuredPrice: number | null; standardDurationMinutes: number; warrantyDays: number; warrantyRemedy: WarrantyRemedy | null; warrantyReplacementCatalogId: number | null; status: ActiveStatus; createdAt: string; updatedAt: string }
+export interface WarrantyClaimSummaryResponse {
+  repairItemId: number; ticketId: number; ticketCode: string; status: ServiceTicketStatus
+  technicalMethod: WarrantyRemedy; receivedAt: string; handedOverAt: string | null
+}
+export interface WarrantyHistoryItemResponse {
+  repairItemId: number; ticketId: number; ticketCode: string; customerDeviceId: number
+  deviceTypeId: number; deviceTypeName: string; deviceModelId: number; deviceModelName: string
+  serviceName: string; originalServiceType: ServiceTypeCode; warrantyTechnicalMethod: WarrantyRemedy | null
+  completedAt: string | null; handedOverAt: string | null; warrantyStartDate: string | null; warrantyEndDate: string | null
+  eligible: boolean; claimCount: number; lastClaimAt: string | null; claims: WarrantyClaimSummaryResponse[]
+}
+export interface WarrantyHistoryResponse { customerId: number; customerFullName: string; customerPhone: string; items: WarrantyHistoryItemResponse[] }
 export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface BranchInventoryResponse { id: number; branchId: number; partId: number; quantity: number; createdAt: string; updatedAt: string }
 export interface InventoryTransactionResponse {
   id: number; partId: number; transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER'
   sourceBranchId: number | null; destinationBranchId: number | null; quantity: number; partUsageId: number | null
   inventoryLotId: number | null; lotCode: string | null
-  recordedById: number; note: string | null; createdAt: string
+  recordedById: number; recordedByName: string; note: string | null; createdAt: string
 }
 export interface InventoryLotResponse {
   id: number; lotCode: string; branchId: number; partId: number; receivedQuantity: number
-  receivedAt: string; receivedById: number; sourceNote: string | null; createdAt: string
+  receivedAt: string; receivedById: number; receivedByName: string; sourceNote: string | null; createdAt: string
 }
 export interface StockInResponse { lot: InventoryLotResponse; inventory: BranchInventoryResponse; transaction: InventoryTransactionResponse }
 export type TechnicianScheduleStatus = 'WORKING' | 'OFF' | 'CANCELLED'

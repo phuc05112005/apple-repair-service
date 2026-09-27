@@ -104,4 +104,31 @@ class ConfigurationFlowsIntegrationTest {
         assertEquals(LocalTime.of(9, 0), slots.availability(fixture.branch.getId(), otherDate).getFirst().startTime());
         assertEquals(1, schedule.week(fixture.branch.getId()).get(date.getDayOfWeek().getValue() - 1).slots().size());
     }
+
+    @Test void weeklyScheduleCopiesMultipleSlotsValidatesAndReloadsExactly() {
+        var threeSlots = List.of(
+                new SlotRule(LocalTime.of(8, 0), LocalTime.of(9, 0), true),
+                new SlotRule(LocalTime.of(9, 30), LocalTime.of(10, 30), true),
+                new SlotRule(LocalTime.of(14, 0), LocalTime.of(15, 0), false));
+        var copied = java.util.stream.IntStream.rangeClosed(1, 7)
+                .mapToObj(day -> new SaveWeeklyScheduleRequest(fixture.branch.getId(), day, day != 7, threeSlots))
+                .toList();
+        schedule.saveWeekdays(copied);
+        var reloaded = schedule.week(fixture.branch.getId());
+        assertEquals(7, reloaded.size());
+        assertTrue(reloaded.stream().allMatch(day -> day.slots().equals(threeSlots)));
+        assertFalse(reloaded.get(6).enabled());
+
+        schedule.saveWeekday(new SaveWeeklyScheduleRequest(fixture.branch.getId(), 2, true, threeSlots.subList(0, 2)));
+        assertEquals(2, schedule.week(fixture.branch.getId()).get(1).slots().size());
+
+        assertThrows(com.applecare.apple_repair_service.exception.AppointmentSlotConflictException.class,
+                () -> schedule.saveWeekday(new SaveWeeklyScheduleRequest(fixture.branch.getId(), 3, true,
+                        List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true),
+                                new SlotRule(LocalTime.of(9, 30), LocalTime.of(11, 0), true)))));
+        assertThrows(com.applecare.apple_repair_service.exception.AppointmentSlotConflictException.class,
+                () -> schedule.saveWeekday(new SaveWeeklyScheduleRequest(fixture.branch.getId(), 3, true,
+                        List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true),
+                                new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true)))));
+    }
 }

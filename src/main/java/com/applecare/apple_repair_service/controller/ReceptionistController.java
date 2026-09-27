@@ -26,6 +26,7 @@ public class ReceptionistController {
     private final TechnicianRecommendationService recommendations;
     private final RepairItemService items;
     private final PaymentService payments;
+    private final WarrantyClaimService warrantyClaims;
     private final CurrentActor actor;
 
     @GetMapping("/appointments")
@@ -65,6 +66,17 @@ public class ReceptionistController {
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceTicketDetailResponse walkIn(@Valid @RequestBody WalkInIntakeRequest request) {
         return tickets.createWalkInTicket(request,actor.id());
+    }
+    @GetMapping("/warranty-history")
+    public WarrantyHistoryResponse warrantyHistory(@RequestParam(required = false) @jakarta.validation.constraints.Size(max = 255) String phone,
+                                                    @RequestParam(required = false) @jakarta.validation.constraints.Size(max = 255) String ticketCode) {
+        return warrantyClaims.history(phone, ticketCode);
+    }
+    @PostMapping("/repair-items/{sourceItemId}/warranty-claims")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ServiceTicketDetailResponse createWarrantyClaim(@PathVariable @Positive Long sourceItemId,
+                                                            @Valid @RequestBody CreateWarrantyClaimRequest request) {
+        return warrantyClaims.create(sourceItemId, request, actor.id());
     }
     @PostMapping("/service-tickets/{id}/cancel")
     public ServiceTicketDetailResponse cancelTicket(@PathVariable @Positive Long id, @Valid @RequestBody ReasonCommand request) {

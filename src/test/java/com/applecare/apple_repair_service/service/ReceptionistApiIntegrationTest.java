@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,6 +31,13 @@ class ReceptionistApiIntegrationTest {
     @Autowired Clock clock;
     ApiFixture f;
     @BeforeEach void fixture() { f=new ApiFixture(em,clock);f.create(); }
+    void openArrivalWindow() {
+        var now = LocalDateTime.now(clock);
+        f.slot.setAppointmentDate(now.toLocalDate());
+        f.slot.setStartTime(now.toLocalTime().minusMinutes(30));
+        f.slot.setEndTime(now.toLocalTime().plusMinutes(30));
+        em.flush();
+    }
     String login(User user) throws Exception {
         var body=mvc.perform(post("/api/v1/auth/login").contentType("application/json")
                 .content(json.writeValueAsString(new LoginRequest(user.getUsername(),ApiFixture.PASSWORD))))
@@ -44,6 +52,7 @@ class ReceptionistApiIntegrationTest {
         var booked=mvc.perform(post("/api/v1/appointments").contentType("application/json").content(json.writeValueAsString(request)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long id=json.readTree(booked).get("appointmentId").asLong();
+        openArrivalWindow();
         em.flush();
         em.clear();
         var persistedCustomer = em.find(Appointment.class, id).getCustomer();
@@ -85,6 +94,37 @@ class ReceptionistApiIntegrationTest {
         mvc.perform(post("/api/v1/internal/appointments/1/confirm").header("Authorization",bearer)).andExpect(status().isForbidden());
     }
 
+    @Test void checkInReturnsClearEarlyAndExpiredErrorsAtServerTime() throws Exception {
+        var request = new CreateAppointmentRequest(f.prefix + " customer", f.prefix + " arrival-phone", f.slot.getId(), null,
+                List.of(new AppointmentDeviceRequest(f.model.getId(), null,
+                        List.of(new AppointmentServiceItemRequest(f.catalog.getId(), null)))));
+        var booking = mvc.perform(post("/api/v1/appointments").contentType("application/json")
+                        .content(json.writeValueAsString(request))).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long appointmentId = json.readTree(booking).get("appointmentId").asLong();
+        String bearer = "Bearer " + login(f.receptionist);
+        String base = "/api/v1/internal/appointments/" + appointmentId;
+        mvc.perform(post(base + "/confirm").header("Authorization", bearer)).andExpect(status().isOk());
+        mvc.perform(post(base + "/arrive").header("Authorization", bearer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_TOO_EARLY"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Chưa đến khung giờ")));
+
+        var now = LocalDateTime.now(clock);
+        f.slot.setAppointmentDate(now.toLocalDate());
+        f.slot.setStartTime(now.toLocalTime().minusHours(2));
+        f.slot.setEndTime(now.toLocalTime().minusHours(1));
+        em.flush();
+        mvc.perform(post(base + "/arrive").header("Authorization", bearer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_EXPIRED"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("không còn đủ điều kiện hưởng ưu đãi")));
+        mvc.perform(get(base).header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointment.status").value("EXPIRED"))
+                .andExpect(jsonPath("$.appointment.arrivedAt").doesNotExist());
+    }
+
     @Test void arrivedBookingCanChangeRepairToReplacementAndKeepOnlineDiscount() throws Exception {
         var replacementType = new ServiceType();
         replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName(f.prefix + "replacement type");
@@ -98,7 +138,9 @@ class ReceptionistApiIntegrationTest {
         replacement.setServiceType(replacementType);
         replacement.setPart(part);
         replacement.setConfiguredPrice(new BigDecimal("200.00"));
+        replacement.setStandardDurationMinutes(45);
         replacement.setWarrantyDays(30);
+        replacement.setWarrantyRemedy(WarrantyRemedy.REPAIR);
         em.persist(replacement);
         em.flush();
 
@@ -109,6 +151,7 @@ class ReceptionistApiIntegrationTest {
                 .content(json.writeValueAsString(request))).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long appointmentId = json.readTree(booking).get("appointmentId").asLong();
+        openArrivalWindow();
         String bearer = "Bearer " + login(f.receptionist);
         String base = "/api/v1/internal/appointments/" + appointmentId;
         mvc.perform(post(base + "/confirm").header("Authorization", bearer))
@@ -171,6 +214,7 @@ class ReceptionistApiIntegrationTest {
         replacement.setServiceType(replacementType);
         replacement.setPart(part);
         replacement.setPart(part);
+        replacement.setStandardDurationMinutes(45);
         replacement.setWarrantyDays(0);
         em.persist(replacement);
         em.flush();

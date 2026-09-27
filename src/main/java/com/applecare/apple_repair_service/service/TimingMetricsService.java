@@ -27,7 +27,7 @@ public class TimingMetricsService {
   if(complete) for(var a:as) {
    long seconds=0;
    for(int i=0;i<hs.size();i++) {
-    var h=hs.get(i);if(h.getToStatus()!=ServiceTicketStatus.REPAIRING)continue;
+    var h=hs.get(i);if(h.getToStatus()!=ServiceTicketStatus.INSPECTING && h.getToStatus()!=ServiceTicketStatus.REPAIRING)continue;
     var end=i+1<hs.size()?hs.get(i+1).getChangedAt():now;
     var start=max(h.getChangedAt(),a.getAssignedAt());end=min(end,a.getEndedAt()==null?now:a.getEndedAt());
     if(end.isAfter(start))seconds+=Duration.between(start,end).getSeconds();

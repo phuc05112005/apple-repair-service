@@ -49,7 +49,7 @@ public class PublicQueryService {
                 .map(x -> new PublicBranchResponse(x.getId(), x.getName(), x.getAddress(), x.getPhone())).toList();
     }
     public List<PublicCatalogResponse> catalog(Long modelId, Long issueId, Long typeId) {
-        var discount = settings.getDecimal("ONLINE_DISCOUNT_PERCENT", PricePolicy.DEFAULT_ONLINE_DISCOUNT);
+        var discount = settings.getDecimal(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT, PricePolicy.DEFAULT_ONLINE_DISCOUNT);
         PricePolicy.discounted(null, discount);
         return catalog.findPublicCatalog(modelId, issueId, typeId).stream()
                 .map(x -> {
