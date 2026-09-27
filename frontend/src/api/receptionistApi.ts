@@ -1,5 +1,5 @@
 import { ApiError, apiRequest } from './client'
-import type { ConfirmationMethod, AppointmentDetailResponse, AppointmentStatus, ApprovalStatus, AssignmentResponse, AssignmentSource, OperationalTicketResponse, PaymentMethod, RepairItemResponse, ServiceTicketDetailResponse, ServiceTicketStatus, TechnicianRecommendationResponse, TicketPaymentSummaryResponse } from './contracts'
+import type { ConfirmationMethod, AppointmentDetailResponse, AppointmentStatus, ApprovalStatus, AssignmentResponse, AssignmentSource, OperationalTicketResponse, PaymentMethod, RepairItemResponse, ServiceTicketDetailResponse, ServiceTicketStatus, TechnicianRecommendationResponse, TicketPaymentSummaryResponse, WarrantyHistoryResponse } from './contracts'
 
 function requireCustomerContact(detail: AppointmentDetailResponse): AppointmentDetailResponse {
   if (!detail.appointment?.customerFullName?.trim() || !detail.appointment?.customerPhone?.trim()) {
@@ -22,8 +22,12 @@ export const receptionistApi = {
   expire: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/expire`, { auth: true, method: 'POST' }),
   intake: (appointmentDeviceId: number, request: { serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds?: number[] }) =>
     apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/appointment-devices/${appointmentDeviceId}/intake`, { auth: true, method: 'POST', body: request }),
-  walkIn: (request: { customerFullName: string; phone: string; branchId: number; deviceModelId: number; serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds?: number[]; customerReportedIssue?: string; authorizedScope?: string }) =>
+  walkIn: (request: { customerFullName: string; phone: string; branchId: number; deviceModelId: number; serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds: number[]; customerReportedIssue?: string; authorizedScope?: string }) =>
     apiRequest<ServiceTicketDetailResponse>('/api/v1/internal/service-tickets/walk-in', { auth: true, method: 'POST', body: request }),
+  warrantyHistory: (query: { phone?: string; ticketCode?: string }, signal?: AbortSignal) =>
+    apiRequest<WarrantyHistoryResponse>('/api/v1/internal/warranty-history', { auth: true, query, signal }),
+  createWarrantyClaim: (sourceItemId: number, request: { branchId: number; receivedCondition: string; customerReportedIssue: string; note?: string; authorizedScope?: string }) =>
+    apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/repair-items/${sourceItemId}/warranty-claims`, { auth: true, method: 'POST', body: request }),
   tickets: (filters: { branchId?: number; status?: ServiceTicketStatus; query?: string }, signal?: AbortSignal) =>
     apiRequest<OperationalTicketResponse[]>('/api/v1/internal/service-tickets', { auth: true, query: filters, signal }),
   ticket: (id: number, signal?: AbortSignal) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}`, { auth: true, signal }),

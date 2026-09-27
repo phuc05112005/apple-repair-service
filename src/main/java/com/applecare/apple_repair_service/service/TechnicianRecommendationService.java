@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TechnicianRecommendationService {
-    public static final int DEFAULT_JOB_MINUTES = 60;
     private final TechnicianScheduleRepository schedules;
     private final AssignmentRepository assignments;
     private final MlPredictionRepository predictions;
@@ -73,6 +72,7 @@ public class TechnicianRecommendationService {
             return prediction.get().getPredictedDurationMinutes();
         long total = items.findAllByServiceTicket_Id(id).stream().filter(i -> i.getApprovalStatus() != ApprovalStatus.REJECTED)
                 .map(i -> i.getServiceCatalogItem().getStandardDurationMinutes()).filter(Objects::nonNull).filter(n -> n > 0).mapToLong(Integer::longValue).sum();
-        return total > 0 ? total : DEFAULT_JOB_MINUTES;
+        BusinessRules.require(total > 0, "Phiếu dịch vụ chưa có thời lượng tiêu chuẩn hợp lệ.");
+        return total;
     }
 }

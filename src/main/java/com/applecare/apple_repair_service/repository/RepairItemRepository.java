@@ -11,4 +11,6 @@ public interface RepairItemRepository extends JpaRepository<RepairItem, Long> {
 
 
     List<RepairItem> findAllByServiceTicket_Id(Long serviceTicketId);
+
+    List<RepairItem> findAllByWarrantySourceItem_IdOrderByCreatedAtDesc(Long sourceItemId);
 }

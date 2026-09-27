@@ -33,9 +33,9 @@ public class ServiceTimingService {
   var now=LocalDateTime.now(clock);var next=t.getStatus();
   if(next==ServiceTicketStatus.HANDED_OVER)return;
   String reason=next.name();
-  if(next==ServiceTicketStatus.REPAIRING) {
+  if(next==ServiceTicketStatus.INSPECTING || next==ServiceTicketStatus.REPAIRING) {
    if(t.getActualRepairStartedAt()==null)t.setActualRepairStartedAt(now);
-   reason=previous==ServiceTicketStatus.WAITING_PART || previous==ServiceTicketStatus.WAITING_APPROVAL ? "RESUME" : "ACTUAL_START";
+   reason=previous==ServiceTicketStatus.WAITING_PART || previous==ServiceTicketStatus.WAITING_APPROVAL ? "RESUME" : previous==ServiceTicketStatus.ASSIGNED ? "ACTUAL_START" : next.name();
   }
   if(next==ServiceTicketStatus.WAITING_HANDOVER && t.getActualRepairCompletedAt()==null)t.setActualRepairCompletedAt(now);
   recalculate(t,actor,reason);
@@ -64,25 +64,25 @@ public class ServiceTimingService {
   var blocked=new HashSet<Long>();
   var byWorker=active.stream().collect(Collectors.groupingBy(a->a.getTechnician().getId()));
   var durationMap=new HashMap<Long,Long>();
-  for(var t:all.values())durationMap.put(t.getId(),estimate(t,itemMap.getOrDefault(t.getId(),List.of()),config.defaultMinutes(),t==trigger && reason.equals("SERVICE_PLAN_CHANGE")));
+  for(var t:all.values())durationMap.put(t.getId(),estimate(t,itemMap.getOrDefault(t.getId(),List.of()),t==trigger && reason.equals("SERVICE_PLAN_CHANGE")));
   for(var worker:byWorker.entrySet()) {
    long workerId=worker.getKey();var queue=new ArrayList<>(worker.getValue());
-   queue.sort(Comparator.comparingInt((Assignment a)->a.getServiceTicket().getStatus()==ServiceTicketStatus.REPAIRING?0:1)
+   queue.sort(Comparator.comparingInt((Assignment a)->active(a.getServiceTicket())?0:1)
            .thenComparing(Assignment::getAssignedAt).thenComparing(Assignment::getId));
    for(var assignment:queue) {
     var t=assignment.getServiceTicket();if(terminal(t)||waiting(t))continue;
     long minutes=durationMap.get(t.getId());long elapsed=elapsed(historyMap.getOrDefault(t.getId(),List.of()),now);
     long remaining=Math.max(0,minutes-elapsed);
     var earliest=cursors.getOrDefault(workerId,now);boolean isTrigger=t.getId().equals(trigger.getId());
-    if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING)earliest=now;
+    if(isTrigger && active(t))earliest=now;
     var range=blocked.contains(workerId)?new WorkCalendar.Estimate(null,null):WorkCalendar.allocate(earliest,remaining,windows(shifts,workerId,t.getBranch().getId()));
-    if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING && (reason.equals("ACTUAL_START") || reason.equals("RESUME")))
+    if(isTrigger && active(t) && (reason.equals("ACTUAL_START") || reason.equals("RESUME")))
      range=new WorkCalendar.Estimate(now,range.completion());
-    if(isTrigger && t.getStatus()==ServiceTicketStatus.REPAIRING && !reason.equals("ACTUAL_START") && !reason.equals("RESUME"))
+    if(isTrigger && active(t) && !reason.equals("ACTUAL_START") && !reason.equals("RESUME"))
      range=new WorkCalendar.Estimate(t.getEstimatedStartAt()!=null?t.getEstimatedStartAt():t.getActualRepairStartedAt(),range.completion());
     if(isTrigger && reason.startsWith("MANUAL:"))range=new WorkCalendar.Estimate(t.getEstimatedStartAt(),t.getEstimatedCompletionAt());
     // Running work keeps its deadline until an explicit event on that work changes it.
-    if(t.getStatus()==ServiceTicketStatus.REPAIRING && !isTrigger && t.getEstimatedDurationMinutes()!=null) {
+    if(active(t) && !isTrigger && t.getEstimatedDurationMinutes()!=null) {
      if(range.completion()!=null)cursors.put(workerId,max(now,range.completion()).plusMinutes(config.breakMinutes()));else blocked.add(workerId);
      continue;
     }
@@ -117,13 +117,16 @@ public class ServiceTimingService {
   return shifts.stream().filter(s->s.getTechnician().getId()==technician && s.getBranch().getId()==branch)
     .map(s->new WorkCalendar.Window(s.getWorkDate().atTime(s.getStartTime()),s.getWorkDate().atTime(s.getEndTime()))).toList();
  }
- private long estimate(ServiceTicket t,List<RepairItem> selected,int fallback,boolean changedPlan) {
+ private long estimate(ServiceTicket t,List<RepairItem> selected,boolean changedPlan) {
   if(!changedPlan && t.getEstimateSource()==EstimateSource.MANUAL && t.getEstimatedDurationMinutes()!=null)return t.getEstimatedDurationMinutes();
-  long total=selected.stream().filter(i->i.getApprovalStatus()==ApprovalStatus.APPROVED)
+   long total=selected.stream().filter(i->i.getApprovalStatus()!=ApprovalStatus.REJECTED)
    .map(i->i.getWarrantyReplacementCatalog()!=null?i.getWarrantyReplacementCatalog():i.getServiceCatalogItem())
    .filter(c->c.getStatus()==ActiveStatus.ACTIVE).map(ServiceCatalogItem::getStandardDurationMinutes).filter(Objects::nonNull).filter(n->n>0).mapToLong(Integer::longValue).sum();
   if(changedPlan)t.setEstimateSource(EstimateSource.STANDARD);
-  return total>0?total:fallback;
+  if(total>0)return total;
+  BusinessRules.require(t.getEstimatedDurationMinutes()!=null && t.getEstimatedDurationMinutes()>0,
+          "Phiếu dịch vụ chưa có thời lượng tiêu chuẩn hợp lệ.");
+  return t.getEstimatedDurationMinutes();
  }
  private long elapsed(List<ServiceStatusHistory> history,LocalDateTime now) {
   try{return RepairDurationService.calculate(history,now);}catch(com.applecare.apple_repair_service.exception.BusinessRuleViolationException ex){return 0;}
@@ -143,5 +146,6 @@ public class ServiceTimingService {
  }
  private static LocalDateTime max(LocalDateTime a,LocalDateTime b){return a.isAfter(b)?a:b;}
  private static boolean waiting(ServiceTicket t){return t.getStatus()==ServiceTicketStatus.WAITING_PART || t.getStatus()==ServiceTicketStatus.WAITING_APPROVAL;}
+ private static boolean active(ServiceTicket t){return t.getStatus()==ServiceTicketStatus.INSPECTING || t.getStatus()==ServiceTicketStatus.REPAIRING;}
  private static boolean terminal(ServiceTicket t){return t.getStatus()==ServiceTicketStatus.WAITING_HANDOVER || t.getStatus()==ServiceTicketStatus.HANDED_OVER || t.getStatus()==ServiceTicketStatus.CANCELLED;}
 }

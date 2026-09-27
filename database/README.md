@@ -1,6 +1,6 @@
 # Khởi tạo schema
 
-`schema.sql` là schema canonical cho database **trống**: 31 bảng, có đủ lịch tuần,
+`schema.sql` là schema canonical cho database **trống**: 32 bảng, có đủ lịch tuần,
 ngày ngoại lệ, mapping issue–device type và các trường Phase 1:
 - `service_tickets.customer_reported_issue`, `authorized_scope` (TEXT nullable).
 - `repair_items.confirmation_method` (DIRECT/PHONE/PRE_AUTHORIZED), `warranty_remedy`
@@ -39,8 +39,43 @@ Không suy diễn defective quantity từ các note cũ. Biên nhận mới là 
 kho lỗi. Không sinh ETA ban đầu giả cho ticket cũ. Các lần tính trong tương lai
 có thể ghi current ETA/history thật từ thời điểm tính, còn initial ETA vẫn null.
 
-Mặc định tập trung khi chưa có setting: nghỉ 10 phút, hạn phân công 15 phút,
-thời lượng kiểm tra tạm 30 phút. Không cần seed setting để ứng dụng khởi động.
+Mặc định tập trung khi chưa có setting: nghỉ 10 phút và hạn phân công 15 phút.
+Không có thời lượng tạm cho phiếu thiếu dịch vụ; catalog phải có duration dương.
 Admin lưu cấu hình sẽ dùng API system_settings hiện có.
 
 Quy tắc: [SERVICE_TIMING_RULES.md](../docs/phase11/SERVICE_TIMING_RULES.md).
+
+## Phase 1.2 — lô nhập kho và điều kiện chờ đã giải quyết
+
+Thêm duy nhất bảng `inventory_lots`. Một lần nhập kho mới tạo InventoryLot, tăng
+BranchInventory và tạo InventoryTransaction STOCK_IN có `inventory_lot_id` trong
+cùng transaction. InventoryLot chỉ lưu nguồn gốc và số lượng ban đầu; không có
+remaining quantity. BranchInventory tiếp tục là nguồn tồn usable hiện tại.
+
+`service_status_histories` lưu `resolved_at`, `resolution_recorded_at`, người và
+ghi chú giải quyết điều kiện chờ. `repair_items.approval_resolved_at` lưu giờ khách
+thực tế phản hồi, tách khỏi giờ nhân viên nhập dữ liệu. Transfer bổ sung công việc
+đã làm, tình trạng thiết bị và ghi chú phản hồi; các cột mới nullable để không bịa
+dữ liệu lịch sử cũ, còn API mới bắt buộc nội dung khi tạo yêu cầu chuyển giao.
+
+`phase12-additive.sql` dành cho schema Phase 1.1 chưa có các thay đổi trên. Chỉ áp
+dụng một lần sau khi đối chiếu schema; không import `schema.sql` vào database đã có
+dữ liệu và không tự backfill nguồn lô/thời điểm chờ/chuyển giao cho lịch sử cũ.
+
+## Phase hiện tại — warranty configuration và duration bắt buộc
+
+`service_catalog_items` thêm nullable `warranty_remedy` và self-FK
+`warranty_replacement_catalog_id`. Không thêm bảng claim: các lần bảo hành được derive
+từ `repair_items.warranty_source_item_id`. `standard_duration_minutes` là bắt buộc cho
+catalog mới và canonical schema.
+
+`phase13-additive.sql` chỉ dành cho schema Phase 1.2 sau khi quản trị viên đã đối chiếu
+và xử lý có chủ đích mọi duration legacy null. Script không tự điền 30 phút và không
+được import thay canonical schema vào database đang có dữ liệu.
+
+## Phase 1.4 — check-in lịch hẹn theo thời gian server
+
+`appointments.arrived_at` lưu thời điểm backend thực tế chấp nhận thao tác “Khách đã
+đến”. `phase14-additive.sql` chỉ thêm cột nullable này; không xóa key grace cũ trong
+`system_settings` và không sửa snapshot ưu đãi của lịch hẹn. Bản ghi lịch sử ARRIVED
+không có `arrived_at` được xem là không đủ bằng chứng áp dụng ưu đãi khi tạo phiếu mới.

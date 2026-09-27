@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
+import com.applecare.apple_repair_service.exception.AppointmentSlotConflictException;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +57,7 @@ public class AppointmentScheduleService {
             BusinessRules.require(Objects.equals(branchId, request.branchId()), "Các ngày phải thuộc cùng chi nhánh.");
             BusinessRules.require(distinct.add(request.weekday()), "Ngày trong tuần bị trùng.");
             BusinessRules.require(request.weekday() >= 1 && request.weekday() <= 7, "Ngày trong tuần không hợp lệ.");
+            BusinessRules.require(!request.enabled() || !request.slots().isEmpty(), "Ngày đang mở phải có ít nhất một khung giờ.");
             validate(request.slots());
         }
         var branch = access.lock(Branch.class, branchId);
@@ -87,6 +89,7 @@ public class AppointmentScheduleService {
     public DateOverrideResponse saveOverride(SaveDateOverrideRequest request) {
         rules.validate(request);
         BusinessRules.require(Set.of("INHERIT", "DISABLED", "REPLACE").contains(request.mode()), "Kiểu điều chỉnh ngày không hợp lệ.");
+        BusinessRules.require(!request.mode().equals("REPLACE") || !request.slots().isEmpty(), "Cần ít nhất một khung giờ thay thế.");
         validate(request.slots());
         var branch = access.lock(Branch.class, request.branchId());
         var existing = overrides.findByBranch_IdAndAppointmentDate(request.branchId(), request.date());
@@ -144,13 +147,28 @@ public class AppointmentScheduleService {
     private static String key(AppointmentSlot slot) { return slot.getStartTime() + "/" + slot.getEndTime(); }
 
     private static void validate(List<SlotRule> rules) {
+        BusinessRules.require(rules != null, "Danh sách khung giờ không được để trống.");
         BusinessRules.require(rules.size() <= 48, "Một ngày không thể có quá 48 khung giờ.");
         var unique = new HashSet<String>();
         for (var rule : rules) {
             BusinessRules.require(rule != null && rule.startTime() != null && rule.endTime() != null
                     && rule.startTime().isBefore(rule.endTime()), "Giờ bắt đầu phải trước giờ kết thúc.");
-            BusinessRules.require(unique.add(key(rule)), "Khung giờ bị trùng.");
+            if (!unique.add(key(rule)))
+                throw new AppointmentSlotConflictException("Khung giờ " + display(rule) + " bị trùng.");
         }
+        var enabled = rules.stream().filter(SlotRule::enabled)
+                .sorted(Comparator.comparing(SlotRule::startTime).thenComparing(SlotRule::endTime)).toList();
+        for (int index = 1; index < enabled.size(); index++) {
+            var previous = enabled.get(index - 1);
+            var current = enabled.get(index);
+            if (current.startTime().isBefore(previous.endTime()))
+                throw new AppointmentSlotConflictException("Khung giờ " + display(current)
+                        + " chồng lấn với " + display(previous) + ".");
+        }
+    }
+
+    private static String display(SlotRule rule) {
+        return rule.startTime() + "–" + rule.endTime();
     }
 
     private String encode(List<SlotRule> rules) {

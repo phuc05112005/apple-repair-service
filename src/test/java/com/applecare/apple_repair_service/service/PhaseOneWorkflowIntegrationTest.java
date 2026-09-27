@@ -59,13 +59,13 @@ class PhaseOneWorkflowIntegrationTest {
         assertFalse(customer.getCreatedAt().isAfter(LocalDateTime.now(clock).plusSeconds(1)));
     }
 
-    @Test void walkInWithoutServiceCanWaitThenTechnicianRecordsPhoneConsent() throws Exception {
+    @Test void walkInWithServiceCanWaitThenTechnicianRecordsPhoneConsent() throws Exception {
         var reception = login(f.receptionist); var technician = login(f.technician);
         var request = new WalkInIntakeRequest("Khách trực tiếp", f.prefix, f.branch.getId(), f.model.getId(),
-                null, null, "Vỏ máy trầy", List.of(), "Máy tự tắt khi dùng");
+                null, null, "Vỏ máy trầy", List.of(f.catalog.getId()), "Máy tự tắt khi dùng");
         var body = mvc.perform(post("/api/v1/internal/service-tickets/walk-in").header("Authorization", reception)
                 .contentType("application/json").content(json.writeValueAsString(request)))
-                .andExpect(status().isCreated()).andExpect(jsonPath("$.repairItems").isEmpty())
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.repairItems.length()").value(1))
                 .andExpect(jsonPath("$.context.symptomDescription").value("Máy tự tắt khi dùng"))
                 .andReturn().getResponse().getContentAsString();
         long id = json.readTree(body).get("ticket").get("id").asLong();
@@ -73,18 +73,19 @@ class PhaseOneWorkflowIntegrationTest {
         mvc.perform(post(path + "/assignments").header("Authorization", reception).contentType("application/json")
                 .content(json.writeValueAsString(new AssignTechnicianCommand(f.technician.getId(), AssignmentSource.MANUAL_OVERRIDE))))
                 .andExpect(status().isCreated());
-        mvc.perform(get(path).header("Authorization", technician)).andExpect(status().isOk()).andExpect(jsonPath("$.repairItems").isEmpty());
+        mvc.perform(get(path).header("Authorization", technician)).andExpect(status().isOk()).andExpect(jsonPath("$.repairItems.length()").value(1));
         mvc.perform(post(path + "/inspection/start").header("Authorization", technician))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("INSPECTING"));
-        var inspection = new InspectionCommand("Lỗi nguồn đã xác định", true,
-                List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.valueOf(100), BigDecimal.valueOf(100), null)));
+        var inspection = new InspectionCommand("Lỗi nguồn đã xác định, phát sinh công việc ngoài báo giá ban đầu", true,
+                List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.valueOf(120), BigDecimal.valueOf(120), null)));
         var inspected = mvc.perform(post(path + "/inspection").header("Authorization", technician).contentType("application/json")
                 .content(json.writeValueAsString(inspection))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.ticket.status").value("WAITING_APPROVAL"))
-                .andExpect(jsonPath("$.repairItems[0].approvalStatus").value("PENDING"))
                 .andExpect(jsonPath("$.context.symptomDescription").value("Máy tự tắt khi dùng"))
                 .andReturn().getResponse().getContentAsString();
-        long itemId = json.readTree(inspected).get("repairItems").get(0).get("id").asLong();
+        var pendingItem = json.readTree(inspected).get("repairItems").valueStream()
+                .filter(node -> "PENDING".equals(node.get("approvalStatus").asString())).findFirst().orElseThrow();
+        long itemId = pendingItem.get("id").asLong();
         var approvalPath = "/api/v1/internal/repair-items/" + itemId + "/approval";
         String decision = "{\"decision\":\"APPROVED\",\"note\":\"Khách đồng ý báo giá\",\"confirmationMethod\":\"PHONE\"}";
         mvc.perform(post(approvalPath).header("Authorization", technician).contentType("application/json").content(decision))
@@ -95,6 +96,8 @@ class PhaseOneWorkflowIntegrationTest {
         mvc.perform(post(path + "/resume-repair").header("Authorization", technician)).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/internal/technician/repair-items/" + itemId + "/approval").header("Authorization", technician).contentType("application/json").content(decision))
                 .andExpect(status().isOk());
+        mvc.perform(post(path + "/resume-repair").header("Authorization", technician))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
         mvc.perform(post(path + "/finish-repair").header("Authorization", technician))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("WAITING_HANDOVER"));
         assertEquals("Máy tự tắt khi dùng", em.find(ServiceTicket.class, id).getCustomerReportedIssue());

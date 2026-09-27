@@ -19,7 +19,7 @@ public record OperationalTicketResponse(
         String branchName,
         ServiceTicketStatus status,
         LocalDateTime receivedAt,
-        long estimatedDurationMinutes,
+        Long estimatedDurationMinutes,
         Long activeAssignmentId,
         Long activeTechnicianId,
         String activeTechnicianName, LocalDateTime assignedAt, TicketTimingResponse timing

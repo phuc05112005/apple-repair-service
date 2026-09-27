@@ -2,6 +2,7 @@ package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.dto.auth.LoginRequest;
 import com.applecare.apple_repair_service.dto.command.StockAdjustmentCommand;
+import com.applecare.apple_repair_service.dto.command.StockInCommand;
 import com.applecare.apple_repair_service.dto.request.*;
 import com.applecare.apple_repair_service.entity.*;
 import com.applecare.apple_repair_service.enums.*;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.List;
@@ -96,6 +98,22 @@ class AdminApiIntegrationTest {
                         f.branch.getId(), 1, true, List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true))))))
                 .andExpect(status().isForbidden());
     }
+    @Test void onlyAdminCanConfigureValidatedOnlineBookingDiscount() throws Exception {
+        String receptionistToken = login(f.receptionist);
+        String url = "/api/v1/admin/system-settings/" + PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT;
+        mvc.perform(put(url).header("Authorization", "Bearer " + receptionistToken)
+                .contentType("application/json").content("{\"settingValue\":\"5\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(url).header("Authorization", "Bearer " + token)
+                .contentType("application/json").content("{\"settingValue\":\"5\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.settingValue").value("5"));
+        mvc.perform(put(url).header("Authorization", "Bearer " + token)
+                .contentType("application/json").content("{\"settingValue\":\"101\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put(url).header("Authorization", "Bearer " + token)
+                .contentType("application/json").content("{\"settingValue\":\"0\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.settingValue").value("0"));
+    }
     @Test void adminUpdatesDisablesReactivatesUsersButCannotDisableSelf() throws Exception {
         var request=new CreateUserRequest(f.prefix+"reception-new",ApiFixture.PASSWORD,"New receptionist",null,UserRole.RECEPTIONIST);
         var created=mvc.perform(post("/api/v1/admin/users").header("Authorization","Bearer "+token)
@@ -136,13 +154,16 @@ class AdminApiIntegrationTest {
     }
     @Test void stockCommandsUseAuthenticatedActorRejectSpoofingAndReportInsufficientStock() throws Exception {
         var part=new Part();part.setPartCode(f.prefix);part.setName(f.prefix);part.setSalePrice(BigDecimal.TEN);em.persist(part);em.flush();
-        var command=new StockAdjustmentCommand(f.branch.getId(),part.getId(),2,"fixture");
+        var command=new StockInCommand(f.prefix+"-LOT-01",f.branch.getId(),part.getId(),2,
+                LocalDateTime.now(clock).minusMinutes(1),"fixture");
         String body=json.writeValueAsString(command);
         String spoof=body.substring(0,body.length()-1)+",\"recordedByUserId\":"+f.technician.getId()+"}";
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
                 .contentType("application/json").content(spoof)).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(body)).andExpect(status().isOk()).andExpect(jsonPath("$.quantity").value(2));
+                .contentType("application/json").content(body)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.lot.lotCode").value(command.lotCode()))
+                .andExpect(jsonPath("$.inventory.quantity").value(2));
         mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+token)
                 .param("branchId",f.branch.getId().toString()).param("partId",part.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))

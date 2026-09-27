@@ -66,7 +66,7 @@ class StatisticsIntegrationTest {
     }
     RepairItem item(ServiceTicket ticket,String price,ApprovalStatus approval,RepairItem source) {
         var catalog=new ServiceCatalogItem();catalog.setDeviceModel(ticket.getCustomerDevice().getDeviceModel());catalog.setServiceType(serviceType);
-        catalog.setServiceIssue(issue);catalog.setName(prefix+UUID.randomUUID().toString().substring(0,8));em.persist(catalog);
+        catalog.setServiceIssue(issue);catalog.setName(prefix+UUID.randomUUID().toString().substring(0,8));catalog.setStandardDurationMinutes(30);em.persist(catalog);
         var item=new RepairItem();item.setServiceTicket(ticket);item.setServiceCatalogItem(catalog);item.setItemNameSnapshot("Fixture");
         item.setFinalPrice(new BigDecimal(price));item.setApprovalStatus(approval);item.setWarrantySourceItem(source);em.persist(item);return item;
     }

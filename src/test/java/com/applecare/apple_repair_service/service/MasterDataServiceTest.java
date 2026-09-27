@@ -4,9 +4,14 @@ import com.applecare.apple_repair_service.dto.request.CreateDeviceTypeRequest;
 import com.applecare.apple_repair_service.dto.request.CreatePartRequest;
 import com.applecare.apple_repair_service.dto.request.CreateServiceCatalogItemRequest;
 import com.applecare.apple_repair_service.entity.DeviceType;
+import com.applecare.apple_repair_service.entity.DeviceModel;
+import com.applecare.apple_repair_service.entity.Part;
+import com.applecare.apple_repair_service.entity.ServiceCatalogItem;
+import com.applecare.apple_repair_service.entity.ServiceIssue;
 import com.applecare.apple_repair_service.entity.ServiceType;
 import com.applecare.apple_repair_service.entity.SystemSetting;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
+import com.applecare.apple_repair_service.enums.WarrantyRemedy;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
@@ -46,6 +51,32 @@ class MasterDataServiceTest {
         var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, null, "Replace", BigDecimal.TEN, 30, 90)));
         verifyNoInteractions(repo);
+    }
+
+    @Test
+    void warrantyConfigurationRequiresTechnicalRemedyAndValidReplacementCatalog() {
+        var access = mock(DomainAccess.class);
+        var repo = mock(ServiceCatalogItemRepository.class);
+        var deviceType = new DeviceType(); deviceType.setId(1L);
+        var model = new DeviceModel(); model.setId(1L); model.setDeviceType(deviceType);
+        var issue = new ServiceIssue(); issue.setId(3L); issue.getDeviceTypes().add(deviceType);
+        var repairType = new ServiceType(); repairType.setId(2L); repairType.setCode(ServiceTypeCode.REPAIR); repairType.setName("Sửa chữa");
+        when(access.get(DeviceModel.class, 1L)).thenReturn(model);
+        when(access.get(ServiceType.class, 2L)).thenReturn(repairType);
+        when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(
+                1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, null, null)));
+
+        var replacementType = new ServiceType(); replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName("Thay thế");
+        var part = new Part(); part.setId(7L);
+        var replacement = new ServiceCatalogItem(); replacement.setId(9L); replacement.setName("Thay nguồn");
+        replacement.setDeviceModel(model); replacement.setServiceIssue(issue); replacement.setServiceType(replacementType); replacement.setPart(part); replacement.setStandardDurationMinutes(30);
+        when(access.get(ServiceCatalogItem.class, 9L)).thenReturn(replacement);
+        when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        assertDoesNotThrow(() -> service.create(new CreateServiceCatalogItemRequest(
+                1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, WarrantyRemedy.REPLACEMENT, 9L)));
+        verify(repo).saveAndFlush(any(ServiceCatalogItem.class));
     }
 
     @Test

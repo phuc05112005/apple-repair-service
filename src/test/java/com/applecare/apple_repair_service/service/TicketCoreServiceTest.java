@@ -9,6 +9,7 @@ import com.applecare.apple_repair_service.entity.Appointment;
 import com.applecare.apple_repair_service.entity.AppointmentDevice;
 import com.applecare.apple_repair_service.entity.AppointmentServiceItem;
 import com.applecare.apple_repair_service.entity.AppointmentSlot;
+import com.applecare.apple_repair_service.entity.Assignment;
 import com.applecare.apple_repair_service.entity.Branch;
 import com.applecare.apple_repair_service.entity.DeviceModel;
 import com.applecare.apple_repair_service.entity.RepairItem;
@@ -32,6 +33,8 @@ import jakarta.validation.Validation;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +56,7 @@ class TicketCoreServiceTest {
     final TicketCodeGenerator codes = mock(TicketCodeGenerator.class);
     final List<ServiceStatusHistory> history = new ArrayList<>();
     final List<RepairItem> items = new ArrayList<>();
-    final ServiceStatusService status = new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class));
+    final ServiceStatusService status = new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class), access);
     final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
     final ServiceTicketService service = new ServiceTicketService(tickets, repairs, booking, histories, customers, access, rules, new EntityResponses(), status, codes, new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), new PaymentService(repairs, access, rules, TestData.CLOCK), mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
 
@@ -66,6 +69,7 @@ class TicketCoreServiceTest {
             return h;
         });
         when(histories.findAllByServiceTicket_IdOrderByChangedAtAsc(any())).thenAnswer(i -> history);
+        when(histories.findFirstByServiceTicket_IdOrderByChangedAtDescIdDesc(any())).thenAnswer(i -> history.isEmpty() ? Optional.empty() : Optional.of(history.getLast()));
         when(repairs.findAllByServiceTicket_Id(any())).thenAnswer(i -> items);
         when(repairs.save(any())).thenAnswer(i -> {
             RepairItem r = i.getArgument(0);
@@ -73,6 +77,7 @@ class TicketCoreServiceTest {
             return r;
         });
         when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
+        when(access.lock(User.class, 1L)).thenReturn(TestData.user(1));
         when(assignments.findFirstByServiceTicket_IdAndStatus(any(), any())).thenReturn(Optional.empty());
         when(tickets.saveAndFlush(any())).thenAnswer(i -> {
             ServiceTicket t = i.getArgument(0);
@@ -85,6 +90,11 @@ class TicketCoreServiceTest {
     ServiceTicket ticket(ServiceTicketStatus state) {
         var t = TestData.ticket(state);
         when(access.lock(ServiceTicket.class, 1L)).thenReturn(t);
+        var assignment = new Assignment();
+        assignment.setId(1L);
+        assignment.setServiceTicket(t);
+        assignment.setTechnician(TestData.user(1));
+        when(assignments.findFirstByServiceTicket_IdAndStatus(1L, com.applecare.apple_repair_service.enums.AssignmentStatus.ACTIVE)).thenReturn(Optional.of(assignment));
         return t;
     }
 
@@ -143,7 +153,7 @@ class TicketCoreServiceTest {
         when(access.get(RepairItem.class, 3L)).thenReturn(proposed);
         when(access.lock(RepairItem.class, 3L)).thenReturn(proposed);
         when(access.get(ServiceTicket.class, 1L)).thenReturn(t);
-        new RepairItemService(repairs, access, rules, status, new EntityResponses(), TestData.CLOCK)
+        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(), TestData.CLOCK)
                 .recordApprovalDecision(3L, new ApprovalDecisionRequest(ApprovalStatus.APPROVED, 1L, "Accepted"));
         var total = new PaymentService(repairs, access, rules, TestData.CLOCK).calculateTicketTotal(1L);
         assertEquals(new BigDecimal("180.00"), total);
@@ -205,24 +215,32 @@ class TicketCoreServiceTest {
     }
 
     @Test
-    void approvedDecisionResumesAfterAllResolved() {
+    void approvedDecisionMarksWaitResolvedWithoutAutoResume() {
         approval(ApprovalStatus.APPROVED);
-        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
+        assertEquals(ServiceTicketStatus.WAITING_APPROVAL, history.getLast().getToStatus());
+        assertNotNull(history.getLast().getResolvedAt());
     }
 
     @Test
-    void allRejectedSkipsRepair() {
+    void allRejectedMarksWaitResolvedWithoutAutoTransition() {
         approval(ApprovalStatus.REJECTED);
-        assertEquals(ServiceTicketStatus.WAITING_HANDOVER, history.getLast().getToStatus());
+        assertEquals(ServiceTicketStatus.WAITING_APPROVAL, history.getLast().getToStatus());
+        assertNotNull(history.getLast().getResolvedAt());
     }
 
     void approval(ApprovalStatus decision) {
         var t = ticket(ServiceTicketStatus.WAITING_APPROVAL);
+        var wait = new ServiceStatusHistory();
+        wait.setId(1L);
+        wait.setServiceTicket(t);
+        wait.setToStatus(ServiceTicketStatus.WAITING_APPROVAL);
+        wait.setChangedAt(LocalDateTime.now(TestData.CLOCK).minusMinutes(5));
+        history.add(wait);
         var item = TestData.item(2, t, ApprovalStatus.PENDING);
         items.add(item);
         when(access.get(RepairItem.class, 2L)).thenReturn(item);
         when(access.lock(RepairItem.class, 2L)).thenReturn(item);
-        new RepairItemService(repairs, access, rules, status, new EntityResponses(), TestData.CLOCK).recordApprovalDecision(2L, new ApprovalDecisionRequest(decision, 1L, "ok"));
+        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(), TestData.CLOCK).recordApprovalDecision(2L, new ApprovalDecisionRequest(decision, 1L, "ok"));
     }
 
     @Test
@@ -250,7 +268,12 @@ class TicketCoreServiceTest {
         a.setDiscountPercent(new BigDecimal("10"));
         var slot = new AppointmentSlot();
         slot.setBranch(TestData.branch(1));
+        var arrival = LocalDateTime.now(TestData.CLOCK);
+        slot.setAppointmentDate(arrival.toLocalDate());
+        slot.setStartTime(arrival.toLocalTime().minusMinutes(30));
+        slot.setEndTime(arrival.toLocalTime().plusMinutes(30));
         a.setAppointmentSlot(slot);
+        a.setArrivedAt(arrival);
         var d = new AppointmentDevice();
         d.setId(2L);
         d.setAppointment(a);
@@ -274,15 +297,55 @@ class TicketCoreServiceTest {
     }
 
     @Test
-    void walkInHasZeroDiscountAndInitialHistory() {
+    void appointmentWithoutValidServerCheckInCannotApplyDiscount() {
+        var physical = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT).getCustomerDevice();
+        var a = new Appointment();
+        a.setId(1L);
+        a.setStatus(AppointmentStatus.ARRIVED);
+        a.setCustomer(physical.getCustomer());
+        a.setDiscountPercent(new BigDecimal("10"));
+        var slot = new AppointmentSlot();
+        slot.setBranch(TestData.branch(1));
+        slot.setAppointmentDate(LocalDate.now(TestData.CLOCK));
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0));
+        a.setAppointmentSlot(slot);
+        a.setArrivedAt(LocalDateTime.of(slot.getAppointmentDate(), LocalTime.of(10, 0)));
+        var d = new AppointmentDevice();
+        d.setId(2L);
+        d.setAppointment(a);
+        d.setDeviceModel(physical.getDeviceModel());
+        when(access.get(AppointmentDevice.class, 2L)).thenReturn(d);
+        when(access.lock(Appointment.class, 1L)).thenReturn(a);
+        when(access.get(Branch.class, 1L)).thenReturn(slot.getBranch());
+        when(customers.resolveDevice(eq(1L), any())).thenReturn(physical);
+        var booked = new AppointmentServiceItem();
+        booked.setServiceCatalogItem(TestData.catalog(3));
+        booked.setServiceNameSnapshot("Snapshot");
+        booked.setBasePriceSnapshot(new BigDecimal("100"));
+        booked.setFinalPriceSnapshot(new BigDecimal("90"));
+        when(booking.findAllByAppointmentDevice_Id(2L)).thenReturn(List.of(booked));
+
+        var result = service.intakeAppointmentDevice(new IntakeAppointmentDeviceRequest(2L, null, null, "Good", 1L));
+        assertEquals(BigDecimal.ZERO, result.ticket().discountPercent());
+        assertEquals(new BigDecimal("100.00"), result.repairItems().getFirst().finalPrice());
+    }
+
+    @Test
+    void walkInRequiresServiceAndValidSelectionKeepsZeroDiscount() {
         var physical = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT).getCustomerDevice();
         when(access.get(Branch.class, 1L)).thenReturn(TestData.branch(1));
         when(access.get(DeviceModel.class, 1L)).thenReturn(physical.getDeviceModel());
         when(customers.resolve("An", "0901")).thenReturn(physical.getCustomer());
         when(customers.resolveDevice(eq(1L), any())).thenReturn(physical);
-        var result = service.createWalkInTicket(new WalkInIntakeRequest("An", "0901", 1L, 1L, null, null, "Good", List.of()), 1L);
+        assertThrows(BusinessRuleViolationException.class, () -> service.createWalkInTicket(
+                new WalkInIntakeRequest("An", "0901", 1L, 1L, null, null, "Good", List.of()), 1L));
+        var catalog = TestData.catalog(3L);
+        when(access.get(ServiceCatalogItem.class, 3L)).thenReturn(catalog);
+        var result = service.createWalkInTicket(new WalkInIntakeRequest("An", "0901", 1L, 1L, null, null, "Good", List.of(3L)), 1L);
         assertEquals(BigDecimal.ZERO, result.ticket().discountPercent());
         assertNull(result.ticket().appointmentDeviceId());
+        assertEquals(1, result.repairItems().size());
         assertEquals(1, history.size());
     }
 

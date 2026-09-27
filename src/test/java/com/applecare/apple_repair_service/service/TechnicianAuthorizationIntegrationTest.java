@@ -63,8 +63,11 @@ class TechnicianAuthorizationIntegrationTest {
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
     }
     long requestTransfer() throws Exception {
-        var body=command(ticketPath("transfers/request"),a,new TransferCommand(f.otherTechnician.getId(),"Please transfer"))
+        var body=command(ticketPath("transfers/request"),a,new TransferCommand(f.otherTechnician.getId(),"Please transfer","Inspection completed","Device is stable"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.requestedById").value(f.technician.getId()))
+                .andExpect(jsonPath("$.note").value("Please transfer"))
+                .andExpect(jsonPath("$.workDone").value("Inspection completed"))
+                .andExpect(jsonPath("$.currentCondition").value("Device is stable"))
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body).get("id").asLong();
     }
@@ -88,8 +91,8 @@ class TechnicianAuthorizationIntegrationTest {
     }
     @Test void directTransferRevokesOldTechnicianWithoutChangingBusinessStatus() throws Exception {
         command(ticketPath("inspection/start"),a,null).andExpect(status().isOk());
-        denied(command(ticketPath("transfers/direct"),a,new TransferCommand(f.otherTechnician.getId(),null)));
-        command(ticketPath("transfers/direct"),reception,new TransferCommand(f.otherTechnician.getId(),"Direct"))
+        denied(command(ticketPath("transfers/direct"),a,new TransferCommand(f.otherTechnician.getId(),"Direct","Inspection completed","Device is stable")));
+        command(ticketPath("transfers/direct"),reception,new TransferCommand(f.otherTechnician.getId(),"Direct","Inspection completed","Device is stable"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
         em.flush();assertEquals(AssignmentStatus.ENDED,initial.getStatus());assertOwner(f.otherTechnician);
         assertEquals(ServiceTicketStatus.INSPECTING,ticket.getStatus());
@@ -98,7 +101,7 @@ class TechnicianAuthorizationIntegrationTest {
         command(ticketPath("inspection"),b,inspection).andExpect(status().isOk()).andExpect(jsonPath("$.ticket.inspectedById").value(f.otherTechnician.getId()));
     }
     @Test void pendingRequestPreservesSourceAccessAndOnlyTargetCanAccept() throws Exception {
-        denied(command(ticketPath("transfers/request"),b,new TransferCommand(f.technician.getId(),null)));
+        denied(command(ticketPath("transfers/request"),b,new TransferCommand(f.technician.getId(),"Unauthorized","None","Unchanged")));
         long transfer=requestTransfer();assertOwner(f.technician);
         denied(command(ticketPath("inspection/start"),b,null));
         command(ticketPath("inspection/start"),a,null).andExpect(status().isOk());
@@ -194,7 +197,7 @@ class TechnicianAuthorizationIntegrationTest {
         if(matches.isEmpty()){warrantyType=new ServiceType();warrantyType.setCode(ServiceTypeCode.WARRANTY);warrantyType.setName(f.prefix+"warranty");em.persist(warrantyType);}
         else warrantyType=matches.getFirst();
         var warrantyCatalog=new ServiceCatalogItem();warrantyCatalog.setName(f.prefix+"warranty");warrantyCatalog.setDeviceModel(f.model);
-        warrantyCatalog.setServiceIssue(f.issue);warrantyCatalog.setServiceType(warrantyType);em.persist(warrantyCatalog);
+        warrantyCatalog.setServiceIssue(f.issue);warrantyCatalog.setServiceType(warrantyType);warrantyCatalog.setStandardDurationMinutes(30);em.persist(warrantyCatalog);
         item.setServiceCatalogItem(warrantyCatalog);item.setWarrantySourceItem(source);em.flush();
         var request=new WarrantyDecisionRequest(WarrantyDecision.APPROVED,null);
         denied(command("repair-items/"+item.getId()+"/warranty-decision",b,request));

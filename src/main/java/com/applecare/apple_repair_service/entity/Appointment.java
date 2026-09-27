@@ -69,6 +69,9 @@ public class Appointment {
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
+    @Column(name = "arrived_at")
+    private LocalDateTime arrivedAt;
+
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 

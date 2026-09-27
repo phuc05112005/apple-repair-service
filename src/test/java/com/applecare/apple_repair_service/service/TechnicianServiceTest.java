@@ -136,7 +136,7 @@ class TechnicianServiceTest {
         assertFalse(result.getLast().eligible());
         assertEquals(90, result.getLast().estimatedWorkloadMinutes());
         assertEquals(60, result.getFirst().predictedNewJobMinutes());
-        assertEquals(60, recommendations.estimate(99L));
+        assertThrows(BusinessRuleViolationException.class, () -> recommendations.estimate(99L));
     }
 
     @Test
@@ -183,7 +183,8 @@ class TechnicianServiceTest {
             return t;
         });
         var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(), TestData.CLOCK, mock(ServiceTimingService.class));
-        var request = new CreateTransferRequest(5L, 2L, 1L, direct ? TransferMode.DIRECT : TransferMode.REQUEST, null);
+        var request = new CreateTransferRequest(5L, 2L, 1L, direct ? TransferMode.DIRECT : TransferMode.REQUEST,
+                "Need transfer", "Inspection completed", "Device is stable");
         var result = direct ? service.directTransfer(request) : service.requestTransfer(request);
         if (!direct) {
             assertEquals(TransferStatus.PENDING, result.status());

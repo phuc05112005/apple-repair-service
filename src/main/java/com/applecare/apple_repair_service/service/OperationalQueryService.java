@@ -113,7 +113,7 @@ public class OperationalQueryService {
         return new OperationalTicketResponse(ticket.getId(), ticket.getTicketCode(), customer.getFullName(), customer.getPhone(),
                 device.getId(), device.getDeviceModel().getId(), device.getDeviceModel().getName(), issueNames, serviceNames,
                 ticket.getBranch().getId(), ticket.getBranch().getName(), ticket.getStatus(), ticket.getReceivedAt(),
-                ticket.getEstimatedDurationMinutes() == null ? TechnicianRecommendationService.DEFAULT_JOB_MINUTES : ticket.getEstimatedDurationMinutes(), assignment == null ? null : assignment.getId(),
+                ticket.getEstimatedDurationMinutes(), assignment == null ? null : assignment.getId(),
                 assignment == null ? null : assignment.getTechnician().getId(),
                 assignment == null ? null : assignment.getTechnician().getFullName(), assignment == null ? null : assignment.getAssignedAt(),
                 com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(ticket));

@@ -20,6 +20,7 @@ import com.applecare.apple_repair_service.exception.InsufficientStockException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.BranchInventoryRepository;
 import com.applecare.apple_repair_service.repository.InventoryTransactionRepository;
+import com.applecare.apple_repair_service.repository.InventoryLotRepository;
 import com.applecare.apple_repair_service.repository.PartUsageRepository;
 import jakarta.validation.Validation;
 
@@ -35,8 +36,9 @@ class InventoryServiceTest {
     final BranchInventoryRepository inventory = mock(BranchInventoryRepository.class);
     final PartUsageRepository usages = mock(PartUsageRepository.class);
     final InventoryTransactionRepository transactions = mock(InventoryTransactionRepository.class);
+    final InventoryLotRepository lots = mock(InventoryLotRepository.class);
     final DomainAccess access = mock(DomainAccess.class);
-    final InventoryService service = new InventoryService(inventory, usages, transactions, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK, mock(DefectiveInventoryService.class));
+    final InventoryService service = new InventoryService(inventory, usages, transactions, lots, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK, mock(DefectiveInventoryService.class));
     final Part part = new Part();
     final BranchInventory stock = new BranchInventory();
     final Branch branch = TestData.branch(1);
@@ -58,6 +60,7 @@ class InventoryServiceTest {
         when(access.lock(RepairItem.class, 1L)).thenReturn(item);
         when(access.lock(ServiceTicket.class, 1L)).thenReturn(ticket);
         when(transactions.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(lots.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
         when(usages.saveAndFlush(any())).thenAnswer(i -> {
             usage = i.getArgument(0);
             usage.setId(1L);

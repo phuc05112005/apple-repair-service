@@ -18,6 +18,7 @@ const NotFoundPage = lazy(() => import('../pages/NotFoundPage').then(module => (
 const AppointmentsPage = lazy(() => import('../pages/internal/receptionist/AppointmentsPage').then(module => ({ default: module.AppointmentsPage })))
 const IntakePage = lazy(() => import('../pages/internal/receptionist/IntakePage').then(module => ({ default: module.IntakePage })))
 const TicketWorkspacePage = lazy(() => import('../pages/internal/receptionist/TicketWorkspacePage').then(module => ({ default: module.TicketWorkspacePage })))
+const WarrantyHistoryPage = lazy(() => import('../pages/internal/receptionist/WarrantyHistoryPage').then(module => ({ default: module.WarrantyHistoryPage })))
 const TicketsPage = lazy(() => import('../pages/internal/receptionist/TicketsPage').then(module => ({ default: module.TicketsPage })))
 const TechnicianTicketPage = lazy(() => import('../pages/internal/technician/TechnicianTicketPage').then(module => ({ default: module.TechnicianTicketPage })))
 const StatisticsPage = lazy(() => import('../pages/internal/admin/StatisticsPage').then(module => ({ default: module.StatisticsPage })))
@@ -57,6 +58,7 @@ export function App() {
       <Route path="appointments" element={<AppointmentsPage />} />
       <Route path="intake" element={<IntakePage />} />
       <Route path="tickets" element={<TicketsPage />} />
+      <Route path="warranty-history" element={<WarrantyHistoryPage />} />
       <Route path="tickets/:ticketId" element={<TicketWorkspacePage />} />
       <Route path="assignments" element={<Navigate to="../tickets" replace />} />
       <Route path="handover" element={<Navigate to="../tickets" replace />} />

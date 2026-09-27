@@ -15,6 +15,7 @@ import com.applecare.apple_repair_service.dto.request.RecordInspectionRequest;
 import com.applecare.apple_repair_service.dto.request.RecordPaymentRequest;
 import com.applecare.apple_repair_service.dto.request.ReversePartUsageRequest;
 import com.applecare.apple_repair_service.dto.request.StockAdjustmentRequest;
+import com.applecare.apple_repair_service.dto.request.StockInRequest;
 import com.applecare.apple_repair_service.dto.request.TransferStockRequest;
 import com.applecare.apple_repair_service.dto.request.UsePartRequest;
 import com.applecare.apple_repair_service.dto.request.WalkInIntakeRequest;
@@ -150,6 +151,32 @@ class ApplicationTransactionsIntegrationTest {
         } finally { org.mockito.Mockito.reset(defectiveReturns); }
     }
 
+    @Test void stockInCreatesLotStockAndLinkedMovementAtomically() {
+        var receivedAt = LocalDateTime.now(TestData.CLOCK).minusMinutes(10);
+        var response = inventory.stockIn(new StockInRequest(prefix + "lot", branchId, partId, 3, receivedAt, userId, "Nhà cung cấp thử nghiệm"));
+        assertEquals(prefix + "lot", response.lot().lotCode());
+        assertEquals(3, response.lot().receivedQuantity());
+        assertEquals(4, response.inventory().quantity());
+        assertEquals(response.lot().id(), response.transaction().inventoryLotId());
+        assertEquals(prefix + "lot", response.transaction().lotCode());
+        assertEquals(1L, tx(() -> em.createQuery("select count(l) from InventoryLot l where l.lotCode=:code", Long.class)
+                .setParameter("code", prefix + "lot").getSingleResult()));
+    }
+
+    @Test void stockInRollbackRemovesLotMovementAndQuantityChange() {
+        var code = prefix + "rollbacklot";
+        assertThrows(BusinessRuleViolationException.class, () -> tx(() -> {
+            inventory.stockIn(new StockInRequest(code, branchId, partId, 2, LocalDateTime.now(TestData.CLOCK), userId, "Rollback test"));
+            throw new BusinessRuleViolationException("Force rollback");
+        }));
+        tx(() -> {
+            assertEquals(1, inventory.getInventory(branchId, partId).quantity());
+            assertEquals(0L, em.createQuery("select count(l) from InventoryLot l where l.lotCode=:code", Long.class).setParameter("code", code).getSingleResult());
+            assertEquals(0L, em.createQuery("select count(t) from InventoryTransaction t where t.inventoryLot.lotCode=:code", Long.class).setParameter("code", code).getSingleResult());
+            return null;
+        });
+    }
+
     @Test void warrantyReceiptFailureRollsBackAllFourWrites() {
         org.mockito.Mockito.doThrow(new IllegalStateException("Injected warranty receipt failure"))
                 .when(defectiveReturns).saveAndFlush(org.mockito.ArgumentMatchers.any());
@@ -243,6 +270,7 @@ class ApplicationTransactionsIntegrationTest {
             catalog.setConfiguredPrice(new BigDecimal("100"));
             catalog.setStandardDurationMinutes(30);
             catalog.setWarrantyDays(30);
+            catalog.setWarrantyRemedy(com.applecare.apple_repair_service.enums.WarrantyRemedy.REPAIR);
             persist(catalog);
             catalogId = catalog.getId();
             var second = new ServiceCatalogItem();
@@ -317,8 +345,9 @@ class ApplicationTransactionsIntegrationTest {
                     new String[]{"ServiceTimeEstimateHistory", "e.serviceTicket.branch.id"},
                     new String[]{"ServiceFeedback", "e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction", "e.serviceTicket.branch.id"},
-                    new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
-                    new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
+                     new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
+                     new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
+                     new String[]{"InventoryLot", "e.branch.id"},
                     new String[]{"PartUsage", "e.repairItem.serviceTicket.branch.id"},
                     new String[]{"ServiceStatusHistory", "e.serviceTicket.branch.id"},
                     new String[]{"Assignment", "e.serviceTicket.branch.id"},
@@ -355,12 +384,24 @@ class ApplicationTransactionsIntegrationTest {
                 new AppointmentDeviceRequest(modelId, "B", List.of(new AppointmentServiceItemRequest(catalogId, null)))));
     }
 
+    void openArrivalWindow() {
+        tx(() -> {
+            var slot = em.find(AppointmentSlot.class, slotId);
+            var now = LocalDateTime.now(TestData.CLOCK);
+            slot.setAppointmentDate(now.toLocalDate());
+            slot.setStartTime(now.toLocalTime().minusMinutes(30));
+            slot.setEndTime(now.toLocalTime().plusMinutes(30));
+            return null;
+        });
+    }
+
     @Test
     void completeBookingToHandoverKeepsDtosUsableOutsideTransaction() {
         var booking = appointments.createAppointment(booking(prefix + "booking"));
         assertEquals(2, booking.devices().size());
         assertEquals(2, booking.devices().getFirst().serviceItems().size());
         var aid = booking.appointment().id();
+        openArrivalWindow();
         appointments.confirmAppointment(aid, new ConfirmAppointmentRequest(userId));
         appointments.markArrived(aid);
         var received = tickets.intakeAppointmentDevice(new IntakeAppointmentDeviceRequest(booking.devices().getFirst().device().id(), prefix + "bookingDevice", null, "Received", userId));
@@ -489,7 +530,8 @@ class ApplicationTransactionsIntegrationTest {
     void transferRollbackKeepsOldAssignmentActive() {
         var old = assignments.assignTechnician(ticketId, new AssignTechnicianRequest(techId, userId, AssignmentSource.MANUAL_OVERRIDE));
         assertThrows(BusinessRuleViolationException.class, () -> tx(() -> {
-            transfers.directTransfer(new CreateTransferRequest(old.id(), otherTechId, userId, TransferMode.DIRECT, null));
+            transfers.directTransfer(new CreateTransferRequest(old.id(), otherTechId, userId, TransferMode.DIRECT,
+                    "Cân bằng công việc", "Đã kiểm tra thiết bị", "Thiết bị đang chờ xử lý tiếp"));
             throw new BusinessRuleViolationException("Force rollback");
         }));
         assertEquals(1, assignments.getHistory(ticketId).size());
@@ -500,6 +542,7 @@ class ApplicationTransactionsIntegrationTest {
     @Test
     void composedUseCasesPreserveChangesWithinOneTransaction() {
         var booking = appointments.createAppointment(booking(prefix + "composed"));
+        openArrivalWindow();
         tx(() -> {
             appointments.confirmAppointment(booking.appointment().id(), new ConfirmAppointmentRequest(userId));
             appointments.markArrived(booking.appointment().id());
@@ -522,7 +565,7 @@ class ApplicationTransactionsIntegrationTest {
     @Test
     void actualTicketCodeCollisionRetriesWholeIntake() {
         org.mockito.Mockito.doReturn(prefix, prefix + "retry").when(codeGenerator).next();
-        var result = tickets.createWalkInTicket(new WalkInIntakeRequest("Retry", prefix + "collision", branchId, modelId, null, null, "Condition", List.of()), userId);
+        var result = tickets.createWalkInTicket(new WalkInIntakeRequest("Retry", prefix + "collision", branchId, modelId, null, null, "Condition", List.of(catalogId)), userId);
         assertEquals(prefix + "retry", result.ticket().ticketCode());
         assertEquals(1L, tx(() -> em.createQuery("select count(c) from Customer c where c.phone=:phone", Long.class).setParameter("phone", prefix + "collision").getSingleResult()));
         assertEquals(1, result.history().size());
@@ -531,7 +574,7 @@ class ApplicationTransactionsIntegrationTest {
     @Test
     void repeatedCollisionExhaustionLeavesNoPartialIntake() {
         org.mockito.Mockito.doReturn(prefix).when(codeGenerator).next();
-        assertThrows(ConflictException.class, () -> tickets.createWalkInTicket(new WalkInIntakeRequest("Retry", prefix + "exhausted", branchId, modelId, null, null, "Condition", List.of()), userId));
+        assertThrows(ConflictException.class, () -> tickets.createWalkInTicket(new WalkInIntakeRequest("Retry", prefix + "exhausted", branchId, modelId, null, null, "Condition", List.of(catalogId)), userId));
         org.mockito.Mockito.verify(codeGenerator, org.mockito.Mockito.times(3)).next();
         assertEquals(0L, tx(() -> em.createQuery("select count(c) from Customer c where c.phone=:phone", Long.class).setParameter("phone", prefix + "exhausted").getSingleResult()));
     }
@@ -557,6 +600,7 @@ class ApplicationTransactionsIntegrationTest {
     @Test
     void concurrentIntakeCreatesOnlyOneTicket() throws Exception {
         var booked = appointments.createAppointment(booking(prefix + "intakerace"));
+        openArrivalWindow();
         appointments.confirmAppointment(booked.appointment().id(), new ConfirmAppointmentRequest(userId));
         appointments.markArrived(booked.appointment().id());
         var request = new IntakeAppointmentDeviceRequest(booked.devices().getFirst().device().id(), null, null, "Condition", userId);

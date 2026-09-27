@@ -68,6 +68,15 @@ public class Transfer {
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 
+    @Column(name = "work_done", columnDefinition = "TEXT")
+    private String workDone;
+
+    @Column(name = "current_condition", columnDefinition = "TEXT")
+    private String currentCondition;
+
+    @Column(name = "response_note", columnDefinition = "TEXT")
+    private String responseNote;
+
     @NotNull
     @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;

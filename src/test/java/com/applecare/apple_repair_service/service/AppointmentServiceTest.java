@@ -5,6 +5,7 @@ import com.applecare.apple_repair_service.dto.request.AppointmentServiceItemRequ
 import com.applecare.apple_repair_service.dto.request.CancelAppointmentRequest;
 import com.applecare.apple_repair_service.dto.request.ConfirmAppointmentRequest;
 import com.applecare.apple_repair_service.dto.request.CreateAppointmentRequest;
+import com.applecare.apple_repair_service.dto.request.RescheduleAppointmentRequest;
 import com.applecare.apple_repair_service.entity.Appointment;
 import com.applecare.apple_repair_service.entity.AppointmentDevice;
 import com.applecare.apple_repair_service.entity.AppointmentServiceItem;
@@ -24,6 +25,8 @@ import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.exception.InvalidStateTransitionException;
+import com.applecare.apple_repair_service.exception.AppointmentExpiredException;
+import com.applecare.apple_repair_service.exception.AppointmentTooEarlyException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AppointmentDeviceRepository;
 import com.applecare.apple_repair_service.repository.AppointmentRepository;
@@ -79,7 +82,7 @@ class AppointmentServiceTest {
         when(access.get(AppointmentSlot.class, 1L)).thenReturn(slot);
         when(access.get(DeviceModel.class, 2L)).thenReturn(model);
         when(customers.resolve(anyString(), anyString())).thenReturn(customer);
-        when(settings.getDecimal(eq("ONLINE_DISCOUNT_PERCENT"), any())).thenReturn(PricePolicy.DEFAULT_ONLINE_DISCOUNT);
+        when(settings.getDecimal(eq(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT), any())).thenReturn(PricePolicy.DEFAULT_ONLINE_DISCOUNT);
         when(appointments.save(any())).thenAnswer(i -> {
             Appointment a = i.getArgument(0);
             a.setId(10L);
@@ -109,6 +112,7 @@ class AppointmentServiceTest {
         c.setName("Service");
         c.setDeviceModel(m);
         c.setConfiguredPrice(new BigDecimal("100.05"));
+        c.setStandardDurationMinutes(30);
         var type = new ServiceType();
         type.setCode(ServiceTypeCode.REPAIR);
         c.setServiceType(type);
@@ -189,6 +193,24 @@ class AppointmentServiceTest {
     }
 
     @Test
+    void zeroDiscountAndChangedSettingAreSnapshottedPerBooking() {
+        when(settings.getDecimal(PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT, PricePolicy.DEFAULT_ONLINE_DISCOUNT))
+                .thenReturn(BigDecimal.ZERO, new BigDecimal("10.00"), new BigDecimal("5.00"));
+        var zero = service.createAppointment(request(List.of(device(4L))));
+        assertEquals(new BigDecimal("0"), zero.appointment().discountPercent());
+        assertEquals(new BigDecimal("100.05"), savedItems.getFirst().getFinalPriceSnapshot());
+        var ten = service.createAppointment(request(List.of(device(4L))));
+        var tenItem = savedItems.get(1);
+        assertEquals(new BigDecimal("10.00"), ten.appointment().discountPercent());
+        assertEquals(new BigDecimal("90.05"), tenItem.getFinalPriceSnapshot());
+        var five = service.createAppointment(request(List.of(device(4L))));
+        assertEquals(new BigDecimal("5.00"), five.appointment().discountPercent());
+        assertEquals(new BigDecimal("95.05"), savedItems.get(2).getFinalPriceSnapshot());
+        assertEquals(new BigDecimal("10.00"), ten.appointment().discountPercent());
+        assertEquals(new BigDecimal("90.05"), tenItem.getFinalPriceSnapshot());
+    }
+
+    @Test
     void unknownPriceRemainsNull() {
         catalog(4L, model).setConfiguredPrice(null);
         service.createAppointment(request(List.of(device(4L))));
@@ -219,6 +241,8 @@ class AppointmentServiceTest {
     @Test
     void confirmThenArrive() {
         var a = appointment(AppointmentStatus.PENDING_CONFIRMATION);
+        slot.setStartTime(LocalTime.of(10, 0));
+        slot.setEndTime(LocalTime.of(11, 0));
         var user = new User();
         when(access.get(User.class, 1L)).thenReturn(user);
         service.confirmAppointment(10L, new ConfirmAppointmentRequest(1L));
@@ -226,6 +250,7 @@ class AppointmentServiceTest {
         assertNotNull(a.getConfirmedAt());
         service.markArrived(10L);
         assertEquals(AppointmentStatus.ARRIVED, a.getStatus());
+        assertEquals(java.time.LocalDateTime.now(clock), a.getArrivedAt());
     }
 
     @Test
@@ -241,14 +266,51 @@ class AppointmentServiceTest {
     }
 
     @Test
-    void expiresStrictlyAfterGrace() {
+    void expirationUsesSlotEndWithoutGracePeriod() {
         var a = appointment(AppointmentStatus.CONFIRMED);
-        slot.setStartTime(LocalTime.of(9, 45));
-        when(settings.getInteger("APPOINTMENT_GRACE_MINUTES")).thenReturn(15);
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0, 1));
         assertThrows(BusinessRuleViolationException.class, () -> service.expireAppointment(10L));
-        slot.setStartTime(LocalTime.of(9, 44));
+        slot.setEndTime(LocalTime.of(10, 0));
         service.expireAppointment(10L);
         assertEquals(AppointmentStatus.EXPIRED, a.getStatus());
+    }
+
+    @Test
+    void arrivalHonorsBothSlotBoundaries() {
+        var early = appointment(AppointmentStatus.CONFIRMED);
+        slot.setStartTime(LocalTime.of(10, 0, 1));
+        slot.setEndTime(LocalTime.of(11, 0));
+        assertThrows(AppointmentTooEarlyException.class, () -> service.markArrived(10L));
+        assertEquals(AppointmentStatus.CONFIRMED, early.getStatus());
+
+        var valid = appointment(AppointmentStatus.CONFIRMED);
+        slot.setStartTime(LocalTime.of(9, 0));
+        slot.setEndTime(LocalTime.of(10, 0, 1));
+        service.markArrived(10L);
+        assertEquals(AppointmentStatus.ARRIVED, valid.getStatus());
+
+        var late = appointment(AppointmentStatus.CONFIRMED);
+        slot.setEndTime(LocalTime.of(10, 0));
+        assertThrows(AppointmentExpiredException.class, () -> service.markArrived(10L));
+        assertEquals(AppointmentStatus.EXPIRED, late.getStatus());
+        assertNull(late.getArrivedAt());
+    }
+
+    @Test
+    void rescheduleUsesNewSlotWindow() {
+        var a = appointment(AppointmentStatus.CONFIRMED);
+        var newSlot = new AppointmentSlot();
+        newSlot.setId(2L);
+        newSlot.setBranch(TestData.branch(1));
+        newSlot.setAppointmentDate(LocalDate.now(clock));
+        newSlot.setStartTime(LocalTime.of(10, 0));
+        newSlot.setEndTime(LocalTime.of(10, 30));
+        when(access.get(AppointmentSlot.class, 2L)).thenReturn(newSlot);
+        service.rescheduleAppointment(10L, new RescheduleAppointmentRequest(2L));
+        service.markArrived(10L);
+        assertEquals(newSlot, a.getAppointmentSlot());
+        assertEquals(AppointmentStatus.ARRIVED, a.getStatus());
     }
 
     RepairItem source() {

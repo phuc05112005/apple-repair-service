@@ -35,7 +35,7 @@ final class ApiFixture {
         issue = new ServiceIssue(); issue.setName(prefix); issue.getDeviceTypes().add(deviceType); issue.setMappingInitialized(true); em.persist(issue);
         catalog = new ServiceCatalogItem(); catalog.setName(prefix); catalog.setDeviceModel(model);
         catalog.setServiceType(serviceType); catalog.setServiceIssue(issue); catalog.setConfiguredPrice(new BigDecimal("100.00"));
-        catalog.setStandardDurationMinutes(30); catalog.setWarrantyDays(30); em.persist(catalog);
+        catalog.setStandardDurationMinutes(30); catalog.setWarrantyDays(30); catalog.setWarrantyRemedy(WarrantyRemedy.REPAIR); em.persist(catalog);
         slot = new AppointmentSlot(); slot.setBranch(branch); slot.setAppointmentDate(LocalDate.now(clock).plusDays(1));
         slot.setStartTime(LocalTime.of(10,0)); slot.setEndTime(LocalTime.of(11,0)); em.persist(slot);
         admin = user(UserRole.ADMIN, "admin"); receptionist = user(UserRole.RECEPTIONIST, "receptionist");

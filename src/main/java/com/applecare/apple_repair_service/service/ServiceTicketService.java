@@ -95,6 +95,8 @@ public class ServiceTicketService {
             throw new ConflictException("Device already received");
         var bookedItems = bookingItems.findAllByAppointmentDevice_Id(device.getId());
         var replacements = r.serviceCatalogItemIds();
+        BusinessRules.require(replacements != null ? !replacements.isEmpty() : !bookedItems.isEmpty(),
+                "Mỗi thiết bị tiếp nhận phải có ít nhất một dịch vụ cụ thể.");
         if (replacements != null) {
             BusinessRules.require(bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null),
                     "Không thể đổi dịch vụ của lịch hẹn bảo hành tại bước tiếp nhận.");
@@ -110,7 +112,7 @@ public class ServiceTicketService {
         var ticket = newTicket(physical, appointment.getAppointmentSlot().getBranch().getId(), r.createdByUserId(), r.receivedCondition());
         ticket.setAppointmentDevice(device);
         ticket.setCustomerReportedIssue(BusinessRules.text(device.getSymptomDescription()));
-        ticket.setDiscountPercent(appointment.getDiscountPercent());
+        ticket.setDiscountPercent(isDiscountEligible(appointment) ? appointment.getDiscountPercent() : BigDecimal.ZERO);
         tickets.saveAndFlush(ticket);
         if (replacements == null) {
             for (var booked : bookedItems) {
@@ -119,7 +121,7 @@ public class ServiceTicketService {
                 item.setServiceCatalogItem(booked.getServiceCatalogItem());
                 item.setItemNameSnapshot(booked.getServiceNameSnapshot());
                 item.setBasePrice(booked.getBasePriceSnapshot());
-                item.setFinalPrice(booked.getFinalPriceSnapshot());
+                item.setFinalPrice(PricePolicy.discounted(booked.getBasePriceSnapshot(), ticket.getDiscountPercent()));
                 item.setWarrantySourceItem(booked.getWarrantySourceItem());
                 item.setApprovalStatus(ApprovalStatus.APPROVED);
                 repairItems.save(item);
@@ -133,7 +135,7 @@ public class ServiceTicketService {
                 item.setItemNameSnapshot(selected.getName());
                 var basePrice = PricePolicy.catalogBasePrice(selected);
                 item.setBasePrice(basePrice);
-                item.setFinalPrice(PricePolicy.discounted(basePrice, appointment.getDiscountPercent()));
+                item.setFinalPrice(PricePolicy.discounted(basePrice, ticket.getDiscountPercent()));
                 item.setApprovalStatus(ApprovalStatus.APPROVED);
                 repairItems.save(item);
             }
@@ -154,6 +156,7 @@ public class ServiceTicketService {
         access.get(User.class, createdByUserId);
         CatalogPolicy.requireModel(access.get(DeviceModel.class, r.deviceModelId()));
         var selected = r.serviceCatalogItemIds() == null ? List.<Long>of() : r.serviceCatalogItemIds();
+        BusinessRules.require(!selected.isEmpty(), "Mỗi thiết bị tiếp nhận phải có ít nhất một dịch vụ cụ thể.");
         BusinessRules.require(new HashSet<>(selected).size() == selected.size(), "Duplicate selected service");
         selected.forEach(id -> catalog(id, r.deviceModelId()));
         var customer = customers.resolve(r.customerFullName(), r.phone());
@@ -227,6 +230,14 @@ public class ServiceTicketService {
             BusinessRules.require(repairItems.findAllByServiceTicket_Id(id).stream().noneMatch(x -> x.getApprovalStatus() == ApprovalStatus.PENDING),
                     "Phiếu vẫn còn hạng mục chờ ý kiến khách hàng.");
         return move(id, userId, ServiceTicketStatus.REPAIRING, null);
+    }
+
+    private static boolean isDiscountEligible(Appointment appointment) {
+        if (appointment.getArrivedAt() == null || appointment.getAppointmentSlot() == null) return false;
+        var slot = appointment.getAppointmentSlot();
+        var start = LocalDateTime.of(slot.getAppointmentDate(), slot.getStartTime());
+        var end = LocalDateTime.of(slot.getAppointmentDate(), slot.getEndTime());
+        return !appointment.getArrivedAt().isBefore(start) && appointment.getArrivedAt().isBefore(end);
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -347,8 +358,11 @@ public class ServiceTicketService {
             if (item.getApprovalStatus() != ApprovalStatus.APPROVED) continue;
             BusinessRules.require(item.getWarrantyDecision() != WarrantyDecision.REJECTED,
                     "Bảo hành đã bị từ chối. Vui lòng bỏ hạng mục bảo hành khỏi phương án và thêm dịch vụ tính phí đã thỏa thuận.");
-            if (item.getServiceCatalogItem().getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
-                    || item.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT) {
+            boolean warrantyContext = item.getWarrantySourceItem() != null && item.getWarrantyDecision() == WarrantyDecision.APPROVED;
+            boolean replacementWork = warrantyContext
+                    ? item.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT
+                    : item.getServiceCatalogItem().getServiceType().getCode() == ServiceTypeCode.REPLACEMENT;
+            if (replacementWork) {
                 var expectedPart = item.getWarrantyReplacementCatalog() == null ? item.getServiceCatalogItem().getPart() : item.getWarrantyReplacementCatalog().getPart();
                 BusinessRules.require(expectedPart != null && partUsages.findAllByRepairItem_Id(item.getId()).stream()
                                 .anyMatch(usage -> usage.getStatus() == com.applecare.apple_repair_service.enums.PartUsageStatus.ACTIVE

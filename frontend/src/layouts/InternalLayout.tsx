@@ -11,7 +11,7 @@ const roleConfig: Record<UserRole, { title: string; groups: NavGroup[] }> = {
     { label: 'Nhân sự', links: [['users', 'Tài khoản', '◎'], ['schedules', 'Lịch làm việc', '◷']] },
     { label: 'Danh mục', links: [['catalog', 'Dịch vụ', '◇'], ['parts', 'Linh kiện', '▣'], ['inventory', 'Tồn kho linh kiện', '▤'], ['branches', 'Chi nhánh', '⌖'], ['slots', 'Khung giờ & lịch hẹn', '◫']] },
   ] },
-  RECEPTIONIST: { title: 'Nhân viên tiếp nhận', groups: [{ label: 'Công việc', links: [['', 'Tổng quan', '⌂'], ['appointments', 'Lịch hẹn', '◫'], ['intake', 'Tiếp nhận', '↳'], ['tickets', 'Phiếu dịch vụ', '▤']] }] },
+  RECEPTIONIST: { title: 'Nhân viên tiếp nhận', groups: [{ label: 'Công việc', links: [['', 'Tổng quan', '⌂'], ['appointments', 'Lịch hẹn', '◫'], ['intake', 'Tiếp nhận', '↳'], ['warranty-history', 'Lịch sử & bảo hành', '◇'], ['tickets', 'Phiếu dịch vụ', '▤']] }] },
   TECHNICIAN: { title: 'Kỹ thuật viên', groups: [{ label: 'Công việc', links: [['', 'Công việc của tôi', '▤']] }] },
 }
 

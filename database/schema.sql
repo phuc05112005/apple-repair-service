@@ -69,6 +69,7 @@ CREATE TABLE `appointments` (
   `booked_at` datetime(6) NOT NULL,
   `cancel_reason` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `confirmed_at` datetime(6) DEFAULT NULL,
+  `arrived_at` datetime(6) DEFAULT NULL,
   `discount_percent` decimal(5,2) NOT NULL,
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `status` enum('ARRIVED','CANCELLED','CONFIRMED','EXPIRED','PENDING_CONFIRMATION') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -286,10 +287,12 @@ CREATE TABLE `service_catalog_items` (
   `configured_price` decimal(18,2) DEFAULT NULL,
   `created_at` datetime(6) NOT NULL,
   `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `standard_duration_minutes` int DEFAULT NULL,
+  `standard_duration_minutes` int NOT NULL,
   `status` enum('ACTIVE','INACTIVE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `updated_at` datetime(6) NOT NULL,
   `warranty_days` int NOT NULL,
+  `warranty_remedy` enum('REPAIR','REPLACEMENT') DEFAULT NULL,
+  `warranty_replacement_catalog_id` bigint DEFAULT NULL,
   `device_model_id` bigint NOT NULL,
   `part_id` bigint DEFAULT NULL,
   `service_issue_id` bigint NOT NULL,
@@ -298,7 +301,8 @@ CREATE TABLE `service_catalog_items` (
   KEY `fk_service_catalog_items_device_model` (`device_model_id`),
   KEY `fk_service_catalog_items_part` (`part_id`),
   KEY `fk_service_catalog_items_service_issue` (`service_issue_id`),
-  KEY `fk_service_catalog_items_service_type` (`service_type_id`)
+  KEY `fk_service_catalog_items_service_type` (`service_type_id`),
+  KEY `fk_service_catalog_warranty_replacement` (`warranty_replacement_catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `service_feedbacks` (
@@ -430,6 +434,9 @@ CREATE TABLE `transfers` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `mode` enum('DIRECT','REQUEST') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `work_done` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `current_condition` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `response_note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `requested_at` datetime(6) NOT NULL,
   `responded_at` datetime(6) DEFAULT NULL,
   `status` enum('ACCEPTED','CANCELLED','PENDING','REJECTED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -544,6 +551,7 @@ ALTER TABLE `service_catalog_items` ADD CONSTRAINT `fk_service_catalog_items_dev
 ALTER TABLE `service_catalog_items` ADD CONSTRAINT `fk_service_catalog_items_part` FOREIGN KEY (`part_id`) REFERENCES `parts` (`id`);
 ALTER TABLE `service_catalog_items` ADD CONSTRAINT `fk_service_catalog_items_service_issue` FOREIGN KEY (`service_issue_id`) REFERENCES `service_issues` (`id`);
 ALTER TABLE `service_catalog_items` ADD CONSTRAINT `fk_service_catalog_items_service_type` FOREIGN KEY (`service_type_id`) REFERENCES `service_types` (`id`);
+ALTER TABLE `service_catalog_items` ADD CONSTRAINT `fk_service_catalog_warranty_replacement` FOREIGN KEY (`warranty_replacement_catalog_id`) REFERENCES `service_catalog_items` (`id`);
 ALTER TABLE `service_feedbacks` ADD CONSTRAINT `fk_service_feedbacks_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`);
 ALTER TABLE `service_issue_device_types` ADD CONSTRAINT `FK8ofnlysdl7mab9y7l5c2oejaj` FOREIGN KEY (`device_type_id`) REFERENCES `device_types` (`id`);
 ALTER TABLE `service_issue_device_types` ADD CONSTRAINT `FKn4ysgewlapc95jjkiht4gsm0p` FOREIGN KEY (`service_issue_id`) REFERENCES `service_issues` (`id`);

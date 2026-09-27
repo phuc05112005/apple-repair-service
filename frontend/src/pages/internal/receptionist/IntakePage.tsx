@@ -103,7 +103,7 @@ export function IntakePage() {
         receivedCondition: condition.trim(),
         customerReportedIssue: reportedIssue.trim() || undefined,
         authorizedScope: authorizedScope.trim() || undefined,
-        serviceCatalogItemIds: selectedService ? [selectedService.id] : undefined,
+        serviceCatalogItemIds: [selectedService!.id],
       }),
     onSuccess: detail => navigate('/internal/receptionist/tickets/' + detail.ticket.id, { state: { created: true } }),
   })
@@ -115,7 +115,7 @@ export function IntakePage() {
 
   const valid = Boolean(condition.trim() && (mode === 'appointment'
     ? selectedBooking && (!changeBookedService || appointmentSelectedService)
-    : fullName.trim() && phone.trim() && branchId && modelId && (!serviceType || selectedService)))
+    : fullName.trim() && phone.trim() && branchId && modelId && issueId && selectedService))
 
   return <div className="workspace-page intake-page">
     <header>
@@ -165,14 +165,14 @@ export function IntakePage() {
         <label className="field"><span>Vấn đề khách mô tả ban đầu</span><textarea placeholder="Nhập triệu chứng hoặc vấn đề khách gặp phải" maxLength={5000} value={reportedIssue} onChange={event => setReportedIssue(event.target.value)} /><small>Thông tin này được lưu riêng với tình trạng khi nhận máy và phương án của kỹ thuật viên.</small></label>
         <label className="field"><span>Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phương án, giới hạn chi phí và điều kiện khách đã đồng ý khi giao máy" maxLength={5000} value={authorizedScope} onChange={event => setAuthorizedScope(event.target.value)} /><small>Kỹ thuật viên có thể xử lý trong phạm vi này; phát sinh ngoài phạm vi cần trao đổi lại với khách.</small></label>
         <section className="intake-section intake-section--service">
-          <div className="intake-section__heading"><span>02</span><div><h2>Dịch vụ dự kiến</h2><p>Có thể để trống và xác định dịch vụ sau khi kỹ thuật viên kiểm tra.</p></div></div>
+          <div className="intake-section__heading"><span>02</span><div><h2>Dịch vụ tiếp nhận</h2><p>Chọn ít nhất một dịch vụ đã được cấu hình trước khi tạo phiếu.</p></div></div>
           {catalog.isLoading && issueId && <LoadingState label="Đang tải dịch vụ phù hợp…" />}
           {catalog.isError && <ErrorState error={catalog.error} retry={() => catalog.refetch()} />}
-          {issueId && !catalog.isLoading && !catalog.isError && !catalogItems.length && <p className="intake-hint">Chưa có dịch vụ được cấu hình cho dòng máy và vấn đề này. Bạn vẫn có thể tạo phiếu để kiểm tra thiết bị.</p>}
+          {issueId && !catalog.isLoading && !catalog.isError && !catalogItems.length && <p className="intake-hint" role="status">Chưa có dịch vụ phù hợp cho dòng máy và vấn đề này. Vui lòng nhờ quản trị viên cấu hình dịch vụ trước khi tiếp nhận.</p>}
           <label className="field">
-            <span>Loại dịch vụ <i>Không bắt buộc</i></span>
-            <select disabled={!issueId || catalog.isLoading || catalog.isError || !serviceTypes.length} value={serviceType ?? ''} onChange={event => { setServiceType(event.target.value as ServiceTypeCode || undefined); setPartName(''); setPartBrandKey(''); setPartVariantKey(''); setServiceId(undefined) }}>
-              <option value="">Chưa chọn dịch vụ</option>
+            <span>Loại dịch vụ</span>
+            <select required disabled={!issueId || catalog.isLoading || catalog.isError || !serviceTypes.length} value={serviceType ?? ''} onChange={event => { setServiceType(event.target.value as ServiceTypeCode || undefined); setPartName(''); setPartBrandKey(''); setPartVariantKey(''); setServiceId(undefined) }}>
+              <option value="">Chọn sửa chữa hoặc thay thế</option>
               {serviceTypes.map(code => <option key={code} value={code}>{serviceTypeLabels[code]}</option>)}
             </select>
           </label>

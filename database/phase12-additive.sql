@@ -35,4 +35,9 @@ ALTER TABLE `service_status_histories`
   ADD KEY `fk_status_history_resolved_by` (`resolved_by`),
   ADD CONSTRAINT `fk_status_history_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`);
 
+ALTER TABLE `transfers`
+  ADD COLUMN `work_done` text DEFAULT NULL,
+  ADD COLUMN `current_condition` text DEFAULT NULL,
+  ADD COLUMN `response_note` text DEFAULT NULL;
+
 -- Legacy rows remain nullable. Do not fabricate lot provenance or wait-resolution times.
