@@ -1,7 +1,0 @@
-{
-  "jar": "target\\apple-repair-service-0.0.1-SNAPSHOT.jar",
-  "sha256": "11a6aac4661ecc3efe9251e80812b0ec7219ecc9e83b662e9e4a6f7cd4ff5784",
-  "testClassesPackaged": [],
-  "testSigningKeyPackaged": false,
-  "springdocUiPackaged": true
-}
