@@ -23,3 +23,8 @@ export function isSessionExpired(expiresAt: string, now = Date.now()) {
   const instant = Date.parse(expiresAt)
   return !Number.isFinite(instant) || instant <= now
 }
+
+export function internalDestination(role: string, requested?: string | null) {
+  const roleBase = `/internal/${role.toLowerCase()}`
+  return requested?.startsWith(`${roleBase}/`) || requested === roleBase ? requested : roleBase
+}

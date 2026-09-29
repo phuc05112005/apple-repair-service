@@ -62,9 +62,14 @@ public class WarrantyClaimService {
         BusinessRules.require(sourceCatalog.getWarrantyDays() != null && sourceCatalog.getWarrantyDays() > 0
                         && sourceCatalog.getWarrantyRemedy() != null,
                 "Dịch vụ nguồn chưa được cấu hình phương án bảo hành.");
-        if (sourceCatalog.getWarrantyRemedy() == WarrantyRemedy.REPLACEMENT)
-            BusinessRules.require(sourceCatalog.getWarrantyReplacementCatalog() != null,
-                    "Dịch vụ nguồn chưa được cấu hình phương án thay thế bảo hành.");
+        var selectedCatalog = access.get(ServiceCatalogItem.class, request.serviceCatalogItemId());
+        CatalogPolicy.requireUsable(selectedCatalog, source.getServiceTicket().getCustomerDevice().getDeviceModel().getId());
+        var expectedType = sourceCatalog.getWarrantyRemedy() == WarrantyRemedy.REPLACEMENT
+                ? ServiceTypeCode.REPLACEMENT : ServiceTypeCode.REPAIR;
+        BusinessRules.require(selectedCatalog.getServiceType().getCode() == expectedType,
+                sourceCatalog.getWarrantyRemedy() == WarrantyRemedy.REPLACEMENT
+                        ? "Hạng mục này áp dụng bảo hành thay thế. Vui lòng chọn dịch vụ thay thế phù hợp."
+                        : "Hạng mục này áp dụng bảo hành sửa chữa. Vui lòng chọn dịch vụ sửa chữa phù hợp.");
 
         var branch = access.get(Branch.class, request.branchId());
         BusinessRules.require(branch.getStatus() == ActiveStatus.ACTIVE, "Chi nhánh đã ngừng hoạt động.");
@@ -84,8 +89,8 @@ public class WarrantyClaimService {
 
         var claim = new RepairItem();
         claim.setServiceTicket(ticket);
-        claim.setServiceCatalogItem(sourceCatalog);
-        claim.setItemNameSnapshot("Bảo hành · " + source.getItemNameSnapshot());
+        claim.setServiceCatalogItem(selectedCatalog);
+        claim.setItemNameSnapshot("Bảo hành · " + selectedCatalog.getName());
         claim.setBasePrice(BigDecimal.ZERO);
         claim.setFinalPrice(BigDecimal.ZERO);
         claim.setApprovalStatus(ApprovalStatus.APPROVED);
@@ -93,7 +98,9 @@ public class WarrantyClaimService {
         claim.setWarrantyDecision(WarrantyDecision.APPROVED);
         claim.setWarrantyDecisionNote("Tiếp nhận trong thời hạn bảo hành");
         claim.setWarrantyRemedy(sourceCatalog.getWarrantyRemedy());
-        claim.setWarrantyReplacementCatalog(sourceCatalog.getWarrantyReplacementCatalog());
+        // The selected catalog is already the concrete warranty service. Keep the legacy
+        // replacement link empty instead of storing the same catalog ID twice.
+        claim.setWarrantyReplacementCatalog(null);
         claim.setWarrantyStartDate(source.getWarrantyStartDate());
         claim.setWarrantyEndDate(source.getWarrantyEndDate());
         items.save(claim);

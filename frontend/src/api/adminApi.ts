@@ -1,5 +1,35 @@
-import { apiRequest } from './client'
-import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryLotResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, StockInResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
+import { ApiError, apiDownload, apiRequest, apiUpload } from './client'
+import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryImportResultResponse, InventoryLotResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, StockInResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
+import { inventoryTransactionCode } from '../utils/inventory'
+
+type InventoryHistoryFilters = { branchId?: number; partId?: number; transactionType?: string; from?: string; to?: string; code?: string }
+
+async function inventoryTransactionHistory(filters: InventoryHistoryFilters = {}, signal?: AbortSignal) {
+  try {
+    return await apiRequest<InventoryTransactionResponse[]>('/api/v1/admin/inventory/transactions', { auth: true, query: filters, signal })
+  } catch (error) {
+    if (!(error instanceof ApiError) || ![404, 405, 500, 503].includes(error.status)) throw error
+    const partIds = filters.partId
+      ? [filters.partId]
+      : (await apiRequest<PartResponse[]>('/api/v1/admin/parts', { auth: true, signal })).map(part => part.id)
+    const histories = await Promise.all(partIds.map(partId =>
+      apiRequest<InventoryTransactionResponse[]>(`/api/v1/admin/parts/${partId}/inventory-transactions`, { auth: true, signal })))
+    const code = filters.code?.trim().toLocaleLowerCase('vi')
+    return histories.flat().filter(row => {
+      const date = row.createdAt.slice(0, 10)
+      const matchesBranch = !filters.branchId || row.sourceBranchId === filters.branchId || row.destinationBranchId === filters.branchId
+      const matchesCode = !code
+        || inventoryTransactionCode(row).toLocaleLowerCase('vi').includes(code)
+        || String(row.id).includes(code.replace(/^(nhap|xuat|chuyen)_?/, ''))
+        || row.lotCode?.toLocaleLowerCase('vi').includes(code)
+      return matchesBranch
+        && (!filters.transactionType || row.transactionType === filters.transactionType)
+        && (!filters.from || date >= filters.from)
+        && (!filters.to || date <= filters.to)
+        && Boolean(matchesCode)
+    }).sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id - left.id)
+  }
+}
 
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
@@ -22,7 +52,10 @@ export const adminApi = {
   inventory: (branchId: number, partId: number, signal?: AbortSignal) => apiRequest<BranchInventoryResponse>('/api/v1/internal/inventory', { auth: true, query: { branchId, partId }, signal }),
   inventories: (filters: { branchId?: number; partId?: number } = {}, signal?: AbortSignal) => apiRequest<BranchInventoryResponse[]>('/api/v1/admin/inventory', { auth: true, query: filters, signal }),
   inventoryTransactions: (partId: number, signal?: AbortSignal) => apiRequest<InventoryTransactionResponse[]>(`/api/v1/admin/parts/${partId}/inventory-transactions`, { auth: true, signal }),
+  inventoryTransactionHistory,
   inventoryLots: (filters: { branchId?: number; partId?: number } = {}, signal?: AbortSignal) => apiRequest<InventoryLotResponse[]>('/api/v1/admin/inventory/lots', { auth: true, query: filters, signal }),
+  inventoryImportTemplate: () => apiDownload('/api/v1/admin/inventory/import-template'),
+  importInventory: (file: File) => apiUpload<InventoryImportResultResponse>('/api/v1/admin/inventory/import', file),
   stockIn: (body: { lotCode: string; branchId: number; partId: number; quantity: number; receivedAt: string; sourceNote?: string }) => apiRequest<StockInResponse>('/api/v1/admin/inventory/stock-in', { auth: true, method: 'POST', body }),
   stockOut: (body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>('/api/v1/admin/inventory/stock-out', { auth: true, method: 'POST', body }),
   transferStock: (body: { partId: number; sourceBranchId: number; destinationBranchId: number; quantity: number; note?: string }) => apiRequest('/api/v1/admin/inventory/transfer', { auth: true, method: 'POST', body }),

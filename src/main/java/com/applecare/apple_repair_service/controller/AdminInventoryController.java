@@ -7,9 +7,16 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.time.LocalDate;
+import com.applecare.apple_repair_service.enums.InventoryTransactionType;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.applecare.apple_repair_service.dto.command.*;
 import com.applecare.apple_repair_service.security.CurrentActor;
@@ -20,6 +27,7 @@ import com.applecare.apple_repair_service.security.CurrentActor;
 @RequiredArgsConstructor
 public class AdminInventoryController {
     private final InventoryService inventory;
+    private final InventoryExcelService inventoryExcel;
     private final CurrentActor actor;
 
     @GetMapping("/internal/inventory")
@@ -35,6 +43,27 @@ public class AdminInventoryController {
     @GetMapping("/admin/parts/{partId}/inventory-transactions")
     public List<InventoryTransactionResponse> transactionHistory(@PathVariable @Positive Long partId) {
         return inventory.getTransactionHistory(partId);
+    }
+    @GetMapping("/admin/inventory/transactions")
+    public List<InventoryTransactionResponse> transactions(
+            @RequestParam(required=false) @Positive Long branchId,
+            @RequestParam(required=false) @Positive Long partId,
+            @RequestParam(required=false) InventoryTransactionType transactionType,
+            @RequestParam(required=false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required=false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required=false) String code) {
+        return inventory.searchTransactions(branchId, partId, transactionType, from, to, code);
+    }
+    @GetMapping("/admin/inventory/import-template")
+    public ResponseEntity<byte[]> importTemplate() {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=inventory-stock-in-template.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(inventoryExcel.createTemplate());
+    }
+    @PostMapping(value = "/admin/inventory/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public InventoryImportResultResponse importInventory(@RequestPart("file") MultipartFile file) {
+        return inventoryExcel.importWorkbook(file, actor.id());
     }
     @GetMapping("/admin/inventory/lots")
     public List<InventoryLotResponse> lots(@RequestParam(required=false) @Positive Long branchId,

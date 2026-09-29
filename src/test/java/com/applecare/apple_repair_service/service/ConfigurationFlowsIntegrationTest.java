@@ -32,6 +32,7 @@ class ConfigurationFlowsIntegrationTest {
     @Autowired PublicQueryService publicQueries;
     @Autowired AppointmentScheduleService schedule;
     @Autowired AppointmentSlotService slots;
+    @Autowired ServiceCatalogService catalogs;
     ApiFixture fixture;
 
     @BeforeEach void setup() { fixture = new ApiFixture(em, clock); fixture.create(); }
@@ -105,6 +106,29 @@ class ConfigurationFlowsIntegrationTest {
         assertEquals(1, schedule.week(fixture.branch.getId()).get(date.getDayOfWeek().getValue() - 1).slots().size());
     }
 
+    @Test void replacementWarrantyStoresCharacteristicWithoutBindingService() {
+        var replacementType = em.createQuery("select t from ServiceType t where t.code=:code", ServiceType.class)
+                .setParameter("code", ServiceTypeCode.REPLACEMENT).getResultStream().findFirst().orElseGet(() -> {
+                    var type = new ServiceType(); type.setCode(ServiceTypeCode.REPLACEMENT); type.setName("Thay thế linh kiện"); em.persist(type); return type;
+                });
+        var standardPart = new Part(); standardPart.setPartCode(fixture.prefix + "-BAT-STD"); standardPart.setName("Pin " + fixture.model.getName());
+        standardPart.setBrand("Pisen"); standardPart.setVariant("Tiêu chuẩn"); standardPart.setSalePrice(java.math.BigDecimal.TEN); em.persist(standardPart); em.flush();
+        var warrantyService = catalogs.create(new CreateServiceCatalogItemRequest(fixture.model.getId(), replacementType.getId(),
+                fixture.issue.getId(), standardPart.getId(), null, java.math.BigDecimal.TEN, 45, 0));
+        var highCapacityPart = new Part(); highCapacityPart.setPartCode(fixture.prefix + "-BAT-HC"); highCapacityPart.setName("Pin " + fixture.model.getName());
+        highCapacityPart.setBrand("Pisen"); highCapacityPart.setVariant("Dung lượng cao"); highCapacityPart.setSalePrice(java.math.BigDecimal.TEN); em.persist(highCapacityPart); em.flush();
+
+        var created = catalogs.create(new CreateServiceCatalogItemRequest(fixture.model.getId(), replacementType.getId(),
+                fixture.issue.getId(), highCapacityPart.getId(), null, java.math.BigDecimal.TEN, 60, 180,
+                WarrantyRemedy.REPLACEMENT, warrantyService.id()));
+
+        em.clear();
+        var stored = em.find(ServiceCatalogItem.class, created.id());
+        assertEquals("Thay pin " + fixture.model.getName() + " — Pisen Dung lượng cao", stored.getName());
+        assertEquals(WarrantyRemedy.REPLACEMENT, stored.getWarrantyRemedy());
+        assertNull(stored.getWarrantyReplacementCatalog());
+    }
+
     @Test void weeklyScheduleCopiesMultipleSlotsValidatesAndReloadsExactly() {
         var threeSlots = List.of(
                 new SlotRule(LocalTime.of(8, 0), LocalTime.of(9, 0), true),
@@ -130,5 +154,13 @@ class ConfigurationFlowsIntegrationTest {
                 () -> schedule.saveWeekday(new SaveWeeklyScheduleRequest(fixture.branch.getId(), 3, true,
                         List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true),
                                 new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true)))));
+
+        var adjacent = List.of(
+                new SlotRule(LocalTime.of(12, 0), LocalTime.of(13, 0), true),
+                new SlotRule(LocalTime.of(13, 0), LocalTime.of(14, 0), true),
+                new SlotRule(LocalTime.of(14, 0), LocalTime.of(15, 0), true));
+        assertDoesNotThrow(() -> schedule.saveWeekday(new SaveWeeklyScheduleRequest(
+                fixture.branch.getId(), 4, true, adjacent)));
+        assertEquals(adjacent, schedule.week(fixture.branch.getId()).get(3).slots());
     }
 }

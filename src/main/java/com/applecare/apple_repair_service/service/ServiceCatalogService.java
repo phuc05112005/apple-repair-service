@@ -90,34 +90,55 @@ public class ServiceCatalogService {
         e.setServiceType(access.get(ServiceType.class, r.serviceTypeId()));
         e.setServiceIssue(access.get(ServiceIssue.class, r.serviceIssueId()));
         e.setPart(r.partId() == null ? null : access.get(Part.class, r.partId()));
-        e.setName(BusinessRules.text(r.name()));
+        BusinessRules.require(e.getServiceType().getCode() != ServiceTypeCode.REPLACEMENT || e.getPart() != null, "Replacement requires part");
+        e.setName(generatedName(e));
         e.setConfiguredPrice(r.configuredPrice());
         e.setStandardDurationMinutes(r.standardDurationMinutes());
         e.setWarrantyDays(r.warrantyDays());
         e.setWarrantyRemedy(r.warrantyDays() > 0 ? r.warrantyRemedy() : null);
-        e.setWarrantyReplacementCatalog(r.warrantyDays() > 0 && r.warrantyReplacementCatalogId() != null
-                ? access.get(ServiceCatalogItem.class, r.warrantyReplacementCatalogId()) : null);
-        BusinessRules.require(e.getServiceType().getCode() != ServiceTypeCode.REPLACEMENT || e.getPart() != null, "Replacement requires part");
+        // The catalog stores only the warranty handling characteristic. Reception staff choose
+        // the concrete compatible service when the customer actually creates a warranty claim.
+        e.setWarrantyReplacementCatalog(null);
         BusinessRules.require(e.getServiceIssue().getDeviceTypes().stream()
                 .anyMatch(type -> type.getId().equals(e.getDeviceModel().getDeviceType().getId())),
                 "Vấn đề dịch vụ không áp dụng cho loại thiết bị của model.");
         BusinessRules.require(e.getWarrantyDays() == 0 || e.getWarrantyRemedy() != null,
                 "Dịch vụ có bảo hành phải cấu hình phương án kỹ thuật bảo hành.");
-        if (e.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT) {
-            var replacement = e.getWarrantyReplacementCatalog();
-            BusinessRules.require(replacement != null && replacement != e,
-                    "Bảo hành thay thế phải chọn một dịch vụ thay thế phù hợp.");
-            BusinessRules.require(replacement.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT
-                            && replacement.getPart() != null
-                            && replacement.getStatus() == ActiveStatus.ACTIVE
-                            && replacement.getPart().getStatus() == ActiveStatus.ACTIVE
-                            && replacement.getStandardDurationMinutes() != null
-                            && replacement.getStandardDurationMinutes() > 0
-                            && replacement.getDeviceModel().getId().equals(e.getDeviceModel().getId())
-                            && replacement.getServiceIssue().getId().equals(e.getServiceIssue().getId()),
-                    "Dịch vụ thay thế bảo hành phải cùng model, vấn đề và có linh kiện.");
-        } else BusinessRules.require(e.getWarrantyReplacementCatalog() == null,
-                "Chỉ phương án bảo hành thay thế mới được gắn dịch vụ thay thế.");
+        BusinessRules.require(e.getWarrantyReplacementCatalog() == null,
+                "Dịch vụ bảo hành cụ thể chỉ được chọn khi tạo phiếu tiếp nhận bảo hành.");
+    }
+
+    private String generatedName(ServiceCatalogItem item) {
+        String model = item.getDeviceModel().getName().trim();
+        if (item.getServiceType().getCode() == ServiceTypeCode.REPLACEMENT) {
+            Part part = item.getPart();
+            StringBuilder name = new StringBuilder("Thay ").append(lowerFirst(part.getName().trim()));
+            appendIfMissing(name, model);
+            String brand = BusinessRules.text(part.getBrand());
+            String variant = BusinessRules.text(part.getVariant());
+            if (brand != null || variant != null) {
+                name.append(" — ");
+                if (brand != null) name.append(brand);
+                if (brand != null && variant != null) name.append(' ');
+                if (variant != null) name.append(variant);
+            }
+            return name.toString();
+        }
+        String prefix = item.getServiceType().getCode() == ServiceTypeCode.REPAIR ? "Sửa chữa " : "Bảo hành ";
+        StringBuilder name = new StringBuilder(prefix).append(lowerFirst(item.getServiceIssue().getName().trim()));
+        appendIfMissing(name, model);
+        return name.toString();
+    }
+
+    private void appendIfMissing(StringBuilder value, String suffix) {
+        if (!value.toString().toLowerCase(java.util.Locale.ROOT).contains(suffix.toLowerCase(java.util.Locale.ROOT))) {
+            value.append(' ').append(suffix);
+        }
+    }
+
+    private String lowerFirst(String value) {
+        if (value.isEmpty()) return value;
+        return value.substring(0, 1).toLowerCase(java.util.Locale.forLanguageTag("vi")) + value.substring(1);
     }
 
     private ServiceCatalogItemResponse save(ServiceCatalogItem e) {

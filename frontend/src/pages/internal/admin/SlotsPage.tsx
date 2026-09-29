@@ -6,18 +6,39 @@ import { ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toast } from '../../../components/Toast'
 import { businessDate, formatDate, formatTime } from '../../../utils/format'
-import { cloneSchedule, validateSlotRules, validateWeeklySchedules } from '../../../utils/scheduleValidation'
+import { cloneSchedule, normalizeTime24, validateSlotRules, validateWeeklySchedules } from '../../../utils/scheduleValidation'
 
 const days = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật']
 const newSlot = (): SlotRule => ({ startTime: '09:00', endTime: '10:00', enabled: true })
+
+function Time24Input({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const edit = (raw: string) => {
+    let next = raw.replace(/[^\d:]/g, '').slice(0, 5)
+    if (!next.includes(':') && next.length > 2) next = `${next.slice(0, 2)}:${next.slice(2)}`
+    onChange(next)
+  }
+  return <input
+    className="time-24-input"
+    type="text"
+    inputMode="numeric"
+    autoComplete="off"
+    placeholder="00:00"
+    maxLength={5}
+    pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]"
+    title="Nhập giờ theo định dạng 24 giờ, từ 00:00 đến 23:59"
+    value={normalizeTime24(value)}
+    onChange={event => edit(event.target.value)}
+    onBlur={() => onChange(normalizeTime24(value))}
+  />
+}
 
 function RuleEditor({ slots, onChange, error }: { slots: SlotRule[]; onChange: (slots: SlotRule[]) => void; error?: string | null }) {
   const edit = (index: number, patch: Partial<SlotRule>) => onChange(slots.map((slot, position) => position === index ? { ...slot, ...patch } : slot))
   return <div className="schedule-rules">
     {slots.length === 0 && <div className="empty-inline">Chưa có khung giờ. Hãy thêm khung giờ trước khi lưu.</div>}
     {slots.map((slot, index) => <div className="schedule-rule" key={index}>
-      <label className="field"><span>Bắt đầu</span><input type="time" value={slot.startTime.slice(0, 5)} onChange={event => edit(index, { startTime: event.target.value })} /></label>
-      <label className="field"><span>Kết thúc</span><input type="time" value={slot.endTime.slice(0, 5)} onChange={event => edit(index, { endTime: event.target.value })} /></label>
+      <label className="field"><span>Bắt đầu <i>24 giờ</i></span><Time24Input value={slot.startTime} onChange={value => edit(index, { startTime: value })} /></label>
+      <label className="field"><span>Kết thúc <i>24 giờ</i></span><Time24Input value={slot.endTime} onChange={value => edit(index, { endTime: value })} /></label>
       <label className="check-option"><input type="checkbox" checked={slot.enabled} onChange={event => edit(index, { enabled: event.target.checked })} /><span>Đang mở</span></label>
       <button type="button" className="text-action text-action--danger" onClick={() => onChange(slots.filter((_, position) => position !== index))}>Xóa</button>
     </div>)}

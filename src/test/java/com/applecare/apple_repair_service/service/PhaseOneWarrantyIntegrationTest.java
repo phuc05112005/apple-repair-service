@@ -153,7 +153,7 @@ class PhaseOneWarrantyIntegrationTest {
         em.flush();
 
         var created = warrantyClaims.create(source.getId(), new CreateWarrantyClaimRequest(
-                f.branch.getId(), "Máy và phụ kiện đã tiếp nhận", "Lỗi nguồn tái diễn", "Khách yêu cầu kiểm tra bảo hành", null), f.receptionist.getId());
+                f.branch.getId(), f.catalog.getId(), "Máy và phụ kiện đã tiếp nhận", "Lỗi nguồn tái diễn", "Khách yêu cầu kiểm tra bảo hành", null), f.receptionist.getId());
         var claim = em.find(RepairItem.class, created.repairItems().getFirst().id());
         assertEquals(source.getId(), claim.getWarrantySourceItem().getId());
         assertEquals(WarrantyRemedy.REPAIR, claim.getWarrantyRemedy());
@@ -171,23 +171,30 @@ class PhaseOneWarrantyIntegrationTest {
         assertNotNull(sourceHistory.lastClaimAt());
     }
 
-    @Test void configuredWarrantyReplacementUsesTargetCatalogAndStillRequiresPartUsage() {
-        var replacement = catalog(ServiceTypeCode.REPLACEMENT, f.issue, "configured-warranty-replacement");
-        f.catalog.setWarrantyRemedy(WarrantyRemedy.REPLACEMENT);
-        f.catalog.setWarrantyReplacementCatalog(replacement);
+    @Test void receptionistCanSelectTheSameReplacementServiceForWarrantyAndItStillRequiresPartUsage() {
+        var replacement = catalog(ServiceTypeCode.REPLACEMENT, f.issue, "same-warranty-replacement");
+        replacement.setWarrantyDays(180);
+        replacement.setWarrantyRemedy(WarrantyRemedy.REPLACEMENT);
         var source = f.item(f.ticket(ServiceTicketStatus.HANDED_OVER));
+        source.setServiceCatalogItem(replacement);
+        source.setItemNameSnapshot(replacement.getName());
         source.setWarrantyStartDate(LocalDate.now(clock).minusDays(1));
         source.setWarrantyEndDate(LocalDate.now(clock).plusDays(20));
         em.flush();
 
         var created = warrantyClaims.create(source.getId(), new CreateWarrantyClaimRequest(
-                f.branch.getId(), "Đã nhận máy", "Linh kiện lỗi lại", null, null), f.receptionist.getId());
+                f.branch.getId(), replacement.getId(), "Đã nhận máy", "Linh kiện lỗi lại", null, null), f.receptionist.getId());
         var claim = em.find(RepairItem.class, created.repairItems().getFirst().id());
         assertEquals(WarrantyRemedy.REPLACEMENT, claim.getWarrantyRemedy());
-        assertEquals(replacement.getId(), claim.getWarrantyReplacementCatalog().getId());
+        assertEquals(replacement.getId(), claim.getServiceCatalogItem().getId());
+        assertNull(claim.getWarrantyReplacementCatalog());
         claim.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
         assertThrows(BusinessRuleViolationException.class,
                 () -> tickets.finishRepair(claim.getServiceTicket().getId(), f.technician.getId()));
+        var used = inventory.usePart(new UsePartRequest(claim.getId(), replacement.getPart().getId(), 1,
+                f.technician.getId(), "Pin lỗi được thu hồi khi tiếp nhận bảo hành"));
+        assertNotNull(used.id());
+        tickets.finishRepair(claim.getServiceTicket().getId(), f.technician.getId());
     }
 
     @Test void expiredSourceCannotCreateWarrantyClaim() {
@@ -196,6 +203,6 @@ class PhaseOneWarrantyIntegrationTest {
         source.setWarrantyEndDate(LocalDate.now(clock).minusDays(1));
         em.flush();
         assertThrows(BusinessRuleViolationException.class, () -> warrantyClaims.create(source.getId(),
-                new CreateWarrantyClaimRequest(f.branch.getId(), "Đã nhận máy", "Lỗi tái diễn", null, null), f.receptionist.getId()));
+                new CreateWarrantyClaimRequest(f.branch.getId(), f.catalog.getId(), "Đã nhận máy", "Lỗi tái diễn", null, null), f.receptionist.getId()));
     }
 }

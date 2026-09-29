@@ -54,12 +54,12 @@ class MasterDataServiceTest {
     }
 
     @Test
-    void warrantyConfigurationRequiresTechnicalRemedyAndValidReplacementCatalog() {
+    void warrantyConfigurationRequiresOnlyTechnicalRemedy() {
         var access = mock(DomainAccess.class);
         var repo = mock(ServiceCatalogItemRepository.class);
         var deviceType = new DeviceType(); deviceType.setId(1L);
-        var model = new DeviceModel(); model.setId(1L); model.setDeviceType(deviceType);
-        var issue = new ServiceIssue(); issue.setId(3L); issue.getDeviceTypes().add(deviceType);
+        var model = new DeviceModel(); model.setId(1L); model.setName("iPhone 16 Pro"); model.setDeviceType(deviceType);
+        var issue = new ServiceIssue(); issue.setId(3L); issue.setName("Pin"); issue.getDeviceTypes().add(deviceType);
         var repairType = new ServiceType(); repairType.setId(2L); repairType.setCode(ServiceTypeCode.REPAIR); repairType.setName("Sửa chữa");
         when(access.get(DeviceModel.class, 1L)).thenReturn(model);
         when(access.get(ServiceType.class, 2L)).thenReturn(repairType);
@@ -68,15 +68,63 @@ class MasterDataServiceTest {
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(
                 1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, null, null)));
 
-        var replacementType = new ServiceType(); replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName("Thay thế");
-        var part = new Part(); part.setId(7L);
-        var replacement = new ServiceCatalogItem(); replacement.setId(9L); replacement.setName("Thay nguồn");
-        replacement.setDeviceModel(model); replacement.setServiceIssue(issue); replacement.setServiceType(replacementType); replacement.setPart(part); replacement.setStandardDurationMinutes(30);
-        when(access.get(ServiceCatalogItem.class, 9L)).thenReturn(replacement);
         when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         assertDoesNotThrow(() -> service.create(new CreateServiceCatalogItemRequest(
-                1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, WarrantyRemedy.REPLACEMENT, 9L)));
+                1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, WarrantyRemedy.REPLACEMENT, null)));
         verify(repo).saveAndFlush(any(ServiceCatalogItem.class));
+    }
+
+    @Test
+    void replacementServiceCanUseRepairWarrantyWithoutReplacementCatalog() {
+        var access = mock(DomainAccess.class);
+        var repo = mock(ServiceCatalogItemRepository.class);
+        var deviceType = new DeviceType(); deviceType.setId(1L);
+        var model = new DeviceModel(); model.setId(1L); model.setName("16 Pro"); model.setDeviceType(deviceType);
+        var issue = new ServiceIssue(); issue.setId(3L); issue.setName("Pin"); issue.getDeviceTypes().add(deviceType);
+        var replacementType = new ServiceType(); replacementType.setId(2L); replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName("Thay thế linh kiện");
+        var part = new Part(); part.setId(7L); part.setName("Pin iPhone 16 Pro"); part.setBrand("Pisen"); part.setVariant("Dung lượng cao");
+        when(access.get(DeviceModel.class, 1L)).thenReturn(model);
+        when(access.get(ServiceType.class, 2L)).thenReturn(replacementType);
+        when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
+        when(access.get(Part.class, 7L)).thenReturn(part);
+        when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+
+        service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, 7L, null,
+                BigDecimal.TEN, 60, 180, WarrantyRemedy.REPAIR, null));
+        var repairCaptor = org.mockito.ArgumentCaptor.forClass(ServiceCatalogItem.class);
+        verify(repo).saveAndFlush(repairCaptor.capture());
+        assertNull(repairCaptor.getValue().getWarrantyReplacementCatalog());
+        assertEquals("Thay pin iPhone 16 Pro — Pisen Dung lượng cao", repairCaptor.getValue().getName());
+    }
+
+    @Test
+    void replacementWarrantyCharacteristicDoesNotBindAnotherCatalog() {
+        var access = mock(DomainAccess.class);
+        var repo = mock(ServiceCatalogItemRepository.class);
+        var deviceType = new DeviceType(); deviceType.setId(1L);
+        var model = new DeviceModel(); model.setId(1L); model.setName("16 Pro"); model.setDeviceType(deviceType);
+        var issue = new ServiceIssue(); issue.setId(3L); issue.setName("Pin"); issue.getDeviceTypes().add(deviceType);
+        var replacementType = new ServiceType(); replacementType.setId(2L); replacementType.setCode(ServiceTypeCode.REPLACEMENT); replacementType.setName("Thay thế linh kiện");
+        var currentPart = new Part(); currentPart.setId(7L); currentPart.setName("Pin dung lượng cao");
+        var warrantyPart = new Part(); warrantyPart.setId(8L); warrantyPart.setName("Pin tiêu chuẩn");
+        var warrantyCatalog = new ServiceCatalogItem(); warrantyCatalog.setId(9L); warrantyCatalog.setName("Thay pin tiêu chuẩn");
+        warrantyCatalog.setDeviceModel(model); warrantyCatalog.setServiceIssue(issue); warrantyCatalog.setServiceType(replacementType);
+        warrantyCatalog.setPart(warrantyPart); warrantyCatalog.setStandardDurationMinutes(45);
+        when(access.get(DeviceModel.class, 1L)).thenReturn(model);
+        when(access.get(ServiceType.class, 2L)).thenReturn(replacementType);
+        when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
+        when(access.get(Part.class, 7L)).thenReturn(currentPart);
+        when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+
+        service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, 7L, null,
+                BigDecimal.TEN, 60, 180, WarrantyRemedy.REPLACEMENT, 9L));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ServiceCatalogItem.class);
+        verify(repo).saveAndFlush(captor.capture());
+        assertEquals(WarrantyRemedy.REPLACEMENT, captor.getValue().getWarrantyRemedy());
+        assertNull(captor.getValue().getWarrantyReplacementCatalog());
     }
 
     @Test

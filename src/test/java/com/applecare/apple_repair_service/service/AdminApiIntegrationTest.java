@@ -163,6 +163,7 @@ class AdminApiIntegrationTest {
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
                 .contentType("application/json").content(body)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.lot.lotCode").value(command.lotCode()))
+                .andExpect(jsonPath("$.transaction.transactionCode", containsString("NHAP_")))
                 .andExpect(jsonPath("$.inventory.quantity").value(2));
         mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+token)
                 .param("branchId",f.branch.getId().toString()).param("partId",part.getId().toString()))
@@ -171,8 +172,27 @@ class AdminApiIntegrationTest {
         mvc.perform(get("/api/v1/admin/parts/"+part.getId()+"/inventory-transactions")
                 .header("Authorization","Bearer "+token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$[0].transactionType").value("STOCK_IN"));
+                .andExpect(jsonPath("$[0].transactionType").value("STOCK_IN"))
+                .andExpect(jsonPath("$[0].transactionCode", containsString("NHAP_")));
+        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
+                .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString())
+                .param("transactionType", "STOCK_IN").param("code", command.lotCode())
+                .param("from", LocalDate.now(clock).minusDays(1).toString()).param("to", LocalDate.now(clock).toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].lotCode").value(command.lotCode()));
+        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
+                .param("code", "NHAP_"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
+        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
+        mvc.perform(get("/api/v1/admin/inventory/import-template").header("Authorization","Bearer "+token))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", containsString("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")));
         mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+login(f.receptionist)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+login(f.receptionist)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/inventory/import-template").header("Authorization","Bearer "+login(f.receptionist)))
                 .andExpect(status().isForbidden());
         em.flush();
         var movement=em.createQuery("select t from InventoryTransaction t where t.part.id=:id",InventoryTransaction.class)
@@ -181,6 +201,46 @@ class AdminApiIntegrationTest {
         mvc.perform(post("/api/v1/admin/inventory/stock-out").header("Authorization","Bearer "+token)
                 .contentType("application/json").content(json.writeValueAsString(new StockAdjustmentCommand(f.branch.getId(),part.getId(),3,null))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INSUFFICIENT_STOCK"));
+    }
+
+    @Test void adminStoresWarrantyCharacteristicWithoutBindingAService() throws Exception {
+        var replacementType = new ServiceType();
+        replacementType.setCode(ServiceTypeCode.REPLACEMENT);
+        replacementType.setName(f.prefix + " replacement");
+        em.persist(replacementType);
+        var standardPart = new Part(); standardPart.setPartCode(f.prefix + "-STD"); standardPart.setName("Pin tiêu chuẩn");
+        standardPart.setBrand("Pisen"); standardPart.setVariant("Tiêu chuẩn"); standardPart.setSalePrice(BigDecimal.TEN); em.persist(standardPart);
+        var highPart = new Part(); highPart.setPartCode(f.prefix + "-HIGH"); highPart.setName("Pin dung lượng cao");
+        highPart.setBrand("Pisen"); highPart.setVariant("Dung lượng cao"); highPart.setSalePrice(BigDecimal.TEN); em.persist(highPart);
+        var standard = new ServiceCatalogItem(); standard.setDeviceModel(f.model); standard.setServiceIssue(f.issue);
+        standard.setServiceType(replacementType); standard.setPart(standardPart); standard.setName(f.prefix + " standard");
+        standard.setStandardDurationMinutes(45); standard.setWarrantyDays(0); em.persist(standard);
+        var high = new ServiceCatalogItem(); high.setDeviceModel(f.model); high.setServiceIssue(f.issue);
+        high.setServiceType(replacementType); high.setPart(highPart); high.setName(f.prefix + " high");
+        high.setStandardDurationMinutes(60); high.setWarrantyDays(180); high.setWarrantyRemedy(WarrantyRemedy.REPAIR); em.persist(high);
+        em.flush();
+        String url = "/api/v1/admin/service-catalog-items/" + high.getId();
+
+        var same = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
+                highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPLACEMENT, high.getId());
+        mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsString(same))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.warrantyRemedy").value("REPLACEMENT"))
+                .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
+
+        var different = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
+                highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPLACEMENT, standard.getId());
+        mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsString(different))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.warrantyRemedy").value("REPLACEMENT"))
+                .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
+
+        var repair = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
+                highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPAIR, null);
+        mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
+                .content(json.writeValueAsString(repair))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.warrantyRemedy").value("REPAIR"))
+                .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
     }
 
     @Test void adminPhysicallyDeletesEverySupportedUnreferencedRecord() throws Exception {
