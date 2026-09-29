@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { useAuth } from '../../auth/useAuth'
+import { internalDestination } from '../../auth/session'
+import { LoadingState } from '../../components/AsyncState'
 
 export function LoginPage() {
   const { status, user, login, notice, clearNotice } = useAuth()
@@ -11,16 +13,16 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  if (status === 'authenticated' && user) return <Navigate to={`/internal/${user.role.toLowerCase()}`} replace />
+  const requested = (location.state as { from?: string } | null)?.from
+  if (status === 'bootstrapping') return <div className="route-loading"><LoadingState label="Đang khôi phục phiên đăng nhập…" /></div>
+  if (status === 'authenticated' && user) return <Navigate to={internalDestination(user.role, requested)} replace />
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError('')
     try {
       const current = await login(username, password)
-      const requested = (location.state as { from?: string } | null)?.from
-      const roleBase = `/internal/${current.role.toLowerCase()}`
-      navigate(requested?.startsWith(roleBase) ? requested : roleBase, { replace: true })
+      navigate(internalDestination(current.role, requested), { replace: true })
     } catch (reason) {
       setError(reason instanceof ApiError
         ? reason.code === 'NETWORK_ERROR' ? 'Không thể kết nối tới máy chủ. Vui lòng thử lại.' : reason.message

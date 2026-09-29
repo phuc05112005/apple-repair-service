@@ -160,10 +160,11 @@ export function IntakePage() {
             <label className="field"><span>Dòng máy</span><select required disabled={!typeId} value={modelId ?? ''} onChange={event => { setModelId(Number(event.target.value) || undefined); setIssueId(undefined); resetService() }}><option value="">Chọn dòng máy</option>{models.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
             <label className="field"><span>Vấn đề khách gặp phải <i>Chọn để xem dịch vụ phù hợp</i></span><select disabled={!modelId} value={issueId ?? ''} onChange={event => { setIssueId(Number(event.target.value) || undefined); resetService() }}><option value="">Chọn vấn đề</option>{issues.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           </div>
+          <div className="intake-notes-grid">
+            <label className="field"><span>Vấn đề khách mô tả ban đầu</span><textarea placeholder="Nhập triệu chứng hoặc vấn đề khách gặp phải" maxLength={5000} value={reportedIssue} onChange={event => setReportedIssue(event.target.value)} /><small>Được lưu riêng với tình trạng thiết bị khi nhận và kết luận của kỹ thuật viên.</small></label>
+            <label className="field"><span>Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phương án, giới hạn chi phí và điều kiện khách đã đồng ý khi giao máy" maxLength={5000} value={authorizedScope} onChange={event => setAuthorizedScope(event.target.value)} /><small>Kỹ thuật viên chỉ xử lý trong phạm vi này; phát sinh mới cần trao đổi lại với khách.</small></label>
+          </div>
         </section>
-
-        <label className="field"><span>Vấn đề khách mô tả ban đầu</span><textarea placeholder="Nhập triệu chứng hoặc vấn đề khách gặp phải" maxLength={5000} value={reportedIssue} onChange={event => setReportedIssue(event.target.value)} /><small>Thông tin này được lưu riêng với tình trạng khi nhận máy và phương án của kỹ thuật viên.</small></label>
-        <label className="field"><span>Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phương án, giới hạn chi phí và điều kiện khách đã đồng ý khi giao máy" maxLength={5000} value={authorizedScope} onChange={event => setAuthorizedScope(event.target.value)} /><small>Kỹ thuật viên có thể xử lý trong phạm vi này; phát sinh ngoài phạm vi cần trao đổi lại với khách.</small></label>
         <section className="intake-section intake-section--service">
           <div className="intake-section__heading"><span>02</span><div><h2>Dịch vụ tiếp nhận</h2><p>Chọn ít nhất một dịch vụ đã được cấu hình trước khi tạo phiếu.</p></div></div>
           {catalog.isLoading && issueId && <LoadingState label="Đang tải dịch vụ phù hợp…" />}

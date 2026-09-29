@@ -35,6 +35,7 @@ import com.applecare.apple_repair_service.repository.PartUsageRepository;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
@@ -59,9 +60,9 @@ public class InventoryService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public StockInResponse stockIn(StockInRequest r) {
         rules.validate(r);
-        BusinessRules.require(!r.receivedAt().isAfter(LocalDateTime.now(clock)), "Thời điểm nhận lô không được ở tương lai.");
+        BusinessRules.require(!r.receivedAt().isAfter(LocalDateTime.now(clock)), "Thời điểm nhận kho không được ở tương lai.");
         var code = r.lotCode().trim();
-        if (lots.existsByLotCodeIgnoreCase(code)) throw new ConflictException("Mã lô đã tồn tại.");
+        if (lots.existsByLotCodeIgnoreCase(code)) throw new ConflictException("Mã nhập kho tham chiếu đã tồn tại.");
         var part = lockPart(r.partId());
         var branch = branch(r.branchId());
         var actor = access.get(User.class, r.receivedByUserId());
@@ -120,7 +121,9 @@ public class InventoryService {
         if (item.getWarrantySourceItem() != null) {
             BusinessRules.require(item.getWarrantyDecision() == com.applecare.apple_repair_service.enums.WarrantyDecision.APPROVED && warrantyReplacement,
                     "Ghi nhận phương án thay bảo hành trước khi xuất linh kiện; dịch vụ trả phí cần hạng mục riêng.");
-            BusinessRules.require(item.getWarrantyReplacementCatalog() != null && item.getWarrantyReplacementCatalog().getPart().getId().equals(part.getId()),
+            var warrantyCatalog = item.getWarrantyReplacementCatalog() != null
+                    ? item.getWarrantyReplacementCatalog() : item.getServiceCatalogItem();
+            BusinessRules.require(warrantyCatalog.getPart() != null && warrantyCatalog.getPart().getId().equals(part.getId()),
                     "Linh kiện phải đúng phương án thay bảo hành.");
             BusinessRules.required(r.defectiveReturnNote(), "Nhập mô tả linh kiện lỗi thu hồi (không nhập lại kho sử dụng)");
         } else if (BusinessRules.text(r.defectiveReturnNote()) != null)
@@ -207,6 +210,34 @@ public class InventoryService {
     public List<InventoryTransactionResponse> getTransactionHistory(Long partId) {
         access.get(Part.class, partId);
         return transactions.findAllByPart_IdOrderByCreatedAtDesc(partId).stream().map(mapper::map).toList();
+    }
+
+    public List<InventoryTransactionResponse> searchTransactions(Long branchId, Long partId,
+            InventoryTransactionType type, LocalDate from, LocalDate to, String code) {
+        if (branchId != null) access.get(Branch.class, branchId);
+        if (partId != null) access.get(Part.class, partId);
+        BusinessRules.require(from == null || to == null || !from.isAfter(to),
+                "Ngày bắt đầu không được sau ngày kết thúc.");
+        LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
+        LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
+        String query = BusinessRules.text(code);
+        return transactions.search(branchId, partId, type, fromTime, toTime).stream()
+                .filter(transaction -> matchesTransactionCode(transaction, query))
+                .map(mapper::map)
+                .toList();
+    }
+
+    private boolean matchesTransactionCode(InventoryTransaction transaction, String query) {
+        if (query == null) return true;
+        String normalized = query.toLowerCase(java.util.Locale.ROOT).trim();
+        String id = transaction.getId().toString();
+        String displayId = String.format("%06d", transaction.getId());
+        String transactionCode = InventoryTransactionResponse.code(transaction.getId(), transaction.getTransactionType())
+                .toLowerCase(java.util.Locale.ROOT);
+        String reference = transaction.getInventoryLot() == null ? "" : transaction.getInventoryLot().getLotCode();
+        return transactionCode.contains(normalized) || id.contains(normalized.replaceAll("^(nhap|xuat|chuyen)_?", ""))
+                || displayId.contains(normalized.replaceAll("^(nhap|xuat|chuyen)_?", ""))
+                || reference.toLowerCase(java.util.Locale.ROOT).contains(query.toLowerCase(java.util.Locale.ROOT));
     }
 
     public List<InventoryLotResponse> listLots(Long branchId, Long partId) {

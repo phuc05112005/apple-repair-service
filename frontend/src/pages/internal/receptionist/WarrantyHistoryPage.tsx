@@ -16,23 +16,27 @@ export function WarrantyHistoryPage() {
   const [lookup, setLookup] = useState<{ phone?: string; ticketCode?: string }>()
   const [source, setSource] = useState<WarrantyHistoryItemResponse>()
   const [branchId, setBranchId] = useState<number>()
+  const [serviceCatalogItemId, setServiceCatalogItemId] = useState<number>()
   const [condition, setCondition] = useState('')
   const [issue, setIssue] = useState('')
   const [note, setNote] = useState('')
   const [scope, setScope] = useState('')
   const history = useQuery({ queryKey: ['receptionist', 'warranty-history', lookup], queryFn: ({ signal }) => receptionistApi.warrantyHistory(lookup!, signal), enabled: Boolean(lookup) })
   const branches = useQuery({ queryKey: ['public', 'branches'], queryFn: ({ signal }) => publicApi.branches(signal), enabled: Boolean(source) })
+  const catalog = useQuery({ queryKey: ['public', 'catalog', source?.deviceModelId], queryFn: ({ signal }) => publicApi.catalog({ deviceModelId: source!.deviceModelId }, signal), enabled: Boolean(source) })
+  const warrantyServices = useMemo(() => (catalog.data ?? []).filter(item => source
+    && item.serviceTypeCode === (source.warrantyTechnicalMethod === 'REPLACEMENT' ? 'REPLACEMENT' : 'REPAIR')), [catalog.data, source])
   const grouped = useMemo(() => {
     const map = new Map<number, WarrantyHistoryItemResponse[]>()
     for (const item of history.data?.items ?? []) map.set(item.customerDeviceId, [...(map.get(item.customerDeviceId) ?? []), item])
     return [...map.values()]
   }, [history.data])
   const create = useMutation({
-    mutationFn: () => receptionistApi.createWarrantyClaim(source!.repairItemId, { branchId: branchId!, receivedCondition: condition.trim(), customerReportedIssue: issue.trim(), note: note.trim() || undefined, authorizedScope: scope.trim() || undefined }),
+    mutationFn: () => receptionistApi.createWarrantyClaim(source!.repairItemId, { branchId: branchId!, serviceCatalogItemId: serviceCatalogItemId!, receivedCondition: condition.trim(), customerReportedIssue: issue.trim(), note: note.trim() || undefined, authorizedScope: scope.trim() || undefined }),
     onSuccess: detail => { closeClaim(); navigate(`/internal/receptionist/tickets/${detail.ticket.id}`) },
   })
 
-  function closeClaim() { setSource(undefined); setBranchId(undefined); setCondition(''); setIssue(''); setNote(''); setScope(''); create.reset() }
+  function closeClaim() { setSource(undefined); setBranchId(undefined); setServiceCatalogItemId(undefined); setCondition(''); setIssue(''); setNote(''); setScope(''); create.reset() }
   function submitLookup(event: FormEvent) { event.preventDefault(); const value = term.trim(); if (value) setLookup(mode === 'phone' ? { phone: value } : { ticketCode: value }) }
 
   return <div className="workspace-page warranty-history-page">
@@ -56,9 +60,9 @@ export function WarrantyHistoryPage() {
         </section>)}</div>
       </article>)}
     </section>}
-    {source && <DetailDrawer busy={create.isPending} eyebrow="Tiếp nhận bảo hành" title={source.serviceName} onClose={closeClaim} footer={<><button className="button button--quiet" disabled={create.isPending} onClick={closeClaim}>Hủy</button><button className="button button--primary" disabled={!branchId || !condition.trim() || !issue.trim() || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Đang tạo phiếu…' : 'Tạo phiếu bảo hành'}</button></>}>
-      <div className="warranty-source-summary"><span>Thiết bị và phương án được lấy từ hạng mục nguồn</span><strong>{source.deviceModelName}</strong><p>{source.ticketCode} · {source.warrantyTechnicalMethod === 'REPLACEMENT' ? 'Thay thế bảo hành' : 'Sửa chữa bảo hành'} · miễn phí theo điều kiện hiện tại</p></div>
-      <div className="drawer-form"><label className="field"><span>Chi nhánh tiếp nhận</span><select required value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Chọn chi nhánh</option>{branches.data?.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label><label className="field"><span>Tình trạng thiết bị khi nhận</span><textarea required placeholder="Nhập tình trạng máy và phụ kiện giao kèm" value={condition} onChange={event => setCondition(event.target.value)} /></label><label className="field"><span>Lỗi phát sinh cần bảo hành</span><textarea required placeholder="Nhập biểu hiện lỗi khách đang gặp" value={issue} onChange={event => setIssue(event.target.value)} /></label><label className="field"><span className="field-label">Ghi chú tiếp nhận <i>Không bắt buộc</i></span><textarea placeholder="Nhập ghi chú cho kỹ thuật viên" value={note} onChange={event => setNote(event.target.value)} /></label><label className="field"><span className="field-label">Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phạm vi hoặc điều kiện khách đã đồng ý" value={scope} onChange={event => setScope(event.target.value)} /></label>{create.isError && <ErrorState error={create.error} />}</div>
+    {source && <DetailDrawer busy={create.isPending} eyebrow="Tiếp nhận bảo hành" title={source.serviceName} onClose={closeClaim} footer={<><button className="button button--quiet" disabled={create.isPending} onClick={closeClaim}>Hủy</button><button className="button button--primary" disabled={!branchId || !serviceCatalogItemId || !condition.trim() || !issue.trim() || create.isPending} onClick={() => create.mutate()}>{create.isPending ? 'Đang tạo phiếu…' : 'Tạo phiếu bảo hành'}</button></>}>
+      <div className="warranty-source-summary"><span>Đặc trưng bảo hành từ hạng mục nguồn</span><strong>{source.deviceModelName}</strong><p>{source.ticketCode} · {source.warrantyTechnicalMethod === 'REPLACEMENT' ? 'Thay thế linh kiện' : 'Sửa chữa'} · nhân viên chọn dịch vụ thực tế khi tiếp nhận</p></div>
+      <div className="drawer-form"><label className="field"><span>Chi nhánh tiếp nhận</span><select required value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Chọn chi nhánh</option>{branches.data?.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label><label className="field"><span>Dịch vụ áp dụng cho lần bảo hành</span><select required value={serviceCatalogItemId ?? ''} onChange={event => setServiceCatalogItemId(Number(event.target.value) || undefined)}><option value="">Chọn dịch vụ phù hợp</option>{warrantyServices.map(service => <option key={service.id} value={service.id}>{service.name}{service.partBrand || service.partVariant ? ` · ${[service.partBrand, service.partVariant].filter(Boolean).join(' · ')}` : ''}</option>)}</select><small>Danh sách gồm toàn bộ dịch vụ đúng model và đặc trưng {source.warrantyTechnicalMethod === 'REPLACEMENT' ? 'thay thế' : 'sửa chữa'}, kể cả dịch vụ ban đầu.</small></label>{catalog.isLoading && <LoadingState label="Đang tải dịch vụ phù hợp…" />}{catalog.isError && <ErrorState error={catalog.error} retry={() => catalog.refetch()} />}{!catalog.isLoading && !catalog.isError && warrantyServices.length === 0 && <EmptyState title="Chưa có dịch vụ phù hợp để tiếp nhận bảo hành" />}<label className="field"><span>Tình trạng thiết bị khi nhận</span><textarea required placeholder="Nhập tình trạng máy và phụ kiện giao kèm" value={condition} onChange={event => setCondition(event.target.value)} /></label><label className="field"><span>Lỗi phát sinh cần bảo hành</span><textarea required placeholder="Nhập biểu hiện lỗi khách đang gặp" value={issue} onChange={event => setIssue(event.target.value)} /></label><label className="field"><span className="field-label">Ghi chú tiếp nhận <i>Không bắt buộc</i></span><textarea placeholder="Nhập ghi chú cho kỹ thuật viên" value={note} onChange={event => setNote(event.target.value)} /></label><label className="field"><span className="field-label">Phạm vi khách cho phép trước <i>Không bắt buộc</i></span><textarea placeholder="Nhập phạm vi hoặc điều kiện khách đã đồng ý" value={scope} onChange={event => setScope(event.target.value)} /></label>{create.isError && <ErrorState error={create.error} />}</div>
     </DetailDrawer>}
   </div>
 }

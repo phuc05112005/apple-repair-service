@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cloneSchedule, validateSlotRules, validateWeeklySchedules } from '../src/utils/scheduleValidation.ts'
-import { AUTH_SESSION_KEY, clearAuthSession, isSessionExpired, readAuthSession, writeAuthSession } from '../src/auth/session.ts'
+import { cloneSchedule, normalizeTime24, validateSlotRules, validateWeeklySchedules } from '../src/utils/scheduleValidation.ts'
+import { AUTH_SESSION_KEY, clearAuthSession, internalDestination, isSessionExpired, readAuthSession, writeAuthSession } from '../src/auth/session.ts'
 
 test('weekly schedule accepts multiple slots and copied days remain independently editable', () => {
   const slots = [
@@ -27,6 +27,14 @@ test('weekly schedule explains overlap, duplicate and invalid ranges', () => {
   assert.match(validateSlotRules([{ startTime: '10:00', endTime: '09:00', enabled: true }]), /không hợp lệ/)
 })
 
+test('adjacent schedule slots remain valid after backend adds seconds', () => {
+  assert.equal(validateSlotRules([
+    { startTime: '12:00:00', endTime: '13:00:00', enabled: true },
+    { startTime: '13:00', endTime: '14:00', enabled: true },
+  ]), null)
+  assert.equal(normalizeTime24('23:59:00'), '23:59')
+})
+
 test('auth session persists only token metadata and can be cleared', () => {
   const values = new Map()
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) }
@@ -42,4 +50,10 @@ test('auth bootstrap detects expired or invalid expiry timestamps', () => {
   assert.equal(isSessionExpired('2026-09-27T00:00:00Z', Date.parse('2026-09-27T00:00:00Z')), true)
   assert.equal(isSessionExpired('2026-09-27T00:00:01Z', Date.parse('2026-09-27T00:00:00Z')), false)
   assert.equal(isSessionExpired('invalid', Date.now()), true)
+})
+
+test('internal back navigation keeps the authenticated role and requested page', () => {
+  assert.equal(internalDestination('ADMIN', '/internal/admin/users'), '/internal/admin/users')
+  assert.equal(internalDestination('RECEPTIONIST', '/internal/admin/users'), '/internal/receptionist')
+  assert.equal(internalDestination('TECHNICIAN', '/'), '/internal/technician')
 })

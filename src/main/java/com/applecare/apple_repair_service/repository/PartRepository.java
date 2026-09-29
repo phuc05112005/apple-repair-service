@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
+import com.applecare.apple_repair_service.enums.ActiveStatus;
 
 public interface PartRepository extends JpaRepository<Part, Long> {
 
@@ -13,4 +14,6 @@ public interface PartRepository extends JpaRepository<Part, Long> {
     boolean existsByPartCode(String partCode);
 
     List<Part> findAllByNameIgnoreCase(String name);
+
+    List<Part> findAllByStatusOrderByNameAsc(ActiveStatus status);
 }

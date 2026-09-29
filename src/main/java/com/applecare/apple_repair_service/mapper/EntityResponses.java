@@ -110,7 +110,7 @@ public class EntityResponses {
     }
 
     public InventoryTransactionResponse map(InventoryTransaction e) {
-        return new InventoryTransactionResponse(e.getId(), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getRecordedBy() == null ? null : e.getRecordedBy().getFullName(), e.getNote(), e.getCreatedAt());
+        return new InventoryTransactionResponse(e.getId(), InventoryTransactionResponse.code(e.getId(), e.getTransactionType()), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getRecordedBy() == null ? null : e.getRecordedBy().getFullName(), e.getNote(), e.getCreatedAt());
     }
 
     public InventoryLotResponse map(InventoryLot e) {
