@@ -28,7 +28,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "ml_predictions", indexes = {
         @Index(name = "idx_ml_predictions_ticket_type_predicted_at",
-                columnList = "service_ticket_id, prediction_type, predicted_at")
+                columnList = "service_ticket_id, prediction_type, predicted_at"),
+        @Index(name = "idx_ml_predictions_technician_type_predicted_at",
+                columnList = "technician_id, prediction_type, predicted_at")
 })
 @Getter
 @Setter
@@ -44,6 +46,11 @@ public class MlPrediction {
     @JoinColumn(name = "service_ticket_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_ml_predictions_service_ticket"))
     private ServiceTicket serviceTicket;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "technician_id",
+            foreignKey = @ForeignKey(name = "fk_ml_predictions_technician"))
+    private User technician;
 
     @NotNull
     @Enumerated(EnumType.STRING)

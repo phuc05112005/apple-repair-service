@@ -119,7 +119,11 @@ public class EntityResponses {
     }
 
     public MlPredictionResponse map(MlPrediction e) {
-        return new MlPredictionResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getPredictionType(), e.getPredictedDurationMinutes(), e.getPredictedSatisfaction(), e.getConfidence(), e.getModelName(), e.getModelVersion(), e.getPredictedAt());
+        return new MlPredictionResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(),
+                e.getTechnician() == null ? null : e.getTechnician().getId(),
+                e.getTechnician() == null ? null : e.getTechnician().getFullName(), e.getPredictionType(),
+                e.getPredictedDurationMinutes(), e.getPredictedSatisfaction(), e.getConfidence(),
+                e.getModelName(), e.getModelVersion(), e.getPredictedAt());
     }
 
     public PartResponse map(Part e) {

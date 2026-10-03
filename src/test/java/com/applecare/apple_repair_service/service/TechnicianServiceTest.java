@@ -114,15 +114,24 @@ class TechnicianServiceTest {
     }
 
     @Test
-    void recommendationUsesMinutesAndLatestPrediction() {
+    void recommendationUsesCandidatePredictionThenLegacyFallback() {
         var predictions = mock(MlPredictionRepository.class);
         var repairs = mock(RepairItemRepository.class);
         var second = TestData.user(3);
         when(access.get(ServiceTicket.class, 1L)).thenReturn(ticket);
         when(schedules.findAllByBranch_IdAndWorkDateAndStatus(any(), any(), any())).thenReturn(List.of(shift(tech), shift(second)));
-        var ml = new MlPrediction();
-        ml.setPredictedDurationMinutes(90);
-        when(predictions.findFirstByServiceTicket_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(10L, PredictionType.REPAIR_DURATION)).thenReturn(Optional.of(ml));
+        var activeJobPrediction = new MlPrediction();
+        activeJobPrediction.setPredictedDurationMinutes(90);
+        when(predictions.findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                10L, 2L, PredictionType.REPAIR_DURATION)).thenReturn(Optional.of(activeJobPrediction));
+        var candidatePrediction = new MlPrediction();
+        candidatePrediction.setPredictedDurationMinutes(45);
+        when(predictions.findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                1L, 2L, PredictionType.REPAIR_DURATION)).thenReturn(Optional.of(candidatePrediction));
+        var legacyPrediction = new MlPrediction();
+        legacyPrediction.setPredictedDurationMinutes(60);
+        when(predictions.findFirstByServiceTicket_IdAndTechnicianIsNullAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                1L, PredictionType.REPAIR_DURATION)).thenReturn(Optional.of(legacyPrediction));
         var a = new Assignment();
         var old = TestData.ticket(ServiceTicketStatus.REPAIRING);
         old.setId(10L);
@@ -136,6 +145,7 @@ class TechnicianServiceTest {
         assertFalse(result.getLast().eligible());
         assertEquals(90, result.getLast().estimatedWorkloadMinutes());
         assertEquals(60, result.getFirst().predictedNewJobMinutes());
+        assertEquals(45, result.getLast().predictedNewJobMinutes());
         assertThrows(BusinessRuleViolationException.class, () -> recommendations.estimate(99L));
     }
 
