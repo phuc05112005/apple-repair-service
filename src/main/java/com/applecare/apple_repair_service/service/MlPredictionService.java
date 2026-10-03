@@ -4,7 +4,9 @@ import com.applecare.apple_repair_service.dto.request.CreateMlPredictionRequest;
 import com.applecare.apple_repair_service.dto.response.MlPredictionResponse;
 import com.applecare.apple_repair_service.entity.MlPrediction;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
+import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.enums.PredictionType;
+import com.applecare.apple_repair_service.enums.UserRole;
 import com.applecare.apple_repair_service.exception.ResourceNotFoundException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.MlPredictionRepository;
@@ -37,6 +39,12 @@ public class MlPredictionService {
             BusinessRules.require(r.predictedSatisfaction() != null && r.predictedDurationMinutes() == null, "Satisfaction prediction must only contain satisfaction");
         var p = new MlPrediction();
         p.setServiceTicket(access.get(ServiceTicket.class, r.serviceTicketId()));
+        if (r.technicianId() != null) {
+            var technician = access.get(User.class, r.technicianId());
+            BusinessRules.require(technician.getRole() == UserRole.TECHNICIAN,
+                    "Prediction technician must have TECHNICIAN role");
+            p.setTechnician(technician);
+        }
         p.setPredictionType(r.predictionType());
         p.setPredictedDurationMinutes(r.predictedDurationMinutes());
         p.setPredictedSatisfaction(r.predictedSatisfaction());

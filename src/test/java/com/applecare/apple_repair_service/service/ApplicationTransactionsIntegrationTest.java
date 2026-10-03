@@ -29,6 +29,7 @@ import com.applecare.apple_repair_service.entity.Part;
 import com.applecare.apple_repair_service.entity.RepairItem;
 import com.applecare.apple_repair_service.entity.ServiceCatalogItem;
 import com.applecare.apple_repair_service.entity.ServiceIssue;
+import com.applecare.apple_repair_service.entity.ServiceInterruption;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.entity.ServiceType;
 import com.applecare.apple_repair_service.entity.TechnicianSchedule;
@@ -36,6 +37,9 @@ import com.applecare.apple_repair_service.enums.AppointmentStatus;
 import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.AssignmentSource;
 import com.applecare.apple_repair_service.enums.AssignmentStatus;
+import com.applecare.apple_repair_service.enums.InterruptionReason;
+import com.applecare.apple_repair_service.enums.InterruptionResponsibility;
+import com.applecare.apple_repair_service.enums.InterruptionSource;
 import com.applecare.apple_repair_service.enums.PaymentMethod;
 import com.applecare.apple_repair_service.enums.PredictionType;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
@@ -71,6 +75,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -111,6 +116,12 @@ class ApplicationTransactionsIntegrationTest {
     RepairItemService repairItemService;
     @Autowired
     MlPredictionService predictions;
+    @Autowired
+    com.applecare.apple_repair_service.repository.MlPredictionRepository mlPredictionRepository;
+    @Autowired
+    com.applecare.apple_repair_service.repository.UserRepository userRepository;
+    @Autowired
+    com.applecare.apple_repair_service.repository.ServiceInterruptionRepository serviceInterruptions;
     @Autowired
     TransferService transfers;
     @MockitoSpyBean
@@ -345,6 +356,7 @@ class ApplicationTransactionsIntegrationTest {
                     new String[]{"ServiceTimeEstimateHistory", "e.serviceTicket.branch.id"},
                     new String[]{"ServiceFeedback", "e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction", "e.serviceTicket.branch.id"},
+                    new String[]{"ServiceInterruption", "e.assignment.serviceTicket.branch.id"},
                      new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
                      new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
                      new String[]{"InventoryLot", "e.branch.id"},
@@ -427,6 +439,102 @@ class ApplicationTransactionsIntegrationTest {
         predictions.savePrediction(new CreateMlPredictionRequest(id, PredictionType.REPAIR_DURATION, 40, null, null, "test", "v2"));
         assertEquals(2, predictions.getPredictionHistory(id, PredictionType.REPAIR_DURATION).size());
         assertEquals(40, predictions.getLatestPrediction(id, PredictionType.REPAIR_DURATION).predictedDurationMinutes());
+    }
+
+    @Test
+    void predictionsPersistPerTechnicianAndKeepTicketLevelSatisfactionNullable() {
+        var first = predictions.savePrediction(new CreateMlPredictionRequest(ticketId, techId,
+                PredictionType.REPAIR_DURATION, 48, null, new BigDecimal("0.9100"), "test", "v1"));
+        var second = predictions.savePrediction(new CreateMlPredictionRequest(ticketId, otherTechId,
+                PredictionType.REPAIR_DURATION, 55, null, new BigDecimal("0.9000"), "test", "v1"));
+        var satisfaction = predictions.savePrediction(new CreateMlPredictionRequest(ticketId,
+                PredictionType.CUSTOMER_SATISFACTION, null, true,
+                new BigDecimal("0.8000"), "test", "v1"));
+
+        assertEquals(techId, first.technicianId());
+        assertEquals(otherTechId, second.technicianId());
+        assertEquals(first.predictedAt(), second.predictedAt());
+        assertNull(satisfaction.technicianId());
+        assertEquals(3, predictions.getPredictionHistory(ticketId, PredictionType.REPAIR_DURATION).size()
+                + predictions.getPredictionHistory(ticketId, PredictionType.CUSTOMER_SATISFACTION).size());
+        assertEquals(48, mlPredictionRepository
+                .findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                        ticketId, techId, PredictionType.REPAIR_DURATION)
+                .orElseThrow().getPredictedDurationMinutes());
+        assertEquals(55, mlPredictionRepository
+                .findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                        ticketId, otherTechId, PredictionType.REPAIR_DURATION)
+                .orElseThrow().getPredictedDurationMinutes());
+    }
+
+    @Test
+    void predictionTechnicianForeignKeyPreventsUserDeletionWithoutCascade() {
+        Long candidateId = tx(() -> {
+            var candidate = TestData.user(1L);
+            candidate.setId(null);
+            candidate.setUsername(prefix + "mlcandidate");
+            candidate.setPasswordHash("TEST-ONLY-NON-AUTHENTICATING-HASH");
+            persist(candidate);
+            em.flush();
+            return candidate.getId();
+        });
+        var prediction = predictions.savePrediction(new CreateMlPredictionRequest(ticketId, candidateId,
+                PredictionType.REPAIR_DURATION, 43, null, null, "test", "v1"));
+
+        assertThrows(DataIntegrityViolationException.class, () -> tx(() -> {
+            userRepository.deleteById(candidateId);
+            userRepository.flush();
+            return null;
+        }));
+        assertTrue(tx(() -> userRepository.existsById(candidateId)));
+        assertTrue(tx(() -> mlPredictionRepository.existsById(prediction.id())));
+    }
+
+    @Test
+    void serviceInterruptionPersistsAssignmentAuditAndRejectsInvalidTimeRange() {
+        var assignment = assignments.assignTechnician(ticketId,
+                new AssignTechnicianRequest(techId, userId, AssignmentSource.MANUAL_OVERRIDE));
+        var startedAt = LocalDateTime.now(TestData.CLOCK).plusMinutes(10);
+        Long interruptionId = tx(() -> {
+            var interruption = new ServiceInterruption();
+            interruption.setAssignment(em.getReference(com.applecare.apple_repair_service.entity.Assignment.class,
+                    assignment.id()));
+            interruption.setStartedAt(startedAt);
+            interruption.setReason(InterruptionReason.EQUIPMENT_FAILURE);
+            interruption.setResponsibilityScope(InterruptionResponsibility.BRANCH);
+            interruption.setSource(InterruptionSource.TECHNICIAN);
+            interruption.setIncidentGroupCode(prefix + "incident");
+            interruption.setNote("Thiết bị kiểm tra tạm ngừng hoạt động");
+            interruption.setRecordedBy(em.getReference(com.applecare.apple_repair_service.entity.User.class,
+                    userId));
+            return serviceInterruptions.saveAndFlush(interruption).getId();
+        });
+
+        tx(() -> {
+            var stored = serviceInterruptions.findById(interruptionId).orElseThrow();
+            assertEquals(assignment.id(), stored.getAssignment().getId());
+            assertEquals(userId, stored.getRecordedBy().getId());
+            assertNull(stored.getEndedAt());
+            assertFalse(stored.isVerified());
+            assertNotNull(stored.getCreatedAt());
+            return null;
+        });
+
+        assertThrows(DataIntegrityViolationException.class, () -> tx(() -> {
+            var invalid = new ServiceInterruption();
+            invalid.setAssignment(em.getReference(com.applecare.apple_repair_service.entity.Assignment.class,
+                    assignment.id()));
+            invalid.setStartedAt(startedAt);
+            invalid.setEndedAt(startedAt.minusMinutes(1));
+            invalid.setReason(InterruptionReason.OTHER);
+            invalid.setResponsibilityScope(InterruptionResponsibility.OTHER);
+            invalid.setSource(InterruptionSource.ADMIN);
+            invalid.setNote("Invalid range test");
+            invalid.setRecordedBy(em.getReference(com.applecare.apple_repair_service.entity.User.class,
+                    userId));
+            serviceInterruptions.saveAndFlush(invalid);
+            return null;
+        }));
     }
 
     @Test

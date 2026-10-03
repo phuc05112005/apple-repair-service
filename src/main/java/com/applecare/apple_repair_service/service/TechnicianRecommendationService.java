@@ -2,6 +2,7 @@ package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.dto.response.TechnicianRecommendationResponse;
 import com.applecare.apple_repair_service.entity.Assignment;
+import com.applecare.apple_repair_service.entity.MlPrediction;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.entity.TechnicianSchedule;
 import com.applecare.apple_repair_service.enums.ApprovalStatus;
@@ -23,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,7 +44,6 @@ public class TechnicianRecommendationService {
     public List<TechnicianRecommendationResponse> recommend(Long ticketId) {
         var ticket = access.get(ServiceTicket.class, ticketId);
         var now = LocalDateTime.now(clock);
-        long newJob = estimate(ticketId);
         var shifts = schedules.findAllByBranch_IdAndWorkDateAndStatus(ticket.getBranch().getId(), now.toLocalDate(), TechnicianScheduleStatus.WORKING);
         var latestEnds = new HashMap<Long, TechnicianSchedule>();
         for (var s : shifts) {
@@ -54,8 +55,10 @@ public class TechnicianRecommendationService {
         var result = new ArrayList<TechnicianRecommendationResponse>();
         for (var s : latestEnds.values()) {
             var user = s.getTechnician();
+            long newJob = estimate(ticketId, user.getId());
             long work = assignments.findAllByTechnician_IdAndStatus(user.getId(), AssignmentStatus.ACTIVE).stream()
-                    .map(Assignment::getServiceTicket).map(ServiceTicket::getId).distinct().mapToLong(this::estimate).sum();
+                    .map(Assignment::getServiceTicket).map(ServiceTicket::getId).distinct()
+                    .mapToLong(id -> estimate(id, user.getId())).sum();
             long remaining = Duration.between(now, LocalDateTime.of(now.toLocalDate(), s.getEndTime())).toMinutes();
             boolean eligible = work + newJob <= remaining;
             result.add(new TechnicianRecommendationResponse(user.getId(), user.getFullName(), ticket.getBranch().getId(), work, newJob, remaining, now.plusMinutes(work), eligible, eligible ? "Fits current shift" : "Insufficient shift time"));
@@ -67,7 +70,17 @@ public class TechnicianRecommendationService {
     }
 
     long estimate(Long id) {
-        var prediction = predictions.findFirstByServiceTicket_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(id, PredictionType.REPAIR_DURATION);
+        return estimate(id, null);
+    }
+
+    long estimate(Long id, Long technicianId) {
+        var prediction = technicianId == null
+                ? Optional.<MlPrediction>empty()
+                : predictions.findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                        id, technicianId, PredictionType.REPAIR_DURATION);
+        if (prediction.isEmpty())
+            prediction = predictions.findFirstByServiceTicket_IdAndTechnicianIsNullAndPredictionTypeOrderByPredictedAtDescIdDesc(
+                    id, PredictionType.REPAIR_DURATION);
         if (prediction.isPresent() && prediction.get().getPredictedDurationMinutes() != null && prediction.get().getPredictedDurationMinutes() > 0)
             return prediction.get().getPredictedDurationMinutes();
         long total = items.findAllByServiceTicket_Id(id).stream().filter(i -> i.getApprovalStatus() != ApprovalStatus.REJECTED)

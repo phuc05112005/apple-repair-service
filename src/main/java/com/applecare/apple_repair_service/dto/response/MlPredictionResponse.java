@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public record MlPredictionResponse(
         Long id,
         Long serviceTicketId,
+        Long technicianId,
+        String technicianName,
         PredictionType predictionType,
         Integer predictedDurationMinutes,
         Boolean predictedSatisfaction,

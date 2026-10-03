@@ -3,8 +3,10 @@ package com.applecare.apple_repair_service.service;
 import com.applecare.apple_repair_service.dto.request.CreateMlPredictionRequest;
 import com.applecare.apple_repair_service.entity.MlPrediction;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
+import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.enums.PredictionType;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import com.applecare.apple_repair_service.enums.UserRole;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.MlPredictionRepository;
@@ -29,6 +31,7 @@ class MlPredictionServiceTest {
     @BeforeEach
     void setup() {
         when(access.get(ServiceTicket.class, 1L)).thenReturn(TestData.ticket(ServiceTicketStatus.REPAIRING));
+        when(access.get(User.class, 2L)).thenReturn(TestData.user(2L));
         when(repository.saveAndFlush(any())).thenAnswer(i -> {
             MlPrediction p = i.getArgument(0);
             assertNull(p.getId());
@@ -42,6 +45,11 @@ class MlPredictionServiceTest {
         return new CreateMlPredictionRequest(1L, type, minutes, satisfied, new BigDecimal("0.9500"), " Model ", " v1 ");
     }
 
+    CreateMlPredictionRequest technicianRequest(Integer minutes) {
+        return new CreateMlPredictionRequest(1L, 2L, PredictionType.REPAIR_DURATION,
+                minutes, null, new BigDecimal("0.9500"), " Model ", " v1 ");
+    }
+
     @Test
     void durationPredictionRequiresPositiveDuration() {
         assertThrows(BusinessRuleViolationException.class, () -> service.savePrediction(request(PredictionType.REPAIR_DURATION, null, null)));
@@ -52,7 +60,28 @@ class MlPredictionServiceTest {
     @Test
     void satisfactionPredictionRequiresBoolean() {
         assertThrows(BusinessRuleViolationException.class, () -> service.savePrediction(request(PredictionType.CUSTOMER_SATISFACTION, null, null)));
-        assertFalse(service.savePrediction(request(PredictionType.CUSTOMER_SATISFACTION, null, false)).predictedSatisfaction());
+        var response = service.savePrediction(request(PredictionType.CUSTOMER_SATISFACTION, null, false));
+        assertFalse(response.predictedSatisfaction());
+        assertNull(response.technicianId());
+        assertNull(response.technicianName());
+    }
+
+    @Test
+    void durationPredictionCanReferenceTechnicianCandidate() {
+        var response = service.savePrediction(technicianRequest(48));
+        assertEquals(2L, response.technicianId());
+        assertEquals("User", response.technicianName());
+        assertSame(access.get(User.class, 2L), saved.getFirst().getTechnician());
+    }
+
+    @Test
+    void predictionCandidateMustHaveTechnicianRole() {
+        var receptionist = TestData.user(2L);
+        receptionist.setRole(UserRole.RECEPTIONIST);
+        when(access.get(User.class, 2L)).thenReturn(receptionist);
+        assertThrows(BusinessRuleViolationException.class,
+                () -> service.savePrediction(technicianRequest(48)));
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
