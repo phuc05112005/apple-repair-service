@@ -47,6 +47,19 @@ jobs:
       - name: Install MySQL client
         run: sudo apt-get update && sudo apt-get install -y mysql-client
 
+      - name: Verify canonical database schema
+        run: |
+          if [ ! -f database/schema.sql ]; then
+            echo "::error file=database/schema.sql::Canonical database schema is missing from the repository."
+            exit 1
+          fi
+
+          table_count=$(grep -c '^CREATE TABLE' database/schema.sql)
+          if [ "$table_count" -ne 33 ]; then
+            echo "::error file=database/schema.sql::Expected 33 CREATE TABLE statements, found $table_count."
+            exit 1
+          fi
+
       - name: Import database schema
         run: |
           mysql \

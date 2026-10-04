@@ -6,12 +6,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.*;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import tools.jackson.databind.ObjectMapper;
-import java.nio.file.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -67,8 +67,16 @@ class OpenApiIntegrationTest {
         });
         inventory.sort(Comparator.comparing(Endpoint::path).thenComparing(Endpoint::method));
         assertFalse(inventory.isEmpty());
-        Files.writeString(Path.of("docs/api-security/endpoint-inventory.json"),json.writerWithDefaultPrettyPrinter().writeValueAsString(inventory));
-        Files.writeString(Path.of("docs/api-security/openapi.json"),body);
+        var baseline = new ClassPathResource("api-security/endpoint-inventory.json");
+        assertTrue(baseline.exists(), "Thiếu baseline endpoint security trong test resources");
+        try (var input = baseline.getInputStream()) {
+            var expected = json.readTree(input);
+            var actual = json.valueToTree(inventory);
+            assertEquals(expected, actual,
+                    "Danh sách endpoint hoặc metadata phân quyền đã thay đổi. "
+                            + "Hãy rà soát quyền truy cập rồi cập nhật fixture "
+                            + "src/test/resources/api-security/endpoint-inventory.json nếu thay đổi là chủ ý.");
+        }
     }
     record Endpoint(String method,String path,String controller,String handler,String access,String request,String response) {}
 }
