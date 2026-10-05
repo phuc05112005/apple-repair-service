@@ -1,115 +1,108 @@
-# ML — Apple Repair Service
+# ML Experiment V1 — Repair Technical Duration Regression
 
-## Trạng thái Phase 1
+This directory contains an **offline, reproducible ML experiment** for the only
+ML problem approved for Apple Repair Service:
 
-Đây chỉ là bộ khung độc lập cho phase sau. Chưa có dataset, notebook thực nghiệm,
-model, huấn luyện, FastAPI inference, HTTP client Spring Boot hoặc giao diện prediction.
-Không thay đổi `ml_predictions` trong Phase 1.
+> Predict the active technical minutes needed to process one repair job.
 
-## Cấu trúc
+The model predicts duration. It does not predict an estimated completion time.
+The operational ETA engine may later combine a duration prediction with queue,
+technician schedule, configured break and current state. Queue time,
+`WAITING_PART`, `WAITING_APPROVAL`, break and handover waiting are not part of
+the target.
 
-| Thư mục | Vai trò dự kiến |
+## Scope and audit decision
+
+The V1 sample is a completed service ticket with:
+
+- exactly one approved repair item whose catalog plan was already known at the
+  prediction timestamp;
+- exactly one technician assignment;
+- no accepted transfer and no assignment created from a transfer;
+- complete, continuous service-status history;
+- a recorded technical completion time.
+
+This restriction is intentional. The current schema measures active time at
+ticket/status and assignment level, not per repair item. It would be incorrect
+to distribute a ticket duration among several items or to assign the total to
+every technician after a transfer.
+
+The production target is the sum of intervals in `INSPECTING` and `REPAIRING`,
+intersected with the single assignment interval. The current
+`RepairDurationService` and `TimingMetricsService` do not subtract persisted
+`service_interruptions`; V1 documents that limitation and does not claim
+otherwise.
+
+See [DATA_CONTRACT.md](DATA_CONTRACT.md) for the source audit, exact inclusion
+rules, feature provenance, leakage rules and future production extraction.
+
+## Files
+
+| File | Purpose |
 |---|---|
-| `notebooks/` | EDA, thử nghiệm regression/classification và đánh giá |
-| `data/raw/` | Bản trích xuất dữ liệu đầu vào được cho phép sử dụng |
-| `data/processed/` | Dataset sau preprocessing và feature engineering |
-| `data/synthetic/` | Dữ liệu giả lập có nhãn nguồn rõ ràng cho phase sau |
-| `src/` | Mã preprocessing, feature engineering, training/evaluation dùng lại |
-| `models/` | Model artifact và metadata phiên bản sau khi huấn luyện |
-| `api/` | FastAPI inference service trong phase sau |
-| `tests/` | Test pipeline và API ML |
+| `generate_synthetic_repair_duration.py` | Deterministic controlled generator; never connects to MySQL |
+| `data/synthetic_repair_duration_v1.csv` | 5,000 chronological synthetic samples |
+| `01_repair_duration_regression.ipynb` | Executable EDA, pipelines, temporal CV, tuning and test evaluation |
+| `DATA_CONTRACT.md` | Production mapping and leakage contract |
+| `tests/test_synthetic_repair_duration.py` | Generator, schema and temporal-history tests |
+| `requirements.txt` | Versions verified for this experiment |
 
-`data/` là dữ liệu phục vụ training, KHÔNG phải runtime business database.
-Dataset và model artifacts mặc định bị gitignore. Không đưa thông tin khách hàng,
-số điện thoại, tên, số sê-ri hoặc thông tin đăng nhập vào repository.
+Legacy empty directories remain only to avoid deleting the existing project
+scaffold. No FastAPI service, Spring client or production model integration is
+implemented in this phase.
 
-## Kiến trúc dự kiến
+## Reproduce
 
-```text
-React
-  |
-  v
-Spring Boot
-  |
-  +--> MySQL
-  |
-  +--> Python FastAPI ML Service
-```
-
-**PHASE 1 CHƯA tích hợp Spring Boot với FastAPI.**
-
-Spring Boot là backend chính, quản lý business rules, authorization, MySQL writes
-và quyết định cuối cùng. Python sau này chỉ nhận feature, dự đoán và trả kết quả.
-Python không trực tiếp update ticket, assign technician, update inventory,
-thanh toán hoặc thay đổi business state. Khi ML lỗi, nghiệp vụ vẫn hoạt động.
-
-## Môi trường dự kiến
-
-Máy kiểm tra Phase 1 có Python 3.13.6. `requirements.txt` liệt kê dependency cần
-cho classical supervised ML; chưa pin phiên bản vì chưa cài/kiểm chứng một bộ
-môi trường training hoàn chỉnh. Phase 2 tạo virtualenv, kiểm tra tương thích rồi
-khóa phiên bản đã kiểm chứng. Không cần TensorFlow/PyTorch.
+From the repository root:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
+python -m pip install -r ml/requirements.txt
+python ml/generate_synthetic_repair_duration.py
+python -m pytest ml/tests -q
+Push-Location ml
+python -m jupyter nbconvert --to notebook --execute --inplace `
+  --ExecutePreprocessor.timeout=600 01_repair_duration_regression.ipynb
+Pop-Location
 ```
 
-Các lệnh cài môi trường trên là hướng dẫn cho phase tiếp theo, chưa chạy ở Phase 1.
+The generator seed is `20261005`. Running it again with the same source and
+seed produces the same CSV. The notebook reads the existing CSV; it does not
+generate training data in a cell.
 
-## Regression: active technical duration theo kỹ thuật viên
+## Experiment protocol
 
-Target dự kiến: `actual_active_technical_minutes`.
-Cùng một ticket có thể nhận ước lượng khác nhau cho từng kỹ thuật viên.
+- Earliest 85%: development set.
+- Latest 15%: untouched test set.
+- Model selection and small hyperparameter searches: `TimeSeriesSplit` on the
+  development set only.
+- EDA and preprocessing fit: development/train folds only.
+- Locked winner: chosen by cross-validated MAE before test metrics are read.
+- Final report: MAE, MSE, RMSE and R² for mean baseline, production
+  standard-duration baseline, Linear Regression, Decision Tree and Random
+  Forest.
 
-Không dùng `handedOverAt - receivedAt`. Cộng các khoảng `INSPECTING` và `REPAIRING`
-từ `service_status_histories`, loại wait, queue, break, transfer gap và chờ bàn giao.
-Với target theo người:
+Categorical preprocessing uses `SimpleImputer` and
+`OneHotEncoder(handle_unknown="ignore")`. Numeric preprocessing uses a median
+imputer; the linear pipeline also scales numeric columns. Every learned
+preprocessing step is inside its model `Pipeline`.
 
-```text
-intersection((INSPECTING + REPAIRING) intervals, technician assignment interval)
-```
+## Synthetic-data boundary
 
-Đây là active technical duration theo state hợp lệ, chưa phải timer từng thao tác.
-Giữ trạng thái active qua đêm vẫn tích lũy thời gian. Chưa có timer riêng từng repair item.
-Chốt đơn vị mẫu trước training: ticket một kỹ thuật viên hay đóng góp theo assignment.
-Không gán thời lượng toàn phiếu cho mọi kỹ thuật viên đã tham gia; thời gian đóng góp
-của một người ở ca chuyển giao không đồng nghĩa thời gian người đó hoàn tất cả ca sửa.
-Bản đầu nên đánh giá riêng các phiếu một kỹ thuật viên, lịch sử đầy đủ.
+The CSV is compatible with the current production feature contract but contains
+no production rows, customer identity, phone, serial number, account or free
+text. Its target is produced from hidden technician, specialty, branch and case
+factors plus controlled noise and a small outlier proportion. Hidden generator
+parameters are not exported as model features.
 
-Nguồn: assignments, service_tickets, repair_items, service_status_histories,
-service_catalog_items, device_models/device_types, service_issues/service_types,
-parts, branches, technician_schedules. Kinh nghiệm/similar-job count được suy ra
-chỉ từ lịch sử có trước thời điểm dự đoán; chưa cần technician_skill_profile.
+Synthetic results validate the research pipeline only. They do not establish
+accuracy on real repairs and must not be used as a production performance
+claim.
 
-ML chỉ dự đoán duration. Spring Boot sau này kết hợp prediction, schedule, workload,
-remaining shift, role và business rules để đề xuất. Không tự biến cảnh báo thời gian
-còn lại thành điều kiện bắt buộc ngăn phân công.
+## Explicit exclusions
 
-Fallback dự kiến duy nhất: tổng `standardDurationMinutes` của phương án kỹ thuật hiện tại.
-Ticket mới không có duration catalog hợp lệ bị từ chối; không dùng giá trị 30/60 phút giả.
-Prediction theo ứng viên cần hợp đồng lưu kèm technician/context trong phase sau;
-Phase 1 không migrate ml_predictions.
-
-## Classification: nguy cơ khách không hài lòng
-
-Target: `dissatisfied = !service_feedbacks.satisfied`.
-Prediction time phiên bản đầu: **WAITING_HANDOVER**, trước feedback.
-Chỉ dùng thông tin đã tồn tại ở thời điểm đó: đặc điểm dịch vụ, thời gian sửa/chờ,
-transfer đã chấp nhận, thay đổi phương án/giá, nguồn bảo hành đã biết.
-Không dùng feedback/comment làm feature. Không gán khách chưa phản hồi là hài lòng.
-Không dùng sự kiện quay lại bảo hành trong tương lai làm feature.
-Chưa có promised deadline; không coi chênh lệch thời lượng ước tính là trễ cam kết.
-
-ML chỉ cảnh báo rủi ro, không tự đổi ticket hoặc quyết định xử lý nhân viên.
-Khi không có model/kết quả, trả “chưa có dự đoán”, không mặc định khách hài lòng.
-
-## Điều kiện chuyển Phase 2
-
-Chốt dataset contract, as-of timestamp, feature/target, quy tắc loại history thiếu,
-quy tắc chuyển giao và tách train/test theo thời gian/phiếu. Đọc convention tại
-`../docs/phase1/TEMPORAL_CONVENTIONS.md`.
-
-Hiện chưa có lịch sử thực tế đủ để train/evaluate. Synthetic data chỉ phục vụ
-kiểm thử pipeline/thử nghiệm và phải được đánh dấu; không chứng minh độ chính xác
-vận hành. Không tự tạo dữ liệu synthetic hoặc model trong Phase 1.
+- No satisfaction classification, satisfaction dataset or risk score.
+- `service_feedbacks` remains a business/statistics feature and is not an ML
+  input here.
+- No Spring Boot, frontend, ETA, recommendation or business-rule changes.
+- No FastAPI endpoint, runtime call, deployment or write to `ml_predictions`.
+- No model binary is committed in V1.
