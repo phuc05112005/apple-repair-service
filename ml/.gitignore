@@ -18,6 +18,9 @@ models/*
 !models/.gitkeep
 !models/experimental_v2/
 !models/experimental_v2/**
+!models/experimental_v3/
+!models/experimental_v3/**
 *.joblib
 *.pkl
 !models/experimental_v2/model.joblib
+!models/experimental_v3/model.joblib

@@ -1,128 +1,99 @@
-# Repair-duration dataset contract V2
+# Repair Technical Duration Regression — Data Contract V3
 
-## Scope and sample unit
+Trạng thái: **EXPERIMENTAL — SYNTHETIC-DATA TRAINED — NOT PRODUCTION
+VALIDATED**. V3 không đọc MySQL và chưa tích hợp runtime.
 
-This contract covers only regression of `actual_technical_minutes`. One row is
-one completed service ticket that satisfies every rule below:
+## Bài toán, thời điểm dự đoán và target
 
-1. exactly one `repair_items` row with decision `APPROVED`;
-2. the approved catalog plan is known at prediction time;
-3. exactly one technician assignment;
-4. no accepted transfer and no transfer-origin assignment;
-5. complete, continuous `service_status_histories`;
-6. a technical completion timestamp is recorded.
+Một sample là một ServiceTicket đã hoàn tất, có đúng một RepairItem APPROVED,
+đúng một ServiceCatalogItem cụ thể, đúng một Assignment đã có ended_at, không
+có transfer được chấp nhận, status history đầy đủ và target dương. Ticket nhiều
+hạng mục hoặc nhiều KTV bị loại vì schema không có timer thực tế theo từng hạng
+mục.
 
-This conservative grain follows the current database. Active duration exists
-at ticket/status/assignment level; there is no defensible per-item timer for a
-multi-item or transferred ticket. Expanding the grain requires new production
-measurement semantics, not synthetic allocation.
+Thời điểm dự đoán là lần phân công duy nhất sau khi phương án một hạng mục đã
+biết. Target:
 
-## Prediction timestamp
+actual_technical_minutes = tổng (INSPECTING + REPAIRING) giao assignment interval.
 
-The prediction timestamp is the first assignment time after the single
-approved repair plan is known. Every feature must be available at or before
-this instant. The strict historical rule is:
+Không tính queue ASSIGNED, WAITING_APPROVAL, WAITING_PART, break, transfer gap,
+WAITING_HANDOVER hoặc thời gian chờ lịch. service_interruptions đã được lưu
+nhưng RepairDurationService hiện chưa tự trừ, nên V3 không giả vờ đã trừ.
 
-```text
-previous_job.completed_at < current_prediction_timestamp
-```
+## Sửa semantic bảo hành trong V3
 
-Equality is excluded. A job completing at the same instant is not prior
-knowledge. The extractor must process rows chronologically and release pending
-jobs into history only after their completion precedes the next prediction.
+V2 dùng service_type = REPAIR | REPLACEMENT | WARRANTY. V3 tách đúng nghiệp vụ:
 
-## Target reconstruction
+- technical_action = REPAIR | REPLACEMENT;
+- is_warranty = 0 | 1.
 
-For active ticket status intervals \([s_k,e_k)\) and the one assignment
-interval \([a_s,a_e)\):
+is_warranty trong extractor thật sẽ lấy từ
+repair_items.warranty_source_item_id IS NOT NULL. Với ca bảo hành,
+technical_action phải resolve theo thứ tự dữ liệu sẵn có từ
+repair_items.warranty_remedy, service_catalog_items.warranty_remedy, hoặc
+catalog kỹ thuật thực tế, rồi chuẩn hóa thành REPAIR/REPLACEMENT.
+service_types.code = WARRANTY vẫn được giữ ở production để tương thích; V3 chỉ
+chuẩn hóa ở tầng ML.
 
-$$
-y = \texttt{actual\_technical\_minutes}
-= \frac{1}{60}\sum_{k:u_k\in\{INSPECTING,REPAIRING\}}
-\max\left(0,\min(e_k,a_e)-\max(s_k,a_s)\right)_{seconds}.
-$$
+## Feature contract chính xác
 
-Included: `INSPECTING` and `REPAIRING` intersected with the assignment.
+| Feature | Kiểu | Nguồn production dự kiến | Quy tắc availability/cold start |
+|---|---|---|---|
+| device_type | category | ticket → customer device → model → type | biết trước dự đoán |
+| device_model | category | ticket device model | biết trước dự đoán |
+| service_issue | category | approved item → catalog → issue | biết trước dự đoán |
+| technical_action | category | service type/remedy/catalog kỹ thuật, chuẩn hóa | chỉ REPAIR, REPLACEMENT |
+| is_warranty | binary numeric | warranty_source_item_id IS NOT NULL | 0/1, không phải action |
+| catalog_service | category | concrete catalog item/name snapshot | biết trước dự đoán |
+| standard_duration_minutes | numeric | catalog | giữ nguyên định mức |
+| technician_id | category | single assignment | không dùng PII |
+| branch_id | category | ticket branch | biết trước dự đoán |
+| prediction_month | category | business timestamp | M01…M12 |
+| prediction_weekday | category | business timestamp | MON…SUN |
+| technician_jobs_completed_before | numeric | lịch sử KTV hợp lệ | 0 nếu chưa có |
+| technician_average_duration_before | numeric | mean target lịch sử KTV | NaN nếu count 0 |
+| technician_historical_efficiency_before | numeric | mean(actual/standard) lịch sử KTV | NaN nếu count 0 |
+| technician_issue_jobs_before | numeric | lịch sử KTV + issue | 0 nếu chưa có |
+| technician_issue_average_duration_before | numeric | mean target KTV + issue | NaN nếu count 0 |
+| technician_issue_efficiency_before | numeric | mean(actual/standard) KTV + issue | NaN nếu count 0 |
+| technician_catalog_jobs_before | numeric | lịch sử KTV + exact catalog | 0 nếu chưa có |
+| technician_catalog_average_duration_before | numeric | mean target KTV + catalog | NaN nếu count 0 |
+| technician_catalog_efficiency_before | numeric | mean(actual/standard) KTV + catalog | NaN nếu count 0 |
 
-Excluded: `ASSIGNED` queue, `WAITING_APPROVAL`, `WAITING_PART`, configured
-break, transfer gap, `WAITING_HANDOVER`, appointment/customer waiting and ETA.
+Dataset có 20 feature, cộng sample_id, prediction_timestamp, completed_at và
+target thành 24 cột.
 
-`service_interruptions` is persisted, but `RepairDurationService` and
-`TimingMetricsService` currently do not subtract it. V2 therefore does not
-pretend interruptions are integrated. A future business-rule change must
-version the target and rebuild the dataset.
+## Quy tắc chống leakage
 
-## Exact feature contract
+Mọi history dùng đúng điều kiện:
 
-The ordered model input has 14 columns. `sample_id`, `prediction_timestamp`,
-`completed_at` and the target are audit columns, not features.
+previous_job.completed_at < current_prediction_timestamp.
 
-| Feature | Type | Production source/derivation | Available at prediction | Leakage/cold-start rule |
-|---|---|---|---|---|
-| `device_type` | category | repair item → ticket/customer device → model → device type | yes | use stored master value; unknown category must not crash |
-| `device_model` | category | repair item/ticket device model | yes | no serial number or customer identity |
-| `service_issue` | category | approved item → catalog → issue | yes | must be the plan known at prediction |
-| `service_type` | category | approved item → catalog → service type | yes | `REPAIR`, `REPLACEMENT` or `WARRANTY` |
-| `catalog_service` | category | approved catalog item identifier/name snapshot | yes | use stable catalog key in the real extractor; synthetic label is versioned |
-| `standard_duration_minutes` | numeric | approved catalog configured duration snapshot | yes | null plans are ineligible; never replace with actual duration |
-| `technician_id` | category | the single assignment technician | yes | unseen technician supported; no name/phone |
-| `branch_id` | category | ticket branch | yes | unseen branch supported |
-| `prediction_month` | category | `M01`…`M12` from prediction timestamp in business timezone | yes | timestamp-derived only |
-| `prediction_weekday` | category | `MON`…`SUN` from prediction timestamp | yes | timestamp-derived only |
-| `technician_jobs_completed_before` | numeric | count of eligible prior jobs for technician | yes | 0 for new technician; strict as-of |
-| `technician_average_duration_before` | numeric | mean target of eligible prior jobs for technician | yes | missing for no history; model preprocessing imputes/native-handles |
-| `technician_issue_experience_before` | numeric | count of eligible prior technician jobs with same issue | yes | 0 for no matching history; strict as-of |
-| `technician_historical_efficiency_before` | numeric | mean `(actual / standard)` over eligible prior technician jobs | yes | missing for no history; no invented average |
+Job bắt đầu trước nhưng hoàn tất sau thời điểm dự đoán không được tính. Generator
+dùng priority queue theo completion event cho cả overall, technician×issue và
+technician×catalog. Không groupby toàn bộ dataset rồi expanding/backfill.
+Preprocessing được fit bên trong từng temporal fold.
 
-V2 retains the same 14 features as V1. The audit found all are derivable from
-the current domain and available at prediction time. Retaining the contract also
-allows a future real dataset to use the same training code.
+## Missing và cold start
 
-## Exclusions
+Count bằng 0. Average/efficiency tương ứng giữ NaN; không gán standard hoặc 1.0
+vì đó là bịa hiệu năng lịch sử. RF/XGBoost/HGB dùng median học từ train;
+CatBoost giữ numeric NaN native. Category chưa thấy được encoder/pipeline xử lý.
 
-The extractor and dataset must exclude:
+## Chia dữ liệu và phê duyệt
 
-- `actual_technical_minutes` and `completed_at` from model input;
-- actual completion/status events after the prediction timestamp;
-- feedback, satisfaction labels and free text;
-- ETA error, previous prediction output or current/future ETA;
-- customer identity, name, phone, ticket code and device serial;
-- price/payment outcome;
-- hidden synthetic capability, specialty, case-complexity, noise and outlier
-  factors;
-- history computed by a full-dataset `groupby`, backward fill or any operation
-  that sees later completions.
+Sort theo prediction_timestamp: 85% đầu là development, 15% cuối là final
+holdout mới của V3. Chỉ development được dùng cho EDA, feature decision,
+TimeSeriesSplit(n_splits=4), tuning và khóa winner. Holdout chỉ được đánh giá
+sau khi winner đã khóa bằng CV MAE và near-tie policy.
 
-## Missing data and cold start
+## Ranh giới synthetic/real
 
-The only intentional missing values are
-`technician_average_duration_before` and
-`technician_historical_efficiency_before` when completed-history count is zero.
-Counts remain 0. No synthetic history is invented. Model-specific handling is:
+Catalog V3 là master data tổng hợp có quan hệ hợp lý cho iPhone, iPad, MacBook,
+Apple Watch và AirPods; không phải snapshot dữ liệu người dùng. Hidden
+capability/specialty/complexity/noise/outlier chỉ sinh target và không xuất.
+is_warranty không có multiplier kỹ thuật ẩn.
 
-- Random Forest and XGBoost: train-fitted numeric median imputation, sparse
-  one-hot categories with `handle_unknown="ignore"`;
-- HistGradientBoosting: train-fitted median plus dense ordinal categories,
-  unknown `-1`, native categorical splits;
-- CatBoost: numeric NaN and native categorical features/ordered statistics.
-
-## Synthetic versus real boundary
-
-`synthetic_repair_duration_v2.csv` is controlled synthetic data. The repository
-contains table definitions and a narrow migration insert, but no complete
-canonical device/model/issue/catalog seed. The V2 generator therefore owns a
-versioned synthetic catalog with logical relationships for iPhone, iPad,
-MacBook, Apple Watch and AirPods. These labels are not asserted to exist in the
-business database.
-
-Latent target factors remain generator-internal. The exported schema contains
-only fields that a production extractor can derive. Synthetic data proves the
-pipeline and leakage guards run; it cannot validate real operational accuracy.
-
-## Future production extraction
-
-The next phase must read a transactionally consistent MySQL snapshot, enforce
-the sample eligibility rules, reconstruct target intervals, sort by prediction
-time, and compute histories with the strict completion rule. It should emit a
-versioned `real_repair_duration_vX` dataset, run this same competition, evaluate
-a later real holdout, and require explicit approval before any runtime use.
+Phase tiếp theo mới xây extractor snapshot MySQL nhất quán, áp dụng grain,
+target và history này, tạo dataset real versioned, chạy lại temporal validation
+và yêu cầu phê duyệt trước mọi tích hợp runtime.

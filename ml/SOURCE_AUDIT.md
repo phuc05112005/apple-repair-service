@@ -1,46 +1,41 @@
-# Source audit for ML Experiment V2
+# Source audit — ML Experiment V3
 
-Audit date: 2026-10-05. The external course directory was read-only and was not
-modified. Only `ml/` in the Apple Repair Service repository was changed.
+Ngày audit: 06/10/2026. Chỉ ml/ được sửa; source Java/schema và tài liệu môn học
+được đọc, không thay đổi.
 
-## Course material actually read
+## Tài liệu môn học đã đọc
 
-| File | Applied principle |
+| File | Nội dung áp dụng |
 |---|---|
-| `D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\01_Hoi_quy.ipynb` | Regression framing; mean baseline; OLS/tree/Random Forest theory; MAE/MSE/RMSE/R²; pipeline; CV; Restart Kernel → Run All discipline. |
-| `D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\02_Phan_loai.ipynb` | Confirmed the distinction between regression and classification and avoided confusion matrix, precision/recall/F1/ROC in this experiment. |
-| `D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\apple_repair_ml_study\docs\01_COURSE_KNOWLEDGE_MAP.md` | Mapped course topics to duration regression; retained temporal validation and train-only preprocessing. |
-| `D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\apple_repair_ml_study\docs\02_REGRESSION_THEORY.md` | Checked target formula, Random Forest averaging, boosting, XGBoost gradients/Hessian and metric interpretations. |
-| `D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\apple_repair_ml_study\docs\04_EXPERIMENT_DESIGN.md` | Preserved snapshot → temporal split → selection → one-time holdout evaluation and synthetic-data limitations. |
-| `D:\Class\AI\Bao_cao_Hoi_quy_va_Phan_loai.md` | Reused the leakage corrections: split before learned preprocessing, do not tune on test, preserve the fitted pipeline, and do not interpret R² as accuracy. |
+| D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\01_Hoi_quy.ipynb | regression, baseline, tree/RF, MAE/MSE/RMSE/R², pipeline và CV |
+| D:\Class\AI\Hoc_may_Hoi_quy_Phan_loai\02_Phan_loai.ipynb | phân biệt classification; không dùng accuracy/F1/ROC cho bài toán này |
+| ...\apple_repair_ml_study\docs\01_COURSE_KNOWLEDGE_MAP.md | ánh xạ kiến thức sang duration regression |
+| ...\apple_repair_ml_study\docs\02_REGRESSION_THEORY.md | công thức regression, boosting, gradient/Hessian |
+| ...\apple_repair_ml_study\docs\04_EXPERIMENT_DESIGN.md | temporal selection và untouched holdout |
+| D:\Class\AI\Bao_cao_Hoi_quy_va_Phan_loai.md | fit preprocessing trên train, không tune test, lưu fitted pipeline |
 
-The V2 formulas for P90AE and CatBoost ordered target statistics extend beyond
-the older course baseline. They are explained in the notebook without claiming
-the simplified ordered-statistic formula describes all of CatBoost.
+## Source production đã đối chiếu
 
-## Application source actually checked
-
-| File | Audit result |
+| Source | Kết luận |
 |---|---|
-| `src/main/java/.../service/RepairDurationService.java` | Active status is exactly `INSPECTING` or `REPAIRING`; history must be continuous and ordered. |
-| `src/main/java/.../service/TimingMetricsService.java` | Technician attribution intersects active status intervals with assignment intervals. |
-| `src/main/java/.../entity/ServiceInterruption.java` | Interruption persistence exists with assignment/start/end/reason fields. |
-| `database/schema.sql` | Confirmed assignments, histories, repair items, catalog relations and `service_interruptions`; no complete canonical master-data seed. |
-| `database/migrate_service_types_20260920.sql` | Contains a narrow catalog migration insert, not a complete supported-device catalog. |
-| Existing V1 files under `ml/` | Retained the conservative sample grain, 14 leakage-safe features, strict completion-time history and V1 dataset for audit. |
+| entity/RepairItem.java | có concrete catalog, approval, warrantyRemedy, warrantySourceItem |
+| entity/ServiceCatalogItem.java | có model, issue, service type, standard duration, warranty remedy/replacement catalog |
+| entity/ServiceType.java, ServiceTypeCode.java | legacy code vẫn có WARRANTY; V3 không refactor DB |
+| entity/ServiceStatusHistory.java | status và changedAt cho interval có thứ tự |
+| entity/Assignment.java | technician, assignedAt, optional endedAt |
+| service/RepairDurationService.java | active status đúng là INSPECTING và REPAIRING; history phải liên tục |
+| service/TimingMetricsService.java | attribution giao active interval với assignment interval |
+| WarrantyService.java, WarrantyPolicy.java, WarrantyClaimService.java | warranty item nối source item; remedy cuối là sửa hoặc thay |
+| database/schema.sql | xác nhận FK/cột remedy/source, assignments, histories, interruptions; không có full canonical seed |
 
-## Decisions from the audit
+## Quyết định V3
 
-- Keep one completed ticket with one approved item, one assignment, no transfer
-  and complete history as the sample grain.
-- Reconstruct target from active status intervals intersected with assignment.
-- Do not claim persisted interruptions are subtracted; production services do
-  not yet do that.
-- Keep the V1 feature contract because all 14 values are derivable and known at
-  prediction time.
-- Use a versioned controlled synthetic catalog across iPhone, iPad, MacBook,
-  Apple Watch and AirPods. Do not claim those labels are live master data.
-- Select only by development temporal CV; use the latest 15% exactly once after
-  winner lock.
-- Compare two baselines plus Random Forest, HGB, XGBoost and CatBoost; do not
-  reintroduce the satisfaction classifier.
+- Warranty là context: is_warranty; thao tác kỹ thuật chỉ REPAIR/REPLACEMENT.
+- Extractor thật sẽ lấy warranty từ warranty_source_item_id và resolve action từ
+  repair-item/catalog remedy hoặc catalog thực thi.
+- Target giữ nguyên active intervals giao assignment; interruption chưa bị trừ.
+- Grain bảo thủ loại multi-item, transfer và history không đầy đủ.
+- Ba tầng history overall/issue/catalog đều dùng completion strictly before
+  prediction; test dựng lại độc lập.
+- V2 CSV, notebook, contract, report và artifacts vẫn tồn tại để audit.
+- Chỉ chạy synthetic experiment; không đọc/ghi database nghiệp vụ.
