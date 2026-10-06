@@ -1,0 +1,73 @@
+{
+  "contract_version": "repair-duration-features-v2",
+  "prediction_timestamp": "first assignment time after the approved single-item plan is known",
+  "features_in_order": [
+    "device_type",
+    "device_model",
+    "service_issue",
+    "service_type",
+    "catalog_service",
+    "standard_duration_minutes",
+    "technician_id",
+    "branch_id",
+    "prediction_month",
+    "prediction_weekday",
+    "technician_jobs_completed_before",
+    "technician_average_duration_before",
+    "technician_issue_experience_before",
+    "technician_historical_efficiency_before"
+  ],
+  "numeric_features": [
+    "standard_duration_minutes",
+    "technician_jobs_completed_before",
+    "technician_average_duration_before",
+    "technician_issue_experience_before",
+    "technician_historical_efficiency_before"
+  ],
+  "categorical_features": [
+    "device_type",
+    "device_model",
+    "service_issue",
+    "service_type",
+    "catalog_service",
+    "technician_id",
+    "branch_id",
+    "prediction_month",
+    "prediction_weekday"
+  ],
+  "intentional_missing_features": [
+    "technician_average_duration_before",
+    "technician_historical_efficiency_before"
+  ],
+  "target": "actual_technical_minutes",
+  "non_feature_columns": [
+    "sample_id",
+    "prediction_timestamp",
+    "completed_at",
+    "actual_technical_minutes"
+  ],
+  "schema": [
+    "sample_id",
+    "prediction_timestamp",
+    "completed_at",
+    "device_type",
+    "device_model",
+    "service_issue",
+    "service_type",
+    "catalog_service",
+    "standard_duration_minutes",
+    "technician_id",
+    "branch_id",
+    "prediction_month",
+    "prediction_weekday",
+    "technician_jobs_completed_before",
+    "technician_average_duration_before",
+    "technician_issue_experience_before",
+    "technician_historical_efficiency_before",
+    "actual_technical_minutes"
+  ],
+  "history_as_of_rule": "previous_job.completed_at < current_prediction_timestamp",
+  "cold_start": "counts are zero; historical averages and efficiency remain missing",
+  "service_interruption_limitation": "persisted service interruptions are not yet subtracted by production duration services",
+  "synthetic_domain": true
+}

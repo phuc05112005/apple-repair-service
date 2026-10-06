@@ -1,108 +1,147 @@
-# ML Experiment V1 — Repair Technical Duration Regression
+# ML Experiment V2 — thời lượng kỹ thuật sửa chữa
 
-This directory contains an **offline, reproducible ML experiment** for the only
-ML problem approved for Apple Repair Service:
+Thư mục này triển khai một bài toán duy nhất: hồi quy
+`actual_technical_minutes` cho một phiếu sửa chữa đủ điều kiện. Input gồm định
+mức dịch vụ, thiết bị, vấn đề, loại dịch vụ, kỹ thuật viên, chi nhánh, thời gian
+dự đoán và lịch sử kỹ thuật viên biết được đúng tại thời điểm phân công. Output
+là số phút kỹ thuật chủ động dự kiến.
 
-> Predict the active technical minutes needed to process one repair job.
+Technical duration khác ETA. ETA còn phải ghép thời lượng dự đoán với hàng đợi,
+ca làm, thời gian nghỉ, trạng thái chờ và lịch kỹ thuật viên. Phase này không đổi
+ETA runtime, backend, frontend hay database.
 
-The model predicts duration. It does not predict an estimated completion time.
-The operational ETA engine may later combine a duration prediction with queue,
-technician schedule, configured break and current state. Queue time,
-`WAITING_PART`, `WAITING_APPROVAL`, break and handover waiting are not part of
-the target.
+## Trạng thái dữ liệu và artifact
 
-## Scope and audit decision
+Dataset V2 là **controlled synthetic data**, không phải dữ liệu vận hành thật.
+Repository chưa có canonical seed đầy đủ cho toàn bộ catalog nên generator dùng
+synthetic catalog được version hóa, quan hệ hợp lý cho iPhone, iPad, MacBook,
+Apple Watch và AirPods. Hidden factors chỉ tạo nhãn, không xuất thành feature.
 
-The V1 sample is a completed service ticket with:
+Artifact trong `models/experimental_v2/` được gắn nhãn bắt buộc:
 
-- exactly one approved repair item whose catalog plan was already known at the
-  prediction timestamp;
-- exactly one technician assignment;
-- no accepted transfer and no assignment created from a transfer;
-- complete, continuous service-status history;
-- a recorded technical completion time.
+> **EXPERIMENTAL — SYNTHETIC-DATA TRAINED — NOT PRODUCTION VALIDATED**
 
-This restriction is intentional. The current schema measures active time at
-ticket/status and assignment level, not per repair item. It would be incorrect
-to distribute a ticket duration among several items or to assign the total to
-every technician after a transfer.
+Metric hiện tại chỉ chứng minh pipeline trên phân phối synthetic. Không được gọi
+đó là độ chính xác ngoài thực tế.
 
-The production target is the sum of intervals in `INSPECTING` and `REPAIRING`,
-intersected with the single assignment interval. The current
-`RepairDurationService` and `TimingMetricsService` do not subtract persisted
-`service_interruptions`; V1 documents that limitation and does not claim
-otherwise.
+## Sample và target
 
-See [DATA_CONTRACT.md](DATA_CONTRACT.md) for the source audit, exact inclusion
-rules, feature provenance, leakage rules and future production extraction.
+Một mẫu là phiếu đã hoàn tất, đúng một repair item `APPROVED`, một assignment,
+không transfer và status history đầy đủ. Target là tổng phút trong
+`INSPECTING + REPAIRING` giao với assignment. Không tính queue, chờ khách, chờ
+linh kiện, break, transfer gap, chờ bàn giao hay appointment waiting.
 
-## Files
+Persistence `service_interruptions` đã tồn tại nhưng duration service hiện chưa
+tự trừ các khoảng này; V2 ghi rõ giới hạn thay vì giả lập integration. Chi tiết
+và 14 feature nằm trong [DATA_CONTRACT.md](DATA_CONTRACT.md). Danh sách chính
+xác tài liệu môn học và source hệ thống đã đối chiếu nằm trong
+[SOURCE_AUDIT.md](SOURCE_AUDIT.md).
 
-| File | Purpose |
-|---|---|
-| `generate_synthetic_repair_duration.py` | Deterministic controlled generator; never connects to MySQL |
-| `data/synthetic_repair_duration_v1.csv` | 5,000 chronological synthetic samples |
-| `01_repair_duration_regression.ipynb` | Executable EDA, pipelines, temporal CV, tuning and test evaluation |
-| `DATA_CONTRACT.md` | Production mapping and leakage contract |
-| `tests/test_synthetic_repair_duration.py` | Generator, schema and temporal-history tests |
-| `requirements.txt` | Versions verified for this experiment |
+## Model competition
 
-Legacy empty directories remain only to avoid deleting the existing project
-scaffold. No FastAPI service, Spring client or production model integration is
-implemented in this phase.
+Hai baseline bắt buộc:
 
-## Reproduce
+- Mean baseline: trung bình target của fold train;
+- Standard-duration baseline: `prediction = standard_duration_minutes`.
 
-From the repository root:
+Bốn candidate chính:
+
+1. `RandomForestRegressor`;
+2. `HistGradientBoostingRegressor`;
+3. `XGBRegressor`;
+4. `CatBoostRegressor` qua adapter sklearn 1.8, vẫn dùng categorical native.
+
+CatBoost 1.2.8 có wheel cho Python 3.13 nhưng chưa cung cấp estimator tags mà
+scikit-learn 1.8 bắt buộc trong `RandomizedSearchCV`. Adapter trong `models.py`
+chỉ bổ sung protocol `BaseEstimator`; model bên trong vẫn là CatBoost native,
+không one-hot category và artifact được lưu dạng `.cbm`.
+
+Tất cả dùng cùng dataset, target, chronological 85/15 split, bốn
+`TimeSeriesSplit` folds và `neg_mean_absolute_error`. Mỗi model có 8 cấu hình
+`RandomizedSearchCV` với seed `20261005`. Test 15% cuối không tham gia
+preprocessing, tuning hoặc khóa winner.
+
+Quy tắc khóa winner được khai báo trước: MAE temporal CV thấp nhất. Các model
+chênh không quá 0,25 phút được xem là gần ngang về nghiệp vụ; lần lượt xét CV
+MAE std, RMSE, P90 absolute error và độ phức tạp. Sau khi khóa, cả bốn model mới
+được fit trên toàn development và báo cáo trên holdout để so sánh minh bạch.
+
+## Cài đặt và tái lập
+
+Chạy từ repository root bằng Python 3.13:
 
 ```powershell
 python -m pip install -r ml/requirements.txt
 python ml/generate_synthetic_repair_duration.py
 python -m pytest ml/tests -q
-Push-Location ml
-python -m jupyter nbconvert --to notebook --execute --inplace `
-  --ExecutePreprocessor.timeout=600 01_repair_duration_regression.ipynb
-Pop-Location
 ```
 
-The generator seed is `20261005`. Running it again with the same source and
-seed produces the same CSV. The notebook reads the existing CSV; it does not
-generate training data in a cell.
+Generator mặc định tạo đúng 5.000 hàng tại
+`ml/data/synthetic_repair_duration_v2.csv`. V1 được giữ để audit, nhưng V2 là
+input của experiment hiện tại.
 
-## Experiment protocol
+## Notebook
 
-- Earliest 85%: development set.
-- Latest 15%: untouched test set.
-- Model selection and small hyperparameter searches: `TimeSeriesSplit` on the
-  development set only.
-- EDA and preprocessing fit: development/train folds only.
-- Locked winner: chosen by cross-validated MAE before test metrics are read.
-- Final report: MAE, MSE, RMSE and R² for mean baseline, production
-  standard-duration baseline, Linear Regression, Decision Tree and Random
-  Forest.
+Notebook nghiên cứu là `ml/01_repair_duration_regression.ipynb`. Chạy bằng
+Restart Kernel → Run All, hoặc:
 
-Categorical preprocessing uses `SimpleImputer` and
-`OneHotEncoder(handle_unknown="ignore")`. Numeric preprocessing uses a median
-imputer; the linear pipeline also scales numeric columns. Every learned
-preprocessing step is inside its model `Pipeline`.
+```powershell
+python -m jupyter nbconvert --to notebook --execute `
+  --ExecutePreprocessor.timeout=1800 `
+  --inplace ml/01_repair_duration_regression.ipynb
+```
 
-## Synthetic-data boundary
+Notebook dùng cùng code trong `ml/src/repair_duration_ml/` với CLI, trình bày
+đủ công thức MAE/MSE/RMSE/R²/P90AE, Random Forest, HGB, objective bậc hai có
+regularization của XGBoost và ordered target statistics của CatBoost.
 
-The CSV is compatible with the current production feature contract but contains
-no production rows, customer identity, phone, serial number, account or free
-text. Its target is produced from hidden technician, specialty, branch and case
-factors plus controlled noise and a small outlier proportion. Hidden generator
-parameters are not exported as model features.
+## Training CLI
 
-Synthetic results validate the research pipeline only. They do not establish
-accuracy on real repairs and must not be used as a production performance
-claim.
+```powershell
+python ml/train_repair_duration_models.py `
+  --data ml/data/synthetic_repair_duration_v2.csv `
+  --output-dir ml/models/experimental_v2
+```
 
-## Explicit exclusions
+Output gồm model winner, metadata, metrics, feature contract snapshot, bảng CV,
+bảng test, predictions, subgroup errors, permutation importance và diagnostic
+plots. `--smoke` chỉ dành cho CI/test nhỏ; không dùng metric smoke trong báo cáo.
 
-- No satisfaction classification, satisfaction dataset or risk score.
-- `service_feedbacks` remains a business/statistics feature and is not an ML
-  input here.
-- No Spring Boot, frontend, ETA, recommendation or business-rule changes.
-- No FastAPI endpoint, runtime call, deployment or write to `ml_predictions`.
-- No model binary is committed in V1.
+Kết quả full run thực tế được ghi tại
+[EXPERIMENT_RESULTS.md](EXPERIMENT_RESULTS.md). `metadata.json` chứa hash dataset,
+seed, versions, split, hyperparameters, thời gian fit/predict và kích thước
+artifact.
+
+## Cấu trúc chính
+
+```text
+ml/
+├── 01_repair_duration_regression.ipynb
+├── generate_synthetic_repair_duration.py
+├── train_repair_duration_models.py
+├── DATA_CONTRACT.md
+├── EXPERIMENT_RESULTS.md
+├── data/synthetic_repair_duration_v1.csv
+├── data/synthetic_repair_duration_v2.csv
+├── models/experimental_v2/
+├── src/repair_duration_ml/
+└── tests/test_synthetic_repair_duration.py
+```
+
+## Phase dữ liệu thật tiếp theo
+
+```text
+MySQL business data
+→ real-data extractor
+→ real_repair_duration_vX dataset
+→ same feature contract
+→ same training pipeline
+→ retrain
+→ validate real temporal holdout
+→ explicit model approval
+→ runtime integration
+```
+
+Phase hiện tại không có satisfaction classifier, FastAPI, Spring runtime
+integration, automatic retraining, production MySQL extractor, auto-assignment
+hoặc ML prediction UI.

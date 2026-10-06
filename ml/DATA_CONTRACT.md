@@ -1,171 +1,128 @@
-# Data Contract — Repair Technical Duration Regression V1
+# Repair-duration dataset contract V2
 
-## 1. Prediction question and as-of time
+## Scope and sample unit
 
-For a technician assignment whose single approved catalog plan is already
-known, predict the active technical minutes required by that repair job.
+This contract covers only regression of `actual_technical_minutes`. One row is
+one completed service ticket that satisfies every rule below:
 
-The V1 prediction timestamp is `assignments.assigned_at`. A future production
-extractor must include only a repair item that existed and was stable by that
-timestamp. Because V1 has no versioned repair-plan history, a conservative
-historical extraction should require both `repair_items.created_at` and
-`repair_items.updated_at` to be no later than `assigned_at`.
+1. exactly one `repair_items` row with decision `APPROVED`;
+2. the approved catalog plan is known at prediction time;
+3. exactly one technician assignment;
+4. no accepted transfer and no transfer-origin assignment;
+5. complete, continuous `service_status_histories`;
+6. a technical completion timestamp is recorded.
 
-The model output is a duration. It is not ETA. The existing operational layer
-remains responsible for combining duration with queue, working schedule, break
-and state.
+This conservative grain follows the current database. Active duration exists
+at ticket/status/assignment level; there is no defensible per-item timer for a
+multi-item or transferred ticket. Expanding the grain requires new production
+measurement semantics, not synthetic allocation.
 
-## 2. Sample unit and inclusion criteria
+## Prediction timestamp
 
-One V1 sample is one completed `service_tickets` row satisfying all conditions:
-
-1. `actual_repair_completed_at` is present and status is `WAITING_HANDOVER` or
-   `HANDED_OVER`.
-2. Status history is non-empty, chronological and continuous.
-3. Exactly one `repair_items` row is selected for execution with
-   `approval_status = APPROVED`.
-4. That item has one concrete `service_catalog_items` relation and was known at
-   prediction time.
-5. Exactly one `assignments` row exists; `ended_at` is present.
-6. No accepted `transfers` row exists and assignment source is not `TRANSFER`.
-7. Active technical duration is positive.
-
-Tickets with several items, several assignments, transfers, incomplete history
-or a plan established after assignment are excluded from V1. They are not
-silently relabelled.
-
-## 3. Target reconstruction
-
-`actual_technical_minutes` is reconstructed from production data as follows:
+The prediction timestamp is the first assignment time after the single
+approved repair plan is known. Every feature must be available at or before
+this instant. The strict historical rule is:
 
 ```text
-active_status_intervals = every interval entered through a
-                          service_status_histories.to_status of
-                          INSPECTING or REPAIRING
-
-assignment_interval = [assignments.assigned_at, assignments.ended_at]
-
-actual_technical_minutes = floor(sum(
-    intersection(active_status_interval, assignment_interval)
-) in seconds / 60)
+previous_job.completed_at < current_prediction_timestamp
 ```
 
-This matches the active-state semantics in `RepairDurationService` and the
-technician attribution logic in `TimingMetricsService`. It excludes:
+Equality is excluded. A job completing at the same instant is not prior
+knowledge. The extractor must process rows chronologically and release pending
+jobs into history only after their completion precedes the next prediction.
 
-- `ASSIGNED` queue time;
-- `WAITING_APPROVAL` and `WAITING_PART`;
-- technician scheduling break;
-- transfer gaps;
-- `WAITING_HANDOVER` and customer handover wait;
-- appointment wait.
+## Target reconstruction
 
-`service_interruptions` has persistence and schema validation, but the current
-duration services do not query or subtract it. Therefore V1 does not claim that
-interruptions are automatically removed. The synthetic generator does not
-simulate interruptions. A later phase may introduce tested interval subtraction
-and version the label contract.
+For active ticket status intervals \([s_k,e_k)\) and the one assignment
+interval \([a_s,a_e)\):
 
-## 4. Model feature contract
+$$
+y = \texttt{actual\_technical\_minutes}
+= \frac{1}{60}\sum_{k:u_k\in\{INSPECTING,REPAIRING\}}
+\max\left(0,\min(e_k,a_e)-\max(s_k,a_s)\right)_{seconds}.
+$$
 
-All categorical labels in the synthetic CSV are controlled aliases. A real
-extractor may use stable IDs or canonical names, but training and inference must
-use the same representation.
+Included: `INSPECTING` and `REPAIRING` intersected with the assignment.
 
-| ML column | Type | Business meaning | Production source / derivation | Available at prediction | Model feature | Leakage risk and handling |
-|---|---|---|---|---|---|---|
-| `device_type` | categorical | Device family | `service_tickets.customer_device_id` → `customer_devices.device_model_id` → `device_models.device_type_id` → `device_types.name` | yes | yes | Use value as-of assignment; master rename requires contract versioning |
-| `device_model` | categorical | Exact device model | `customer_devices.device_model_id` → `device_models.name` | yes | yes | Same as above |
-| `service_issue` | categorical | Technical issue of the selected plan | Single item → `service_catalog_items.service_issue_id` → `service_issues.name` | yes, under V1 restriction | yes | Exclude plans created/changed after prediction |
-| `service_type` | categorical | `REPAIR`, `REPLACEMENT` or `WARRANTY` | Single item → catalog → `service_types.code` | yes | yes | Do not infer from final outcome |
-| `catalog_service` | categorical | Configured technical plan | `repair_items.service_catalog_item_id` → `service_catalog_items.name` | yes, under V1 restriction | yes | `handle_unknown=ignore` for a new catalog value |
-| `standard_duration_minutes` | numeric | Current business estimate for the selected plan | `service_catalog_items.standard_duration_minutes` | yes | yes | Snapshot/as-of semantics are needed if catalog duration later changes |
-| `technician_id` | categorical | Assigned technician identity | The single `assignments.technician_id`; synthetic labels use `TECH_nn` | yes | yes | Cold-start category is allowed; identity is used intentionally, not as row ID |
-| `branch_id` | categorical | Processing branch | `service_tickets.branch_id`; synthetic labels use `BRANCH_nn` | yes | yes | Operational differences may exist; no address or customer data used |
-| `prediction_month` | categorical | Calendar month at assignment | Month derived from `assignments.assigned_at` in business timezone | yes | yes | Derive from prediction time, never completion time |
-| `prediction_weekday` | categorical | Weekday at assignment | Weekday derived from `assignments.assigned_at` | yes | yes | Same rule |
-| `technician_jobs_completed_before` | numeric | Prior eligible jobs completed by technician | Count V1-eligible samples for technician where technical completion `< current assigned_at` | yes | yes | Strict as-of aggregation; never whole-dataset groupby |
-| `technician_average_duration_before` | numeric nullable | Mean target of prior eligible jobs | Expanding mean of prior completed eligible jobs only | yes | yes | Missing for cold-start; median imputer is fit in each train fold |
-| `technician_issue_experience_before` | numeric | Prior eligible jobs for same technician and issue | Expanding technician+issue count with completion `< current assigned_at` | yes | yes | Strict as-of aggregation |
-| `technician_historical_efficiency_before` | numeric nullable | Prior mean `actual / standard` ratio | Expanding ratio mean over prior completed eligible jobs only | yes | yes | Missing for cold-start; never uses current/future target |
+Excluded: `ASSIGNED` queue, `WAITING_APPROVAL`, `WAITING_PART`, configured
+break, transfer gap, `WAITING_HANDOVER`, appointment/customer waiting and ETA.
 
-The V1 model has 14 features: nine categorical and five numeric.
+`service_interruptions` is persisted, but `RepairDurationService` and
+`TimingMetricsService` currently do not subtract it. V2 therefore does not
+pretend interruptions are integrated. A future business-rule change must
+version the target and rebuild the dataset.
 
-## 5. Non-feature and excluded-column contract
+## Exact feature contract
 
-| Column/data | Role | Use as feature | Reason |
-|---|---|---|---|
-| `sample_id` | Synthetic row identifier | no | Identifier has no causal business meaning |
-| `prediction_timestamp` | Sort/split/as-of audit | no | Used for chronology, not prediction |
-| `completed_at` | Historical eligibility and audit | no | Future information at prediction time |
-| `actual_technical_minutes` | Regression target | no | Direct target leakage |
-| `service_tickets.actual_repair_completed_at` | Target cutoff | no | Future timestamp |
-| `service_tickets.handed_over_at` | Handover reporting | no | Future and includes customer waiting |
-| Current/future ticket status | Workflow outcome | no | Future-state leakage |
-| `service_feedbacks.satisfied/comment` | Service-quality reporting | no | Created after service; classification was explicitly removed |
-| `ml_predictions` values | Runtime prediction history | no | Model output/circular feature; this phase never writes it |
-| Queue/wait/break duration | ETA operations | no | Outside technical-duration target and generally future at assignment |
-| Ticket code, customer, phone, serial, free text | Identity/PII | no | Unnecessary, unsafe and non-generalizable |
-| Hidden synthetic speed, complexity and outlier factors | Generator only | no | They are unavailable in production and would reveal the target process |
+The ordered model input has 14 columns. `sample_id`, `prediction_timestamp`,
+`completed_at` and the target are audit columns, not features.
 
-## 6. Temporal leakage prevention
+| Feature | Type | Production source/derivation | Available at prediction | Leakage/cold-start rule |
+|---|---|---|---|---|
+| `device_type` | category | repair item → ticket/customer device → model → device type | yes | use stored master value; unknown category must not crash |
+| `device_model` | category | repair item/ticket device model | yes | no serial number or customer identity |
+| `service_issue` | category | approved item → catalog → issue | yes | must be the plan known at prediction |
+| `service_type` | category | approved item → catalog → service type | yes | `REPAIR`, `REPLACEMENT` or `WARRANTY` |
+| `catalog_service` | category | approved catalog item identifier/name snapshot | yes | use stable catalog key in the real extractor; synthetic label is versioned |
+| `standard_duration_minutes` | numeric | approved catalog configured duration snapshot | yes | null plans are ineligible; never replace with actual duration |
+| `technician_id` | category | the single assignment technician | yes | unseen technician supported; no name/phone |
+| `branch_id` | category | ticket branch | yes | unseen branch supported |
+| `prediction_month` | category | `M01`…`M12` from prediction timestamp in business timezone | yes | timestamp-derived only |
+| `prediction_weekday` | category | `MON`…`SUN` from prediction timestamp | yes | timestamp-derived only |
+| `technician_jobs_completed_before` | numeric | count of eligible prior jobs for technician | yes | 0 for new technician; strict as-of |
+| `technician_average_duration_before` | numeric | mean target of eligible prior jobs for technician | yes | missing for no history; model preprocessing imputes/native-handles |
+| `technician_issue_experience_before` | numeric | count of eligible prior technician jobs with same issue | yes | 0 for no matching history; strict as-of |
+| `technician_historical_efficiency_before` | numeric | mean `(actual / standard)` over eligible prior technician jobs | yes | missing for no history; no invented average |
 
-For sample `s` with prediction timestamp `t_s`, historical technician features
-may use a prior job `j` only when:
+V2 retains the same 14 features as V1. The audit found all are derivable from
+the current domain and available at prediction time. Retaining the contract also
+allows a future real dataset to use the same training code.
 
-```text
-j.actual_repair_completed_at < t_s
-```
+## Exclusions
 
-Sorting by prediction time alone is insufficient because an earlier-started job
-may still be in progress. The generator maintains a completion-time priority
-queue and updates history only when a job leaves that queue before the current
-prediction timestamp. Unit tests independently reconstruct the same as-of state.
+The extractor and dataset must exclude:
 
-Cold-start rules:
+- `actual_technical_minutes` and `completed_at` from model input;
+- actual completion/status events after the prediction timestamp;
+- feedback, satisfaction labels and free text;
+- ETA error, previous prediction output or current/future ETA;
+- customer identity, name, phone, ticket code and device serial;
+- price/payment outcome;
+- hidden synthetic capability, specialty, case-complexity, noise and outlier
+  factors;
+- history computed by a full-dataset `groupby`, backward fill or any operation
+  that sees later completions.
 
-- counts start at zero;
-- average duration and historical efficiency remain missing until at least one
-  eligible job is completed;
-- missing values are handled inside the model pipeline;
-- no synthetic history is invented for a new technician;
-- unseen technician categories are accepted by `OneHotEncoder` and fall back to
-  the other observed context plus learned numeric imputation.
+## Missing data and cold start
 
-## 7. How this synthetic dataset maps to production data
+The only intentional missing values are
+`technician_average_duration_before` and
+`technician_historical_efficiency_before` when completed-history count is zero.
+Counts remain 0. No synthetic history is invented. Model-specific handling is:
 
-| Synthetic concept | Production mapping | Required extraction behavior |
-|---|---|---|
-| One CSV row | One restricted completed service ticket | Apply every inclusion criterion before building features |
-| Synthetic catalog tuple | Device/model/issue/type/catalog joins | Read current canonical relations; do not invent a disconnected taxonomy |
-| `prediction_timestamp` | Single assignment's `assigned_at` | Enforce business timezone and plan-known rule |
-| `completed_at` | `actual_repair_completed_at` / assignment end | Used only for labels and historical eligibility |
-| `actual_technical_minutes` | Active history intervals ∩ assignment | Validate status continuity; exclude wait states |
-| Technician history | Earlier eligible completed tickets | Compute in chronological order or with equivalent as-of SQL/window logic |
-| Missing cold-start history | Technician has no prior eligible completion | Preserve missing; let train-fold preprocessing handle it |
+- Random Forest and XGBoost: train-fitted numeric median imputation, sparse
+  one-hot categories with `handle_unknown="ignore"`;
+- HistGradientBoosting: train-fitted median plus dense ordinal categories,
+  unknown `-1`, native categorical splits;
+- CatBoost: numeric NaN and native categorical features/ordered statistics.
 
-The production extractor should output this same model-feature contract before
-runtime integration is considered. It must version master-data snapshots or
-apply conservative as-of restrictions where the current schema lacks history.
+## Synthetic versus real boundary
 
-## 8. Synthetic generating process
+`synthetic_repair_duration_v2.csv` is controlled synthetic data. The repository
+contains table definitions and a narrow migration insert, but no complete
+canonical device/model/issue/catalog seed. The V2 generator therefore owns a
+versioned synthetic catalog with logical relationships for iPhone, iPad,
+MacBook, Apple Watch and AirPods. These labels are not asserted to exist in the
+business database.
 
-The canonical schema contains the required tables, constraints and enums but no
-complete master-data seed for all device/model/issue/catalog relationships.
-Therefore V1 uses a controlled synthetic domain rather than reading the user
-database or pretending the migration's limited warranty rows are a full seed.
+Latent target factors remain generator-internal. The exported schema contains
+only fields that a production extractor can derive. Synthetic data proves the
+pipeline and leakage guards run; it cannot validate real operational accuracy.
 
-The committed V1 generator uses seed `20261005`, 24 controlled catalog
-combinations compatible with current entity relationships, 12 synthetic
-technicians and three synthetic branches. It spans business days from January
-2025 through September 2026.
+## Future production extraction
 
-The target depends on hidden technician speed, technician/issue specialty,
-branch and service-type effects, mild seasonality, log-normal case noise,
-occasional complex cases and a small technical-outlier fraction. Only observable
-contract columns are exported. Non-technical elapsed minutes affect
-`completed_at` so history is realistic, but they never enter the target.
-
-This process is deliberately noisy. High synthetic scores demonstrate that the
-pipeline can recover a controlled signal; they are not evidence of real-world
-accuracy.
+The next phase must read a transactionally consistent MySQL snapshot, enforce
+the sample eligibility rules, reconstruct target intervals, sort by prediction
+time, and compute histories with the strict completion rule. It should emit a
+versioned `real_repair_duration_vX` dataset, run this same competition, evaluate
+a later real holdout, and require explicit approval before any runtime use.

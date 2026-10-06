@@ -1,0 +1,723 @@
+{
+  "development_cv": [
+    {
+      "model": "CatBoostRegressor",
+      "cv_mae_mean": 27.16679080615067,
+      "cv_mae_std": 1.106630160064843,
+      "cv_mse": 1689.8806671118155,
+      "cv_rmse": 40.99310317943454,
+      "cv_r2": 0.6754035630554561,
+      "cv_p90_absolute_error": 58.64250384061903,
+      "cv_fit_seconds": 45.816208299998834,
+      "cv_predict_seconds": 0.04657509999924514,
+      "search_seconds": 718.3557044000008
+    },
+    {
+      "model": "XGBRegressor",
+      "cv_mae_mean": 27.220469192056093,
+      "cv_mae_std": 1.280937811669469,
+      "cv_mse": 1678.520696173989,
+      "cv_rmse": 40.84300992921894,
+      "cv_r2": 0.6778040510059511,
+      "cv_p90_absolute_error": 56.937091064453135,
+      "cv_fit_seconds": 0.8846256999986508,
+      "cv_predict_seconds": 0.07316130000072008,
+      "search_seconds": 8.20591659999991
+    },
+    {
+      "model": "HistGradientBoostingRegressor",
+      "cv_mae_mean": 27.235749329064582,
+      "cv_mae_std": 1.1633601828310445,
+      "cv_mse": 1650.75903288693,
+      "cv_rmse": 40.493145076340454,
+      "cv_r2": 0.6832110391271848,
+      "cv_p90_absolute_error": 57.65111736769044,
+      "cv_fit_seconds": 3.526187800001935,
+      "cv_predict_seconds": 0.10331509999923583,
+      "search_seconds": 74.39509700000053
+    },
+    {
+      "model": "RandomForestRegressor",
+      "cv_mae_mean": 28.17352479910942,
+      "cv_mae_std": 1.5511360263173515,
+      "cv_mse": 1677.48040397606,
+      "cv_rmse": 40.84103026131454,
+      "cv_r2": 0.6776235235383523,
+      "cv_p90_absolute_error": 59.49180843514109,
+      "cv_fit_seconds": 22.70728600000075,
+      "cv_predict_seconds": 0.27870989999610174,
+      "search_seconds": 290.1394571000001
+    },
+    {
+      "model": "StandardDurationBaseline",
+      "cv_mae_mean": 30.60029411764706,
+      "cv_mae_std": 1.8589760113680813,
+      "cv_mse": 2224.840882352941,
+      "cv_rmse": 46.99313340401053,
+      "cv_r2": 0.5737517071142537,
+      "cv_p90_absolute_error": 67.32500000000002,
+      "cv_fit_seconds": 0.0,
+      "cv_predict_seconds": 0.0,
+      "search_seconds": NaN
+    },
+    {
+      "model": "MeanBaseline",
+      "cv_mae_mean": 52.743861245674736,
+      "cv_mae_std": 1.5732702614266691,
+      "cv_mse": 5203.176975605536,
+      "cv_rmse": 72.0488055654913,
+      "cv_r2": -0.004519544406746123,
+      "cv_p90_absolute_error": 94.74264705882354,
+      "cv_fit_seconds": 0.0,
+      "cv_predict_seconds": 0.0,
+      "search_seconds": NaN
+    }
+  ],
+  "untouched_test": [
+    {
+      "model": "HistGradientBoostingRegressor",
+      "mae": 26.992055010118765,
+      "mse": 1796.1483684243087,
+      "rmse": 42.38099064939739,
+      "r2": 0.6577572584054572,
+      "p90_absolute_error": 55.92316216210537,
+      "fit_seconds": 2.4433504000007815,
+      "predict_seconds": 0.03894079999918176
+    },
+    {
+      "model": "CatBoostRegressor",
+      "mae": 27.009444419221023,
+      "mse": 1800.9066969575358,
+      "rmse": 42.437091052021174,
+      "r2": 0.6568505942171041,
+      "p90_absolute_error": 56.07519935421155,
+      "fit_seconds": 12.876149699999587,
+      "predict_seconds": 0.009040599999934784
+    },
+    {
+      "model": "XGBRegressor",
+      "mae": 27.016926274617514,
+      "mse": 1809.833372974879,
+      "rmse": 42.5421364411201,
+      "r2": 0.6551496823507966,
+      "p90_absolute_error": 55.93164520263673,
+      "fit_seconds": 0.3974135999997088,
+      "predict_seconds": 0.018473399999493267
+    },
+    {
+      "model": "RandomForestRegressor",
+      "mae": 27.744682943911297,
+      "mse": 1715.2800814177376,
+      "rmse": 41.41593994367069,
+      "r2": 0.6731661103353581,
+      "p90_absolute_error": 58.622237939568215,
+      "fit_seconds": 17.32340529999965,
+      "predict_seconds": 0.069290399998863
+    },
+    {
+      "model": "StandardDurationBaseline",
+      "mae": 31.214666666666666,
+      "mse": 2516.5266666666666,
+      "rmse": 50.164994435030756,
+      "r2": 0.5204945199202399,
+      "p90_absolute_error": 73.10000000000002,
+      "fit_seconds": 0.0,
+      "predict_seconds": 0.0
+    },
+    {
+      "model": "MeanBaseline",
+      "mae": 52.033844705882345,
+      "mse": 5258.108886809688,
+      "rmse": 72.51281877578397,
+      "r2": -0.0018936256379822325,
+      "p90_absolute_error": 93.32447058823533,
+      "fit_seconds": 0.0,
+      "predict_seconds": 0.0
+    }
+  ],
+  "winner": "CatBoostRegressor",
+  "winner_reason": "Models within 0.25 minute of the best CV MAE were treated as a practical tie (CatBoostRegressor, XGBRegressor, HistGradientBoostingRegressor). CatBoostRegressor was locked using, in order, lower CV-MAE standard deviation, CV RMSE, CV P90 absolute error and implementation-complexity rank. The test set was not consulted.",
+  "winner_improvement_vs_standard_duration_mae_minutes": 4.2052222474456435,
+  "winner_improvement_vs_standard_duration_mae_percent": 13.471943469241948,
+  "fold_metrics": {
+    "MeanBaseline": [
+      {
+        "mae": 54.56592110726644,
+        "mse": 5788.263288581315,
+        "rmse": 76.08063675194441,
+        "r2": -3.8452033810143504e-05,
+        "p90_absolute_error": 102.0188235294118,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 51.17444567474047,
+        "mse": 4582.159960207612,
+        "rmse": 67.69165354907214,
+        "r2": -0.015433503948611094,
+        "p90_absolute_error": 87.4170588235294,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 51.7201384083045,
+        "mse": 4848.808138408305,
+        "rmse": 69.63338379260558,
+        "r2": -0.002002514362648533,
+        "p90_absolute_error": 90.39176470588237,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 53.514939792387544,
+        "mse": 5593.476515224914,
+        "rmse": 74.7895481683431,
+        "r2": -0.0006037072819147227,
+        "p90_absolute_error": 99.1429411764706,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      }
+    ],
+    "StandardDurationBaseline": [
+      {
+        "mae": 31.385882352941177,
+        "mse": 2646.8258823529413,
+        "rmse": 51.44731171162339,
+        "r2": 0.5427077991747655,
+        "p90_absolute_error": 70.10000000000002,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 27.988235294117647,
+        "mse": 1712.2070588235295,
+        "rmse": 41.3788237970043,
+        "r2": 0.6205648802474484,
+        "p90_absolute_error": 62.10000000000002,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 30.72,
+        "mse": 2019.2235294117647,
+        "rmse": 44.93577115630447,
+        "r2": 0.5827289932335871,
+        "p90_absolute_error": 68.10000000000002,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      },
+      {
+        "mae": 32.30705882352941,
+        "mse": 2521.1070588235293,
+        "rmse": 50.21062695110995,
+        "r2": 0.5490051558012141,
+        "p90_absolute_error": 69.0,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 0.0,
+        "predict_seconds": 0.0
+      }
+    ],
+    "RandomForestRegressor": [
+      {
+        "mae": 30.417160632773523,
+        "mse": 2072.944188753787,
+        "rmse": 45.52959684374316,
+        "r2": 0.6418573595704713,
+        "p90_absolute_error": 66.58071591823482,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 1.5465457999998762,
+        "predict_seconds": 0.06188599999950384
+      },
+      {
+        "mae": 27.341727112366044,
+        "mse": 1421.573886808431,
+        "rmse": 37.703764889045644,
+        "r2": 0.6849708946131319,
+        "p90_absolute_error": 56.80833557646667,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 3.798247099999571,
+        "predict_seconds": 0.06895359999907669
+      },
+      {
+        "mae": 26.969792359971102,
+        "mse": 1481.839756912532,
+        "rmse": 38.49467179899748,
+        "r2": 0.6937789411489679,
+        "p90_absolute_error": 57.01516252059515,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 6.792018300000564,
+        "predict_seconds": 0.07267179999871587
+      },
+      {
+        "mae": 27.965419091327007,
+        "mse": 1733.5637834294905,
+        "rmse": 41.6360875134719,
+        "r2": 0.689886898820838,
+        "p90_absolute_error": 57.56301972526773,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 10.570474800000738,
+        "predict_seconds": 0.07519849999880535
+      }
+    ],
+    "HistGradientBoostingRegressor": [
+      {
+        "mae": 28.941480781375343,
+        "mse": 2066.3650413023197,
+        "rmse": 45.457288098855166,
+        "r2": 0.6429940391071549,
+        "p90_absolute_error": 57.88528152664709,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 0.6398787000016455,
+        "predict_seconds": 0.027632299999822862
+      },
+      {
+        "mae": 26.352063468724722,
+        "mse": 1331.2746899336742,
+        "rmse": 36.4866371420233,
+        "r2": 0.7049817258984992,
+        "p90_absolute_error": 56.22448497038759,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 0.9832419000013033,
+        "predict_seconds": 0.028179099999761092
+      },
+      {
+        "mae": 26.698392095604888,
+        "mse": 1503.00573977414,
+        "rmse": 38.7686179760659,
+        "r2": 0.689405006887001,
+        "p90_absolute_error": 59.90138028165352,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 0.9440546999994694,
+        "predict_seconds": 0.024523300000510062
+      },
+      {
+        "mae": 26.951060970553367,
+        "mse": 1702.390660537586,
+        "rmse": 41.26003708841748,
+        "r2": 0.695463384616084,
+        "p90_absolute_error": 56.593322692073535,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 0.9590124999995169,
+        "predict_seconds": 0.02298039999914181
+      }
+    ],
+    "XGBRegressor": [
+      {
+        "mae": 28.95349924872903,
+        "mse": 2041.0460481142827,
+        "rmse": 45.17793762572925,
+        "r2": 0.6473684024511251,
+        "p90_absolute_error": 57.092253875732425,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 0.1416417000000365,
+        "predict_seconds": 0.018998700001247926
+      },
+      {
+        "mae": 25.911529653212604,
+        "mse": 1329.597390814663,
+        "rmse": 36.46364478236731,
+        "r2": 0.7053534252141883,
+        "p90_absolute_error": 54.771218872070314,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 0.19332779999967897,
+        "predict_seconds": 0.019054999998843414
+      },
+      {
+        "mae": 26.767838444429284,
+        "mse": 1563.5152172878977,
+        "rmse": 39.54131026265945,
+        "r2": 0.6769007693752528,
+        "p90_absolute_error": 58.466999816894536,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 0.24106159999973897,
+        "predict_seconds": 0.017789400000765454
+      },
+      {
+        "mae": 27.249009421853458,
+        "mse": 1779.9241284791128,
+        "rmse": 42.18914704611973,
+        "r2": 0.6815936069832382,
+        "p90_absolute_error": 57.417891693115244,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 0.30859459999919636,
+        "predict_seconds": 0.017318199999863282
+      }
+    ],
+    "CatBoostRegressor": [
+      {
+        "mae": 28.536545603576258,
+        "mse": 2041.547814112654,
+        "rmse": 45.183490503862735,
+        "r2": 0.6472817123219314,
+        "p90_absolute_error": 58.65694713844122,
+        "fold": 1,
+        "train_rows": 850,
+        "validation_rows": 850,
+        "fit_seconds": 10.316735299998982,
+        "predict_seconds": 0.010673400000086986
+      },
+      {
+        "mae": 26.016785252912385,
+        "mse": 1366.8501140365559,
+        "rmse": 36.970936071954625,
+        "r2": 0.697098003404095,
+        "p90_absolute_error": 58.87256363980545,
+        "fold": 2,
+        "train_rows": 1700,
+        "validation_rows": 850,
+        "fit_seconds": 10.760749999999462,
+        "predict_seconds": 0.01119509999989532
+      },
+      {
+        "mae": 26.582045101137837,
+        "mse": 1559.373452927422,
+        "rmse": 39.488902908632724,
+        "r2": 0.6777566618306008,
+        "p90_absolute_error": 58.96328010906592,
+        "fold": 3,
+        "train_rows": 2550,
+        "validation_rows": 850,
+        "fit_seconds": 12.222533199999816,
+        "predict_seconds": 0.01046929999938584
+      },
+      {
+        "mae": 27.531787266976192,
+        "mse": 1791.7512873706303,
+        "rmse": 42.32908323328808,
+        "r2": 0.6794778746651972,
+        "p90_absolute_error": 58.07722447516351,
+        "fold": 4,
+        "train_rows": 3400,
+        "validation_rows": 850,
+        "fit_seconds": 12.516189800000575,
+        "predict_seconds": 0.014237299999876996
+      }
+    ]
+  },
+  "subgroup_errors": {
+    "technician_id": [
+      {
+        "group": "TECH_09",
+        "sample_count": 45,
+        "mae": 35.74318000383357,
+        "rmse": 58.28923028977772
+      },
+      {
+        "group": "TECH_07",
+        "sample_count": 83,
+        "mae": 34.074031359314525,
+        "rmse": 50.675158301608114
+      },
+      {
+        "group": "TECH_02",
+        "sample_count": 61,
+        "mae": 31.357898407897327,
+        "rmse": 43.28825496663944
+      },
+      {
+        "group": "TECH_06",
+        "sample_count": 52,
+        "mae": 30.990734199509593,
+        "rmse": 56.296308297770814
+      },
+      {
+        "group": "TECH_04",
+        "sample_count": 70,
+        "mae": 30.244085036422717,
+        "rmse": 45.563283588066575
+      },
+      {
+        "group": "TECH_12",
+        "sample_count": 45,
+        "mae": 27.526810667567993,
+        "rmse": 49.71015353195011
+      },
+      {
+        "group": "TECH_01",
+        "sample_count": 71,
+        "mae": 26.59713287275409,
+        "rmse": 36.86930182298965
+      },
+      {
+        "group": "TECH_05",
+        "sample_count": 71,
+        "mae": 24.912951485801596,
+        "rmse": 35.437809103261365
+      },
+      {
+        "group": "TECH_03",
+        "sample_count": 61,
+        "mae": 24.13732005711814,
+        "rmse": 34.797340859423464
+      },
+      {
+        "group": "TECH_08",
+        "sample_count": 62,
+        "mae": 21.42640899321116,
+        "rmse": 28.35773401274234
+      },
+      {
+        "group": "TECH_10",
+        "sample_count": 66,
+        "mae": 21.41186183742901,
+        "rmse": 40.3773840168332
+      },
+      {
+        "group": "TECH_11",
+        "sample_count": 63,
+        "mae": 16.970483266392055,
+        "rmse": 22.542999664069033
+      }
+    ],
+    "device_type": [
+      {
+        "group": "MacBook",
+        "sample_count": 106,
+        "mae": 38.98298985054322,
+        "rmse": 54.634848608809975
+      },
+      {
+        "group": "iPad",
+        "sample_count": 114,
+        "mae": 33.73042137490849,
+        "rmse": 44.40701388490038
+      },
+      {
+        "group": "iPhone",
+        "sample_count": 360,
+        "mae": 23.687971777482126,
+        "rmse": 40.7779145425939
+      },
+      {
+        "group": "AirPods",
+        "sample_count": 98,
+        "mae": 23.48959704338357,
+        "rmse": 38.38558556589411
+      },
+      {
+        "group": "Apple Watch",
+        "sample_count": 72,
+        "mae": 20.138444491298117,
+        "rmse": 30.378926595733326
+      }
+    ],
+    "service_issue": [
+      {
+        "group": "Mainboard",
+        "sample_count": 35,
+        "mae": 64.93734823979419,
+        "rmse": 97.95702107617414
+      },
+      {
+        "group": "Bàn phím",
+        "sample_count": 30,
+        "mae": 51.29970533530881,
+        "rmse": 70.85017711810087
+      },
+      {
+        "group": "Chống ồn",
+        "sample_count": 17,
+        "mae": 34.63919680643057,
+        "rmse": 62.61548806649026
+      },
+      {
+        "group": "Sạc không dây",
+        "sample_count": 13,
+        "mae": 30.913405184528344,
+        "rmse": 37.516174317651796
+      },
+      {
+        "group": "Cổng sạc",
+        "sample_count": 69,
+        "mae": 28.9769138498712,
+        "rmse": 43.764473282456684
+      },
+      {
+        "group": "Màn hình",
+        "sample_count": 185,
+        "mae": 28.553161352754458,
+        "rmse": 39.25001205037238
+      },
+      {
+        "group": "Digital Crown",
+        "sample_count": 15,
+        "mae": 23.316001015319962,
+        "rmse": 44.7331782554395
+      },
+      {
+        "group": "Âm thanh",
+        "sample_count": 24,
+        "mae": 23.05517613382771,
+        "rmse": 28.581172526443307
+      },
+      {
+        "group": "Camera",
+        "sample_count": 24,
+        "mae": 21.843023893285846,
+        "rmse": 26.224170722396114
+      },
+      {
+        "group": "Pin",
+        "sample_count": 288,
+        "mae": 20.24622237968589,
+        "rmse": 30.115952447139865
+      },
+      {
+        "group": "Hộp sạc",
+        "sample_count": 25,
+        "mae": 19.15846673449387,
+        "rmse": 29.065514409259702
+      },
+      {
+        "group": "Pin tai nghe",
+        "sample_count": 25,
+        "mae": 17.425276694497025,
+        "rmse": 23.39046041074825
+      }
+    ],
+    "service_type": [
+      {
+        "group": "REPAIR",
+        "sample_count": 179,
+        "mae": 35.726016530863944,
+        "rmse": 59.732235417984896
+      },
+      {
+        "group": "WARRANTY",
+        "sample_count": 73,
+        "mae": 26.589204872129244,
+        "rmse": 34.47743332197861
+      },
+      {
+        "group": "REPLACEMENT",
+        "sample_count": 498,
+        "mae": 23.93798072234074,
+        "rmse": 35.43318145179834
+      }
+    ]
+  },
+  "cold_start_predictions": {
+    "known_history": 122.36665647964242,
+    "new_technician": 111.80170297379907,
+    "unseen_categories": 113.42977602781342
+  },
+  "feature_importance": [
+    {
+      "feature": "standard_duration_minutes",
+      "importance_mean_mae_increase": 23.81804033228575,
+      "importance_std": 0.7234280449866906
+    },
+    {
+      "feature": "service_type",
+      "importance_mean_mae_increase": 2.022173521397371,
+      "importance_std": 0.3403745212794554
+    },
+    {
+      "feature": "technician_historical_efficiency_before",
+      "importance_mean_mae_increase": 0.9457428660772784,
+      "importance_std": 0.15542197906898192
+    },
+    {
+      "feature": "device_type",
+      "importance_mean_mae_increase": 0.7796268768321533,
+      "importance_std": 0.12773195308781862
+    },
+    {
+      "feature": "technician_id",
+      "importance_mean_mae_increase": 0.47064482348583353,
+      "importance_std": 0.09972982349674475
+    },
+    {
+      "feature": "service_issue",
+      "importance_mean_mae_increase": 0.4405122042101347,
+      "importance_std": 0.10900025720977236
+    },
+    {
+      "feature": "catalog_service",
+      "importance_mean_mae_increase": 0.3337836491802214,
+      "importance_std": 0.1276813375838991
+    },
+    {
+      "feature": "technician_average_duration_before",
+      "importance_mean_mae_increase": 0.1191818912186875,
+      "importance_std": 0.04916882390833103
+    },
+    {
+      "feature": "device_model",
+      "importance_mean_mae_increase": 0.11282782084100659,
+      "importance_std": 0.06196308023680985
+    },
+    {
+      "feature": "technician_jobs_completed_before",
+      "importance_mean_mae_increase": 0.03948483969088201,
+      "importance_std": 0.013794322952592692
+    },
+    {
+      "feature": "prediction_month",
+      "importance_mean_mae_increase": -0.0021629073227657615,
+      "importance_std": 0.022083338712286037
+    },
+    {
+      "feature": "technician_issue_experience_before",
+      "importance_mean_mae_increase": -0.0037679506372981565,
+      "importance_std": 0.02825125122095188
+    },
+    {
+      "feature": "prediction_weekday",
+      "importance_mean_mae_increase": -0.01180074129173434,
+      "importance_std": 0.00830558655788428
+    },
+    {
+      "feature": "branch_id",
+      "importance_mean_mae_increase": -0.027391148064431547,
+      "importance_std": 0.033242390619133755
+    }
+  ]
+}

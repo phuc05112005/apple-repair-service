@@ -16,5 +16,8 @@ data/synthetic/*
 !data/synthetic/.gitkeep
 models/*
 !models/.gitkeep
+!models/experimental_v2/
+!models/experimental_v2/**
 *.joblib
 *.pkl
+!models/experimental_v2/model.joblib
