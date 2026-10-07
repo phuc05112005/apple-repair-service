@@ -3,9 +3,9 @@ spring:
     name: apple-repair-service
 
   datasource:
-    url: jdbc:mysql://localhost:3307/apple_repair_service
-    username: root
-    password: 123456
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3307/apple_repair_service}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
 
   jpa:
     open-in-view: false
@@ -32,6 +32,11 @@ app:
     enabled: ${BOOTSTRAP_ADMIN_ENABLED:false}
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  ml:
+    enabled: ${ML_ENABLED:true}
+    base-url: ${ML_SERVICE_BASE_URL:http://localhost:8001}
+    connect-timeout: ${ML_CONNECT_TIMEOUT:1s}
+    read-timeout: ${ML_READ_TIMEOUT:3s}
 
 springdoc:
   api-docs:

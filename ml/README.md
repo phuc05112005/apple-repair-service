@@ -1,55 +1,10 @@
-# ML Experiment V1 — Repair Technical Duration Regression
+# Repair-duration ML experiment
 
-This directory contains an **offline, reproducible ML experiment** for the only
-ML problem approved for Apple Repair Service:
+This directory is the final research/training baseline for predicting **active
+technical minutes** in Apple Repair Service. It is deliberately isolated from
+Spring Boot, MySQL, ETA, `ml_predictions`, frontend and deployment code.
 
-> Predict the active technical minutes needed to process one repair job.
-
-The model predicts duration. It does not predict an estimated completion time.
-The operational ETA engine may later combine a duration prediction with queue,
-technician schedule, configured break and current state. Queue time,
-`WAITING_PART`, `WAITING_APPROVAL`, break and handover waiting are not part of
-the target.
-
-## Scope and audit decision
-
-The V1 sample is a completed service ticket with:
-
-- exactly one approved repair item whose catalog plan was already known at the
-  prediction timestamp;
-- exactly one technician assignment;
-- no accepted transfer and no assignment created from a transfer;
-- complete, continuous service-status history;
-- a recorded technical completion time.
-
-This restriction is intentional. The current schema measures active time at
-ticket/status and assignment level, not per repair item. It would be incorrect
-to distribute a ticket duration among several items or to assign the total to
-every technician after a transfer.
-
-The production target is the sum of intervals in `INSPECTING` and `REPAIRING`,
-intersected with the single assignment interval. The current
-`RepairDurationService` and `TimingMetricsService` do not subtract persisted
-`service_interruptions`; V1 documents that limitation and does not claim
-otherwise.
-
-See [DATA_CONTRACT.md](DATA_CONTRACT.md) for the source audit, exact inclusion
-rules, feature provenance, leakage rules and future production extraction.
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `generate_synthetic_repair_duration.py` | Deterministic controlled generator; never connects to MySQL |
-| `data/synthetic_repair_duration_v1.csv` | 5,000 chronological synthetic samples |
-| `01_repair_duration_regression.ipynb` | Executable EDA, pipelines, temporal CV, tuning and test evaluation |
-| `DATA_CONTRACT.md` | Production mapping and leakage contract |
-| `tests/test_synthetic_repair_duration.py` | Generator, schema and temporal-history tests |
-| `requirements.txt` | Versions verified for this experiment |
-
-Legacy empty directories remain only to avoid deleting the existing project
-scaffold. No FastAPI service, Spring client or production model integration is
-implemented in this phase.
+> **EXPERIMENTAL_DEMO — synthetic data only — runtime available — not production validated.**
 
 ## Reproduce
 
@@ -59,50 +14,68 @@ From the repository root:
 python -m pip install -r ml/requirements.txt
 python ml/generate_synthetic_repair_duration.py
 python -m pytest ml/tests -q
-Push-Location ml
-python -m jupyter nbconvert --to notebook --execute --inplace `
-  --ExecutePreprocessor.timeout=600 01_repair_duration_regression.ipynb
-Pop-Location
+python ml/train_repair_duration_models.py
+python ml/build_repair_duration_notebook.py
 ```
 
-The generator seed is `20261005`. Running it again with the same source and
-seed produces the same CSV. The notebook reads the existing CSV; it does not
-generate training data in a cell.
+Then restart the notebook kernel and run all cells in
+`ml/repair_duration_regression.ipynb`.
 
-## Experiment protocol
+## Final structure
 
-- Earliest 85%: development set.
-- Latest 15%: untouched test set.
-- Model selection and small hyperparameter searches: `TimeSeriesSplit` on the
-  development set only.
-- EDA and preprocessing fit: development/train folds only.
-- Locked winner: chosen by cross-validated MAE before test metrics are read.
-- Final report: MAE, MSE, RMSE and R² for mean baseline, production
-  standard-duration baseline, Linear Regression, Decision Tree and Random
-  Forest.
+- `repair_duration_regression.ipynb`: one end-to-end auditable notebook.
+- `generate_synthetic_repair_duration.py`: deterministic 5,000-row generator,
+  seed `20261007`.
+- `train_repair_duration_models.py`: full temporal model competition CLI.
+- `src/repair_duration_ml/`: reusable contract, data, features, models,
+  evaluation and training code.
+- `data/synthetic_repair_duration.csv`: controlled synthetic dataset.
+- `models/experimental/`: locked experimental artifact and evidence tables.
+- `DATA_CONTRACT.md`: target, sample grain, time and leakage rules.
+- `EXPERIMENT_RESULTS.md`: exact run results and limitations.
 
-Categorical preprocessing uses `SimpleImputer` and
-`OneHotEncoder(handle_unknown="ignore")`. Numeric preprocessing uses a median
-imputer; the linear pipeline also scales numeric columns. Every learned
-preprocessing step is inside its model `Pipeline`.
+Only `RandomForestRegressor`, `XGBRegressor` and `CatBoostRegressor` are final
+candidates. Selection uses development `TimeSeriesSplit(4)` MAE. The last 15%
+chronological holdout remains untouched until the winner is locked.
 
-## Synthetic-data boundary
+## Real Data Bridge
 
-The CSV is compatible with the current production feature contract but contains
-no production rows, customer identity, phone, serial number, account or free
-text. Its target is produced from hidden technician, specialty, branch and case
-factors plus controlled noise and a small outlier proportion. Hidden generator
-parameters are not exported as model features.
+The read-only MySQL bridge is documented in `REAL_DATA_SOURCE_AUDIT.md` and
+`REAL_DATA_CONTRACT.md`. It transforms only provably eligible completed tickets
+into the same frozen 20-feature schema and never trains or replaces the current
+experimental artifact.
 
-Synthetic results validate the research pipeline only. They do not establish
-accuracy on real repairs and must not be used as a production performance
-claim.
+Run it with database credentials supplied only through `DB_HOST`, `DB_PORT`,
+`DB_NAME`, `DB_USER`, and `DB_PASSWORD`:
 
-## Explicit exclusions
+```bash
+python ml/extract_real_repair_duration_dataset.py
+```
 
-- No satisfaction classification, satisfaction dataset or risk score.
-- `service_feedbacks` remains a business/statistics feature and is not an ML
-  input here.
-- No Spring Boot, frontend, ETA, recommendation or business-rule changes.
-- No FastAPI endpoint, runtime call, deployment or write to `ml_predictions`.
-- No model binary is committed in V1.
+Use `--dry-run` to validate without writing the CSV/JSON snapshot.
+
+## Internal runtime
+
+The Python runtime is isolated from Spring Boot and uses read-only MySQL access.
+It returns predicted technical minutes for an ordered candidate list; it does
+not rank, recommend, assign, calculate ETA, or persist predictions.
+
+```powershell
+$env:DB_HOST='localhost'
+$env:DB_PORT='3307'
+$env:DB_NAME='apple_repair_service'
+$env:DB_USER='<read-only-user>'
+$env:DB_PASSWORD='<password>'
+python ml/run_runtime_api.py
+```
+
+Endpoints are `/health/live`, `/health/ready`, `/api/v1/model-info`, and
+`/api/v1/repair-duration/predict-candidates`. See
+`RUNTIME_INFERENCE_REPORT.md` and `RUNTIME_INFERENCE_STATUS.md`.
+
+| Gate | Status |
+|---|---|
+| Final ML Research | PASS |
+| Real Data Bridge | PASS — functional, 0 real samples |
+| Runtime Inference Core | PASS |
+| Internal ML API | PASS |

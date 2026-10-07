@@ -1,0 +1,18 @@
+{
+  "model_load_ms": 13.153500010957941,
+  "candidate_batches": {
+    "1": {
+      "median_ms": 2.0555999944917858,
+      "max_ms": 16.98200000100769
+    },
+    "3": {
+      "median_ms": 2.2047999955248088,
+      "max_ms": 2.615899997181259
+    },
+    "10": {
+      "median_ms": 2.927499997895211,
+      "max_ms": 3.310799991595559
+    }
+  },
+  "scope": "local smoke only; no production SLA claim"
+}

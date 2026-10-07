@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("local")
+@Profile({"local", "docker"})
 @ConditionalOnProperty(name="app.bootstrap-admin.enabled", havingValue="true")
 public class LocalAdminBootstrap implements ApplicationRunner {
     private final UserService users;
@@ -31,4 +31,3 @@ public class LocalAdminBootstrap implements ApplicationRunner {
         users.create(new CreateUserRequest(username,password,"Local administrator",null,UserRole.ADMIN));
     }
 }
-

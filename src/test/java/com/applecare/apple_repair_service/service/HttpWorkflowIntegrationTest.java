@@ -121,13 +121,13 @@ class HttpWorkflowIntegrationTest {
         tx(() -> {
             var slot = em.find(AppointmentSlot.class, f.slot.getId());
             slot.setAppointmentDate(now.toLocalDate());
-            slot.setStartTime(now.toLocalTime().minusMinutes(30));
-            slot.setEndTime(now.toLocalTime().plusMinutes(30));
+            slot.setStartTime(LocalTime.MIN);
+            slot.setEndTime(LocalTime.of(23, 59, 59));
             return null;
         });
         f.slot.setAppointmentDate(now.toLocalDate());
-        f.slot.setStartTime(now.toLocalTime().minusMinutes(30));
-        f.slot.setEndTime(now.toLocalTime().plusMinutes(30));
+        f.slot.setStartTime(LocalTime.MIN);
+        f.slot.setEndTime(LocalTime.of(23, 59, 59));
     }
     long bookAndIntake(String receptionist) throws Exception {
         var booking=postJson("/api/v1/appointments",null,new CreateAppointmentRequest(f.prefix,f.prefix,f.slot.getId(),null,
@@ -158,8 +158,10 @@ class HttpWorkflowIntegrationTest {
         long ticketId=bookAndIntake(reception);
         String path="/api/v1/internal/service-tickets/"+ticketId;
         mvc.perform(get(path+"/technician-recommendations").header("Authorization",reception)).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
-        assign(ticketId,reception);
         String technician=login(f.technician);
+        mvc.perform(get(path+"/technician-recommendations").header("Authorization",technician)).andExpect(status().isForbidden());
+        mvc.perform(get(path+"/technician-recommendations")).andExpect(status().isUnauthorized());
+        assign(ticketId,reception);
         postJson(path+"/inspection/start",technician,null,200);
         var inspected=postJson(path+"/inspection",technician,new InspectionCommand("Same repair",false,
                 List.of(new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("90.00"),null))),200);

@@ -32,6 +32,19 @@ public class MlPredictionService {
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public MlPredictionResponse savePrediction(CreateMlPredictionRequest r) {
+        return savePrediction(r, LocalDateTime.now(clock));
+    }
+
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public MlPredictionResponse saveDurationAudit(Long ticketId, Long technicianId, int minutes,
+                                                  String modelName, String modelVersion,
+                                                  LocalDateTime evaluationTimestamp) {
+        return savePrediction(new CreateMlPredictionRequest(ticketId, technicianId,
+                PredictionType.REPAIR_DURATION, minutes, null, null, modelName, modelVersion),
+                evaluationTimestamp);
+    }
+
+    private MlPredictionResponse savePrediction(CreateMlPredictionRequest r, LocalDateTime predictedAt) {
         rules.validate(r);
         if (r.predictionType() == PredictionType.REPAIR_DURATION)
             BusinessRules.require(r.predictedDurationMinutes() != null && r.predictedSatisfaction() == null, "Duration prediction must only contain positive duration");
@@ -51,7 +64,7 @@ public class MlPredictionService {
         p.setConfidence(r.confidence());
         p.setModelName(r.modelName().trim());
         p.setModelVersion(r.modelVersion().trim());
-        p.setPredictedAt(LocalDateTime.now(clock));
+        p.setPredictedAt(predictedAt == null ? LocalDateTime.now(clock) : predictedAt);
         return mapper.map(repository.saveAndFlush(p));
     }
 

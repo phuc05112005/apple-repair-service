@@ -1,0 +1,442 @@
+mxGraphModel dx=1600 dy=900 grid=1 gridSize=10 guides=1 tooltips=1
+  connect=1 arrows=1 fold=1 page=1 pageScale=1
+  pageWidth=1800 pageHeight=1100 math=0 shadow=0
+  root
+    mxCell id=0
+    mxCell id=1 parent=0
+
+    !-- TITLE --
+    mxCell id=title
+      value=SƠ ĐỒ LUỒNG HOẠT ĐỘNG TỔNG THỂ CỦA NỀN TẢNG FIN-06
+      style=text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontFamily=Arial;fontColor=#0B1F51;
+      vertex=1 parent=1
+      mxGeometry x=250 y=20 width=1300 height=50 as=geometry
+    mxCell
+
+    !-- ====================================================== --
+    !-- LANE NGUOI DUNG --
+    !-- ====================================================== --
+    mxCell id=laneUser value=
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;
+      vertex=1 parent=1
+      mxGeometry x=30 y=90 width=1700 height=210 as=geometry
+    mxCell
+
+    mxCell id=labelUser value=NGƯỜI DÙNG
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#43A047;fontStyle=1;fontSize=17;fontFamily=Arial;align=center;
+      vertex=1 parent=1
+      mxGeometry x=30 y=90 width=150 height=210 as=geometry
+    mxCell
+
+    mxCell id=uLogin value=Đăng ký  Đăng nhập
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=220 y=125 width=170 height=60 as=geometry
+    mxCell
+
+    mxCell id=uChoice value=Muốn thực hiện
+      style=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;strokeWidth=2;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=440 y=115 width=130 height=85 as=geometry
+    mxCell
+
+    mxCell id=uCreate value=Tạo nhóm  quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=630 y=105 width=170 height=55 as=geometry
+    mxCell
+
+    mxCell id=uJoin value=Tham gia nhóm&#xa;bằng mã  liên kết
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=630 y=190 width=170 height=65 as=geometry
+    mxCell
+
+    mxCell id=uInvite value=Nhận và xử lý&#xa;lời mời tham gia nhóm
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=850 y=190 width=190 height=65 as=geometry
+    mxCell
+
+    mxCell id=uPublic value=Được tham gia&#xa;trực tiếp
+      style=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1090 y=180 width=130 height=85 as=geometry
+    mxCell
+
+    mxCell id=uBecomeMember value=Trở thành&#xa;Thành viên
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;strokeWidth=2;fontStyle=1;fontSize=14;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1450 y=190 width=170 height=65 as=geometry
+    mxCell
+
+    !-- ====================================================== --
+    !-- LANE THANH VIEN --
+    !-- ====================================================== --
+    mxCell id=laneMember value=
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1E88E5;strokeWidth=2;
+      vertex=1 parent=1
+      mxGeometry x=30 y=320 width=1700 height=245 as=geometry
+    mxCell
+
+    mxCell id=labelMember value=THÀNH VIÊN
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1E88E5;fontStyle=1;fontSize=17;fontFamily=Arial;align=center;
+      vertex=1 parent=1
+      mxGeometry x=30 y=320 width=150 height=245 as=geometry
+    mxCell
+
+    mxCell id=mEntry value=Tham gia hoạt động&#xa;trong nhóm
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontStyle=1;fontSize=15;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=220 y=345 width=190 height=65 as=geometry
+    mxCell
+
+    mxCell id=mView value=Tra cứu thông tin quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=470 y=340 width=175 height=55 as=geometry
+    mxCell
+
+    mxCell id=mInvite value=Mời người dùng&#xa;tham gia nhóm
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=690 y=340 width=175 height=55 as=geometry
+    mxCell
+
+    mxCell id=mContribute value=Khai báo nộp quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=910 y=340 width=165 height=55 as=geometry
+    mxCell
+
+    mxCell id=mProposal value=Tạo đề xuất chi
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1120 y=340 width=165 height=55 as=geometry
+    mxCell
+
+    mxCell id=mApprovalRequired value=Cần phê duyệt
+      style=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#F9A825;strokeWidth=2;fontSize=12;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1320 y=325 width=120 height=85 as=geometry
+    mxCell
+
+    mxCell id=mVote value=Biểu quyết đề xuất chi&#xa;(nếu đủ quyền)
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1490 y=340 width=185 height=55 as=geometry
+    mxCell
+
+    mxCell id=mLeave value=Rời nhóm
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=470 y=455 width=175 height=55 as=geometry
+    mxCell
+
+    mxCell id=memberNote
+      value=Quản trị nhóm và Thủ quỹ đều là Thành viên của nhóm, vì vậy kế thừa toàn bộ các chức năng cơ bản của Thành viên.
+      style=rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#F8FBFF;strokeColor=#64B5F6;fontSize=12;fontFamily=Arial;fontColor=#37474F;
+      vertex=1 parent=1
+      mxGeometry x=690 y=445 width=590 height=70 as=geometry
+    mxCell
+
+    !-- ====================================================== --
+    !-- LANE ADMIN --
+    !-- ====================================================== --
+    mxCell id=laneAdmin value=
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;
+      vertex=1 parent=1
+      mxGeometry x=30 y=585 width=1700 height=225 as=geometry
+    mxCell
+
+    mxCell id=labelAdmin value=QUẢN TRỊ NHÓM
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#FB8C00;fontStyle=1;fontSize=17;fontFamily=Arial;align=center;
+      vertex=1 parent=1
+      mxGeometry x=30 y=585 width=150 height=225 as=geometry
+    mxCell
+
+    mxCell id=aCreator value=Người tạo nhóm mặc định&#xa;MEMBER + ADMIN
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontStyle=1;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=220 y=615 width=200 height=65 as=geometry
+    mxCell
+
+    mxCell id=aConfig value=Quản lý thông tin&#xa;và cấu hình nhóm  quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=470 y=615 width=200 height=65 as=geometry
+    mxCell
+
+    mxCell id=aRoles value=Quản lý thành viên&#xa;và vai trò
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=720 y=615 width=190 height=65 as=geometry
+    mxCell
+
+    mxCell id=aRoleNote
+      value=Có thể gán ADMIN  TREASURER cho chính mình hoặc thành viên khác
+      style=rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#FFFDF8;strokeColor=#F6A746;fontSize=11;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=700 y=710 width=230 height=55 as=geometry
+    mxCell
+
+    mxCell id=aObligation value=Quản lý nghĩa vụ&#xa;đóng góp
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=960 y=615 width=180 height=65 as=geometry
+    mxCell
+
+    mxCell id=aApproval value=Cấu hình cơ chế&#xa;phê duyệt chi
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1190 y=615 width=180 height=65 as=geometry
+    mxCell
+
+    mxCell id=aJoinApproval value=Duyệt yêu cầu&#xa;tham gia nhóm
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1420 y=615 width=180 height=65 as=geometry
+    mxCell
+
+    mxCell id=aClose value=Đóng nhóm  quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#EF6C00;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1420 y=715 width=180 height=55 as=geometry
+    mxCell
+
+    !-- ====================================================== --
+    !-- LANE TREASURER --
+    !-- ====================================================== --
+    mxCell id=laneTreasurer value=
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#8E24AA;strokeWidth=2;
+      vertex=1 parent=1
+      mxGeometry x=30 y=830 width=1700 height=200 as=geometry
+    mxCell
+
+    mxCell id=labelTreasurer value=THỦ QUỸ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#8E24AA;fontStyle=1;fontSize=17;fontFamily=Arial;align=center;
+      vertex=1 parent=1
+      mxGeometry x=30 y=830 width=150 height=200 as=geometry
+    mxCell
+
+    mxCell id=tEntry value=Thành viên được gán&#xa;vai trò TREASURER
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;fontStyle=1;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=240 y=880 width=210 height=65 as=geometry
+    mxCell
+
+    mxCell id=tConfirm value=Xác nhận&#xa;khoản nộp
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=520 y=880 width=175 height=65 as=geometry
+    mxCell
+
+    mxCell id=tExpense value=Ghi nhận&#xa;khoản chi
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=780 y=880 width=175 height=65 as=geometry
+    mxCell
+
+    mxCell id=tTransfer value=Chuyển giao quỹ
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1040 y=880 width=175 height=65 as=geometry
+    mxCell
+
+    mxCell id=tReceive value=Xác nhận nhận&#xa;chuyển giao
+      style=rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7B1FA2;strokeWidth=2;fontSize=13;fontFamily=Arial;
+      vertex=1 parent=1
+      mxGeometry x=1300 y=880 width=190 height=65 as=geometry
+    mxCell
+
+
+    !-- ====================================================== --
+    !-- EDGES USER --
+    !-- ====================================================== --
+
+    mxCell id=e1 style=edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#455A64;
+      edge=1 parent=1 source=uLogin target=uChoice
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e2 value=Tạo nhóm
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#455A64;fontSize=11;
+      edge=1 parent=1 source=uChoice target=uCreate
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e3 value=Tham gia
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#455A64;fontSize=11;
+      edge=1 parent=1 source=uChoice target=uJoin
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e4
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#455A64;
+      edge=1 parent=1 source=uJoin target=uPublic
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e5
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#455A64;
+      edge=1 parent=1 source=uInvite target=uPublic
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e6 value=Có
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#2E7D32;fontSize=11;
+      edge=1 parent=1 source=uPublic target=uBecomeMember
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- CREATE GROUP - ADMIN --
+    mxCell id=e7
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;
+      edge=1 parent=1 source=uCreate target=aCreator
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- PRIVATE JOIN - ADMIN APPROVAL --
+    mxCell id=e8 value=Nhóm PRIVATE  cần duyệt
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;fontSize=11;
+      edge=1 parent=1 source=uPublic target=aJoinApproval
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e9 value=Được duyệt
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#2E7D32;fontSize=11;
+      edge=1 parent=1 source=aJoinApproval target=uBecomeMember
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- MEMBER ENTRY --
+    mxCell id=e10
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=uBecomeMember target=mEntry
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- MEMBER FUNCTIONS --
+    mxCell id=e11 style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mEntry target=mView
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e12 style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mEntry target=mInvite
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e13 style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mEntry target=mContribute
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e14 style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mEntry target=mProposal
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e15 style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mEntry target=mLeave
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- MEMBER INVITE - USER RECEIVES INVITATION --
+    mxCell id=e16
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#2E7D32;
+      edge=1 parent=1 source=mInvite target=uInvite
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- CONTRIBUTION - TREASURER --
+    mxCell id=e17
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;
+      edge=1 parent=1 source=mContribute target=tConfirm
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- PROPOSAL FLOW --
+    mxCell id=e18
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;
+      edge=1 parent=1 source=mProposal target=mApprovalRequired
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e19 value=Có
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#1565C0;fontSize=11;
+      edge=1 parent=1 source=mApprovalRequired target=mVote
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e20 value=Không
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;fontSize=11;
+      edge=1 parent=1 source=mApprovalRequired target=tExpense
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e21 value=Đạt điều kiện phê duyệt
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;fontSize=11;
+      edge=1 parent=1 source=mVote target=tExpense
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- ADMIN FLOW --
+    mxCell id=e22
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;
+      edge=1 parent=1 source=aCreator target=aConfig
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e23
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;
+      edge=1 parent=1 source=aConfig target=aRoles
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e24
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;
+      edge=1 parent=1 source=aRoles target=aObligation
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e25
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#EF6C00;
+      edge=1 parent=1 source=aObligation target=aApproval
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- ASSIGN TREASURER --
+    mxCell id=e26 value=Gán TREASURER
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;fontSize=11;
+      edge=1 parent=1 source=aRoles target=tEntry
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    !-- TREASURER FUNCTIONS --
+    mxCell id=e27
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;
+      edge=1 parent=1 source=tEntry target=tConfirm
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e28
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;
+      edge=1 parent=1 source=tEntry target=tExpense
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e29
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;
+      edge=1 parent=1 source=tEntry target=tTransfer
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+    mxCell id=e30
+      style=edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeWidth=2;strokeColor=#7B1FA2;
+      edge=1 parent=1 source=tTransfer target=tReceive
+      mxGeometry relative=1 as=geometry
+    mxCell
+
+  root
+mxGraphModel

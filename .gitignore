@@ -3,7 +3,20 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-docs/
+docs/*
+!docs/SYSTEM_TEST_MATRIX.md
+!docs/FEATURE_COMPLETENESS_MATRIX.md
+!docs/DEMO_DATA_PLAN.md
+!docs/REACT_SYSTEM_COMPLETION_REPORT.md
+!docs/OPERATIONAL_DATA_REPORT.md
+!docs/DEMO_DATA_GUIDE.md
+!docs/DOCKER_COMPOSE_GUIDE.md
+!docs/DEPLOYMENT_ARCHITECTURE.md
+!docs/DEPLOYMENT_RUNBOOK.md
+!docs/BACKUP_RESTORE_GUIDE.md
+!docs/CD_DEPLOYMENT_GUIDE.md
+!docs/DEPENDENCY_SECURITY_REVIEW.md
+!docs/FULL_STACK_LIVE_TEST_REPORT.md
 
 ### STS ###
 .apt_generated
@@ -36,6 +49,13 @@ build/
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
+.env
+
+### Local operational/deployment output ###
+target/operational-data/
+target/live-e2e/

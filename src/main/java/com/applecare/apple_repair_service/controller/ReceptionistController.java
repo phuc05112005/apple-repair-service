@@ -22,7 +22,7 @@ import java.util.List;
 public class ReceptionistController {
     private final AppointmentService appointments;
     private final ServiceTicketService tickets;
-    private final AssignmentService assignments;
+    private final AssignmentOrchestrationService assignments;
     private final TechnicianRecommendationService recommendations;
     private final RepairItemService items;
     private final PaymentService payments;
@@ -87,7 +87,7 @@ public class ReceptionistController {
     @PostMapping("/service-tickets/{id}/assignments")
     @ResponseStatus(HttpStatus.CREATED)
     public AssignmentResponse assign(@PathVariable @Positive Long id, @Valid @RequestBody AssignTechnicianCommand request) {
-        return assignments.assignTechnician(id,new AssignTechnicianRequest(request.technicianId(),actor.id(),request.source()));
+        return assignments.assign(id,new AssignTechnicianRequest(request.technicianId(),actor.id(),request.source()));
     }
     @PostMapping("/repair-items/{id}/approval")
     public RepairItemResponse approval(@PathVariable @Positive Long id, @Valid @RequestBody ApprovalCommand request) {

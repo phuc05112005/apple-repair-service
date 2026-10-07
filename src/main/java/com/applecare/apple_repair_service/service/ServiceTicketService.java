@@ -298,7 +298,9 @@ public class ServiceTicketService {
             var item = current.stream()
                     .filter(x -> x.getApprovalStatus() != ApprovalStatus.REJECTED
                             && x.getServiceCatalogItem().getId().equals(c.getId())
-                            && Objects.equals(x.getItemNameSnapshot(), c.getName())
+                            && (Objects.equals(x.getItemNameSnapshot(), c.getName())
+                                || (x.getWarrantySourceItem() != null
+                                    && Objects.equals(x.getItemNameSnapshot(), "Bảo hành · " + c.getName())))
                             && sameAmount(x.getBasePrice(), request.basePrice())
                             && sameAmount(x.getFinalPrice(), request.finalPrice())
                             && Objects.equals(x.getWarrantySourceItem() == null ? null : x.getWarrantySourceItem().getId(), request.warrantySourceItemId()))
@@ -306,7 +308,8 @@ public class ServiceTicketService {
             retained.add(item);
             item.setServiceTicket(t);
             item.setServiceCatalogItem(c);
-            item.setItemNameSnapshot(c.getName());
+            if (item.getId() == null || item.getWarrantySourceItem() == null)
+                item.setItemNameSnapshot(c.getName());
             item.setBasePrice(request.basePrice());
             item.setFinalPrice(request.finalPrice());
             if (request.warrantySourceItemId() != null) {

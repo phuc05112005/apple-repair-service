@@ -1,0 +1,14 @@
+.git
+.idea
+.vscode
+target
+frontend/node_modules
+frontend/dist
+frontend/playwright-report
+frontend/test-results
+ml/.pytest_cache
+ml/**/__pycache__
+ml/data/real
+ml/notebooks
+*.log
+.env

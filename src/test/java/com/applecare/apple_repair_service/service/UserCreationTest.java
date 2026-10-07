@@ -38,4 +38,9 @@ class UserCreationTest {
         assertThrows(BusinessRuleViolationException.class,()->service.create(request("é".repeat(40))));
         verify(repository,never()).saveAndFlush(any());
     }
+    @Test void sixCharacterOperationalPasswordIsHashedAndAccepted() {
+        when(repository.saveAndFlush(any())).thenAnswer(i -> { User u=i.getArgument(0); u.setId(2L); return u; });
+        service.create(request("123456"));
+        verify(repository).saveAndFlush(argThat(user -> encoder.matches("123456", user.getPasswordHash())));
+    }
 }
