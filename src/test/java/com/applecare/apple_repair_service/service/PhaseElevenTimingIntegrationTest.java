@@ -1,7 +1,9 @@
 package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.entity.*;
+import com.applecare.apple_repair_service.dto.request.AssignTechnicianRequest;
 import com.applecare.apple_repair_service.enums.*;
+import com.applecare.apple_repair_service.repository.MlPredictionRepository;
 import com.applecare.apple_repair_service.repository.ServiceTimeEstimateHistoryRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
@@ -31,6 +33,8 @@ class PhaseElevenTimingIntegrationTest {
  @Autowired ServiceTimingService timing;
  @Autowired TimingMetricsService metrics;
  @Autowired ServiceTimeEstimateHistoryRepository histories;
+ @Autowired AssignmentOrchestrationService assignmentOrchestration;
+ @Autowired MlPredictionRepository mlPredictions;
  ApiFixture f;
  @BeforeEach void setup(){clock.at("09:00");f=new ApiFixture(em,clock);f.create();shift(f.technician);}
  void shift(User tech){var s=new TechnicianSchedule();s.setTechnician(tech);s.setBranch(f.branch);s.setWorkDate(LocalDate.now(clock));s.setStartTime(LocalTime.of(8,0));s.setEndTime(LocalTime.of(20,0));em.persist(s);em.flush();}
@@ -41,6 +45,7 @@ class PhaseElevenTimingIntegrationTest {
  void finish(ServiceTicket t){statuses.changeStatus(t,ServiceTicketStatus.WAITING_HANDOVER,f.technician,"Complete");}
  void pause(int value){var rows=em.createQuery("select s from SystemSetting s where s.settingKey=:key",SystemSetting.class).setParameter("key",TimingSettings.BREAK).getResultList();var s=rows.isEmpty()?new SystemSetting():rows.getFirst();s.setSettingKey(TimingSettings.BREAK);s.setSettingValue(""+value);if(s.getId()==null)em.persist(s);em.flush();}
  @Test void creationHasProvisionalEtaDeadlineHistoryWithoutAssignment(){var t=create(40);assertEquals(at("09:00"),t.getInitialEstimatedStartAt());assertEquals(at("09:40"),t.getInitialEstimatedCompletionAt());assertEquals(at("09:15"),t.getAssignmentDueAt());assertEquals(1,histories.findAllByServiceTicket_IdOrderByCreatedAtAscIdAsc(t.getId()).size());clock.at("09:16");assertEquals(1,Duration.between(t.getAssignmentDueAt(),LocalDateTime.now(clock)).toMinutes());assertEquals(ServiceTicketStatus.WAITING_ASSIGNMENT,t.getStatus());assertEquals(0,em.createQuery("select count(a) from Assignment a where a.serviceTicket.id=:id",Long.class).setParameter("id",t.getId()).getSingleResult());}
+ @Test void mlDisabledFallsBackAndStillPersistsAssignmentWithEta(){var t=create(40);var initial=t.getEstimatedCompletionAt();var response=assignmentOrchestration.assign(t.getId(),new AssignTechnicianRequest(f.technician.getId(),f.receptionist.getId(),AssignmentSource.MANUAL_OVERRIDE));em.flush();em.clear();var stored=em.find(ServiceTicket.class,t.getId());assertEquals(f.technician.getId(),response.technicianId());assertEquals(ServiceTicketStatus.ASSIGNED,stored.getStatus());assertEquals(40,stored.getEstimatedDurationMinutes());assertNotNull(stored.getEstimatedStartAt());assertNotNull(stored.getEstimatedCompletionAt());assertNotNull(initial);assertEquals(0,mlPredictions.findAllByServiceTicket_IdAndPredictionTypeOrderByPredictedAtDesc(t.getId(),PredictionType.REPAIR_DURATION).size());}
  @Test void lateActualStartMovesCurrentEtaButPreservesInitialAndExcludesQueueWait(){clock.at("10:30");var t=create(40);assign(t);clock.at("10:40");start(t);assertEquals(at("11:10"),t.getInitialEstimatedCompletionAt());assertEquals(at("11:20"),t.getEstimatedCompletionAt());assertEquals(at("10:40"),t.getActualRepairStartedAt());clock.at("10:45");var m=metrics.calculate(t.getId());assertEquals(10,m.startDelayMinutes());assertEquals(10,m.queueWaitMinutes());assertEquals(5,m.actualActiveRepairMinutes());}
  @Test void completionPreservesOverdueEtaAndCascadesQueue(){var a=create(90);assign(a);start(a);var b=create(90);assign(b);var initial=b.getInitialEstimatedStartAt();assertEquals(at("10:40"),b.getEstimatedStartAt());clock.at("10:45");finish(a);assertEquals(at("10:30"),a.getEstimatedCompletionAt());assertEquals(15,metrics.calculate(a.getId()).currentEtaCompletionDelayMinutes());assertEquals(at("10:55"),b.getEstimatedStartAt());assertEquals(initial,b.getInitialEstimatedStartAt());}
  @Test void earlyCompletionPullsQueueForwardAndBreakIsNotAnEnforcedTimer(){var a=create(60);assign(a);start(a);var b=create(60);assign(b);assertEquals(at("10:10"),b.getEstimatedStartAt());clock.at("09:50");finish(a);assertEquals(at("10:00"),b.getEstimatedStartAt());clock.at("09:53");start(b);assertEquals(at("09:53"),b.getActualRepairStartedAt());assertEquals(at("10:53"),b.getEstimatedCompletionAt());assertEquals(0,metrics.calculate(b.getId()).actualActiveRepairMinutes());}

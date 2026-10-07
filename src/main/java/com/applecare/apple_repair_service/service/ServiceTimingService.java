@@ -42,6 +42,11 @@ public class ServiceTimingService {
  }
  public void planChanged(ServiceTicket t,User actor) {recalculate(t,actor,"SERVICE_PLAN_CHANGE");}
  public void transferred(ServiceTicket t,User actor) {recalculate(t,actor,"TRANSFER");}
+ public void assignmentPrediction(ServiceTicket t,User technician,long minutes,User actor) {
+  BusinessRules.require(minutes>0,"Thời lượng kỹ thuật dự đoán phải lớn hơn 0.");
+  BusinessRules.require(t.getStatus()==ServiceTicketStatus.ASSIGNED,"Chỉ tinh chỉnh ETA sau khi phân công thành công.");
+  recalculate(t,actor,"ML_ASSIGNMENT_REFINEMENT",minutes);
+ }
  public void manual(ServiceTicket t,LocalDateTime start,LocalDateTime completion,long minutes,User actor,String reason) {
   BusinessRules.require(!terminal(t) && !waiting(t),"Chỉ điều chỉnh ETA cho phiếu đang có thể xử lý.");
   BusinessRules.require(!completion.isBefore(start) && completion.isAfter(LocalDateTime.now(clock)),"ETA hoàn thành phải sau thời điểm hiện tại và không trước thời điểm bắt đầu.");
@@ -49,7 +54,8 @@ public class ServiceTimingService {
   recalculate(t,actor,"MANUAL: "+BusinessRules.required(reason,"Lý do điều chỉnh ETA"));
  }
 
- private void recalculate(ServiceTicket trigger,User actor,String reason) {
+ private void recalculate(ServiceTicket trigger,User actor,String reason) {recalculate(trigger,actor,reason,null);}
+ private void recalculate(ServiceTicket trigger,User actor,String reason,Long triggerDurationOverride) {
   var now=LocalDateTime.now(clock);var config=settings.values();
   var active=assignments.findTimingAssignments();
   var unassigned=tickets.findUnassignedForTiming();
@@ -64,7 +70,8 @@ public class ServiceTimingService {
   var blocked=new HashSet<Long>();
   var byWorker=active.stream().collect(Collectors.groupingBy(a->a.getTechnician().getId()));
   var durationMap=new HashMap<Long,Long>();
-  for(var t:all.values())durationMap.put(t.getId(),estimate(t,itemMap.getOrDefault(t.getId(),List.of()),t==trigger && reason.equals("SERVICE_PLAN_CHANGE")));
+  for(var t:all.values())durationMap.put(t.getId(),t.getId().equals(trigger.getId()) && triggerDurationOverride!=null
+          ?triggerDurationOverride:estimate(t,itemMap.getOrDefault(t.getId(),List.of()),t==trigger && reason.equals("SERVICE_PLAN_CHANGE")));
   for(var worker:byWorker.entrySet()) {
    long workerId=worker.getKey();var queue=new ArrayList<>(worker.getValue());
    queue.sort(Comparator.comparingInt((Assignment a)->active(a.getServiceTicket())?0:1)

@@ -1,0 +1,53 @@
+{
+  "tickets_scanned": 0,
+  "eligible_samples": 0,
+  "excluded_total": 0,
+  "count_by_reason": {},
+  "excluded_samples": [],
+  "dataset_rows": 0,
+  "dataset_columns": 24,
+  "date_range": {
+    "prediction_timestamp_min": null,
+    "prediction_timestamp_max": null
+  },
+  "missing_values": {
+    "sample_id": 0,
+    "prediction_timestamp": 0,
+    "completed_at": 0,
+    "device_type": 0,
+    "device_model": 0,
+    "service_issue": 0,
+    "technical_action": 0,
+    "is_warranty": 0,
+    "catalog_service": 0,
+    "standard_duration_minutes": 0,
+    "technician_id": 0,
+    "branch_id": 0,
+    "prediction_month": 0,
+    "prediction_weekday": 0,
+    "technician_jobs_completed_before": 0,
+    "technician_average_duration_before": 0,
+    "technician_historical_efficiency_before": 0,
+    "technician_issue_jobs_before": 0,
+    "technician_issue_average_duration_before": 0,
+    "technician_issue_efficiency_before": 0,
+    "technician_catalog_jobs_before": 0,
+    "technician_catalog_average_duration_before": 0,
+    "technician_catalog_efficiency_before": 0,
+    "actual_technical_minutes": 0
+  },
+  "technical_action_distribution": {},
+  "warranty_distribution": {},
+  "target_distribution": {
+    "count": 0,
+    "min": null,
+    "max": null,
+    "mean": null,
+    "median": null,
+    "q25": null,
+    "q75": null
+  },
+  "validation": "PASS",
+  "pipeline_status": "REAL-DATA PIPELINE FUNCTIONALLY VERIFIED",
+  "production_validation": "INSUFFICIENT REAL DATA FOR STATISTICAL PRODUCTION VALIDATION"
+}

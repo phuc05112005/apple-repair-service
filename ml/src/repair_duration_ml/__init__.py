@@ -1,19 +1,5 @@
-"""Reusable V2 repair-duration regression experiment core."""
+"""Reproducible experimental repair-duration regression package."""
 
-from .config import (
-    CATEGORICAL_FEATURES,
-    FEATURE_COLUMNS,
-    NUMERIC_FEATURES,
-    OUTPUT_COLUMNS,
-    SEED,
-    TARGET,
-)
+from .config import EXPERIMENT_VERSION, FINAL_FEATURE_COLUMNS, SEED, TARGET
 
-__all__ = [
-    "CATEGORICAL_FEATURES",
-    "FEATURE_COLUMNS",
-    "NUMERIC_FEATURES",
-    "OUTPUT_COLUMNS",
-    "SEED",
-    "TARGET",
-]
+__all__ = ["EXPERIMENT_VERSION", "FINAL_FEATURE_COLUMNS", "SEED", "TARGET"]

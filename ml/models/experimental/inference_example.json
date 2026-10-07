@@ -1,0 +1,7 @@
+{
+  "sample_id": "SYN_RD_FINAL_005000",
+  "prediction_timestamp": "2026-09-30T17:34:00",
+  "predicted_technical_minutes": 127.60356521820154,
+  "actual_technical_minutes": 85.0,
+  "model_file": "ml/models/experimental/model.cbm"
+}

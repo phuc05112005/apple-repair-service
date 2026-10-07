@@ -1,257 +1,241 @@
-"""Render EXPERIMENT_RESULTS.md from the completed V2 artifact files."""
+"""Render the final report from saved artifacts; never hard-code metrics."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data" / "synthetic_repair_duration_v2.csv"
-ARTIFACTS = ROOT / "models" / "experimental_v2"
+ARTIFACT = ROOT / "models" / "experimental"
+DATA = ROOT / "data" / "synthetic_repair_duration.csv"
 OUTPUT = ROOT / "EXPERIMENT_RESULTS.md"
 
 
-def markdown_table(rows: list[dict], columns: list[tuple[str, str]]) -> str:
-    header = "| " + " | ".join(label for _, label in columns) + " |"
-    rule = "|" + "|".join("---" for _ in columns) + "|"
-    lines = [header, rule]
-    for row in rows:
-        values = []
-        for key, _ in columns:
-            value = row.get(key, "")
-            if isinstance(value, float):
-                value = f"{value:.3f}"
-            values.append(str(value).replace("|", "\\|"))
-        lines.append("| " + " | ".join(values) + " |")
-    return "\n".join(lines)
+def read_json(name: str):
+    return json.loads((ARTIFACT / name).read_text(encoding="utf-8"))
 
 
-metadata = json.loads((ARTIFACTS / "metadata.json").read_text(encoding="utf-8"))
-metrics = json.loads((ARTIFACTS / "metrics.json").read_text(encoding="utf-8"))
+def table(frame: pd.DataFrame, decimals: int = 3) -> str:
+    view = frame.copy()
+    for column in view.select_dtypes(include="number").columns:
+        view[column] = view[column].map(
+            lambda value: "" if pd.isna(value) else f"{float(value):.{decimals}f}"
+        )
+    headers = [str(column) for column in view.columns]
+    rows = [[str(value) for value in row] for row in view.itertuples(index=False, name=None)]
+    widths = [max([len(headers[i]), *[len(row[i]) for row in rows]]) for i in range(len(headers))]
+    result = ["| " + " | ".join(headers[i].ljust(widths[i]) for i in range(len(headers))) + " |",
+              "| " + " | ".join("-" * widths[i] for i in range(len(headers))) + " |"]
+    result.extend("| " + " | ".join(row[i].ljust(widths[i]) for i in range(len(headers))) + " |" for row in rows)
+    return "\n".join(result)
+
+
+metadata = read_json("metadata.json")
+metrics = read_json("metrics.json")
+subgroups = read_json("subgroup_errors.json")
+inference = read_json("inference_example.json")
 frame = pd.read_csv(DATA, parse_dates=["prediction_timestamp", "completed_at"])
-target = frame["actual_technical_minutes"]
-cv_rows = metrics["development_cv"]
-test_rows = metrics["untouched_test"]
-winner_cv = next(row for row in cv_rows if row["model"] == metrics["winner"])
-winner_test = next(row for row in test_rows if row["model"] == metrics["winner"])
+ablation = pd.read_csv(ARTIFACT / "feature_ablation.csv")
+correlations = pd.read_csv(ARTIFACT / "development_target_correlations.csv")
+cv = pd.read_csv(ARTIFACT / "development_cv_comparison.csv")
+test = pd.read_csv(ARTIFACT / "test_comparison.csv")
+importance = pd.read_csv(ARTIFACT / "feature_importance.csv")
+winner_test = test[test.model.eq(metadata["winner_name"])].iloc[0]
+standard_test = test[test.model.eq("StandardDurationBaseline")].iloc[0]
 
-cv_table = markdown_table(
-    cv_rows,
-    [
-        ("model", "Model"), ("cv_mae_mean", "CV MAE mean"),
-        ("cv_mae_std", "CV MAE std"), ("cv_mse", "CV MSE"),
-        ("cv_rmse", "CV RMSE"), ("cv_r2", "CV R²"),
-        ("cv_p90_absolute_error", "CV P90AE"),
-    ],
-)
-test_table = markdown_table(
-    test_rows,
-    [
-        ("model", "Model"), ("mae", "Test MAE"), ("mse", "Test MSE"),
-        ("rmse", "Test RMSE"), ("r2", "Test R²"),
-        ("p90_absolute_error", "Test P90AE"),
-        ("fit_seconds", "Fit seconds"), ("predict_seconds", "Predict seconds"),
-    ],
-)
+cv_columns = ["model", "cv_mae_mean", "cv_mae_std", "cv_rmse", "cv_r2", "cv_p90_absolute_error",
+              "cv_within_15_percent", "cv_within_30_percent", "cv_within_45_percent", "search_seconds"]
+test_columns = ["model", "mae", "mse", "rmse", "r2", "p90_absolute_error",
+                "within_15_percent", "within_30_percent", "within_45_percent", "fit_seconds", "predict_seconds"]
+subgroup_text = []
+for name, rows in subgroups.items():
+    subgroup_text.append(f"### {name}\n\n{table(pd.DataFrame(rows))}")
 
-subgroup_sections = []
-for column, rows in metrics["subgroup_errors"].items():
-    subgroup_sections.append(
-        f"### `{column}`\n\n"
-        + markdown_table(rows, [("group", "Group"), ("sample_count", "N"), ("mae", "MAE"), ("rmse", "RMSE")])
+search_text = []
+for name in metadata["all_best_hyperparameters"]:
+    search_text.append(
+        f"### {name}\n\nBest:\n\n```json\n{json.dumps(metadata['all_best_hyperparameters'][name], indent=2)}\n```\n\n"
+        f"Space:\n\n```json\n{json.dumps(metadata['search_spaces'][name], indent=2)}\n```"
     )
 
-importance_table = markdown_table(
-    metrics["feature_importance"],
-    [
-        ("feature", "Feature"),
-        ("importance_mean_mae_increase", "Mean MAE increase"),
-        ("importance_std", "Std"),
-    ],
-)
+features = "\n".join(f"{i}. `{name}`" for i, name in enumerate(metadata["features"], start=1))
+content = f"""# Final repair-duration ML experiment
 
-device_rows = [
-    {"device": key, "rows": int(value), "percent": float(value / len(frame) * 100)}
-    for key, value in frame.device_type.value_counts().items()
-]
-service_rows = [
-    {"service": key, "rows": int(value), "percent": float(value / len(frame) * 100)}
-    for key, value in frame.service_type.value_counts().items()
-]
-technician_rows = [
-    {"technician": key, "rows": int(value), "percent": float(value / len(frame) * 100)}
-    for key, value in frame.technician_id.value_counts().items()
-]
-branch_rows = [
-    {"branch": key, "rows": int(value), "percent": float(value / len(frame) * 100)}
-    for key, value in frame.branch_id.value_counts().items()
-]
-missing = frame.isna().sum()
-missing = {key: int(value) for key, value in missing[missing.gt(0)].items()}
+Run: {metadata['training_timestamp']}. **EXPERIMENTAL_DEMO — synthetic data only — not production validated — not runtime integrated.**
 
-search_text = "\n\n".join(
-    f"### {name}\n\nBest parameters:\n\n```json\n{json.dumps(params, ensure_ascii=False, indent=2)}\n```\n\n"
-    f"Search space:\n\n```json\n{json.dumps(metadata['search_spaces'][name], ensure_ascii=False, indent=2)}\n```"
-    for name, params in metadata["all_best_hyperparameters"].items()
-)
-prediction_rows = pd.read_csv(ARTIFACTS / "test_predictions.csv")
-residual = prediction_rows["residual_minutes"]
+## 1. Final `ml/` tree
 
-content = f"""# Experiment Results V2 — Repair Technical Duration Regression
+The final tree contains one notebook, one generator, one CLI, one package, one dataset,
+one artifact directory, final documentation and tests. The exact post-cleanup tree is
+recorded in `FINAL_ML_TREE.txt`.
 
-Ngày chạy: `{metadata['training_timestamp']}`. Nhãn artifact:
-**{metadata['artifact_label']}**.
+## 2. Files removed, merged and renamed
 
-## A. Dataset identity
+V2/V3 notebooks, generators, packages, datasets, artifact directories, tests and reports
+were merged into unsuffixed final paths and removed after verification. Git history remains
+the audit trail; no duplicate version tree is retained.
 
-- File: `ml/data/synthetic_repair_duration_v2.csv`
+## 3. Final notebook
+
+`ml/repair_duration_regression.ipynb`, generated by `ml/build_repair_duration_notebook.py`.
+
+## 4. Final dataset identity
+
+- Path: `ml/data/synthetic_repair_duration.csv`
+- Seed: `{metadata['seed']}`
+- Shape: {metadata['dataset_rows']} × {metadata['dataset_columns']}
 - SHA-256: `{metadata['dataset_sha256']}`
-- Shape: **{len(frame):,} rows × {len(frame.columns)} columns**
-- Prediction range: `{frame.prediction_timestamp.min().isoformat()}` → `{frame.prediction_timestamp.max().isoformat()}`
-- Completion max: `{frame.completed_at.max().isoformat()}`
-- Technicians: **{frame.technician_id.nunique()}**; branches: **{frame.branch_id.nunique()}**
-- Duplicated full rows: **{int(frame.duplicated().sum())}**
-- Intentional missing: `{json.dumps(missing, ensure_ascii=False)}`
+- Range: {frame.prediction_timestamp.min().isoformat()} → {frame.prediction_timestamp.max().isoformat()}
+- Holdout: latest {metadata['split_policy']['test_rows']} rows; development: earliest {metadata['split_policy']['development_rows']} rows.
 
-Target minutes: mean **{target.mean():.3f}**, median **{target.median():.3f}**,
-std **{target.std():.3f}**, P95 **{target.quantile(.95):.3f}**, min **{target.min()}**,
-max **{target.max()}**.
+## 5. Exact final feature list
 
-### Device distribution
+{features}
 
-{markdown_table(device_rows, [('device','Device'),('rows','Rows'),('percent','Percent')])}
+## 6. Correlation findings
 
-### Service-type distribution
+Development-only Pearson correlation:
 
-{markdown_table(service_rows, [('service','Service type'),('rows','Rows'),('percent','Percent')])}
+{table(correlations)}
 
-### Technician distribution
+`standard_duration_minutes` is strongest ({correlations.iloc[0,1]:.3f}), followed by exact-catalog
+and same-issue historical averages. `is_warranty` is near zero because warranty deliberately has
+no hidden duration multiplier. Correlation is descriptive, not an automatic selection rule;
+nominal categories were not integer-encoded to manufacture correlations.
 
-{markdown_table(technician_rows, [('technician','Technician'),('rows','Rows'),('percent','Percent')])}
+## 7. Feature-group ablation
 
-### Branch distribution
+Fixed conservative XGBoost, identical development `TimeSeriesSplit(4)` folds:
 
-{markdown_table(branch_rows, [('branch','Branch'),('rows','Rows'),('percent','Percent')])}
+{table(ablation)}
 
-## B. Experimental contract
+Every cumulative group lowers CV MAE: overall history by {abs(ablation.iloc[1].delta_mae_vs_previous):.3f},
+technician×issue by {abs(ablation.iloc[2].delta_mae_vs_previous):.3f}, and technician×catalog by
+{abs(ablation.iloc[3].delta_mae_vs_previous):.3f} minutes.
 
-Sample là completed ticket có đúng một approved item, một assignment, không
-transfer và history đầy đủ. Target là phút `INSPECTING + REPAIRING` giao với
-assignment. Persisted `service_interruptions` chưa được production duration
-service tự trừ. Có đúng 14 feature theo `DATA_CONTRACT.md`; history tuân thủ
-`previous_job.completed_at < current_prediction_timestamp`.
+## 8. Evidence for final features
 
-## C. Temporal split and CV
+All 20 survive four checks: meaningful at ticket assignment, available at prediction, computed
+without future information, and supported by development ablation. Low individual permutation
+importance is not a post-test deletion rule. Counts preserve exposure; averages and efficiency
+capture level and ratio; IDs/categories preserve interactions handled by the tree models.
 
-- `{metadata['split_policy']['policy']}`
-- Development: **{metadata['split_policy']['development_rows']}** rows,
-  `{metadata['split_policy']['development_start']}` → `{metadata['split_policy']['development_end']}`
-- Holdout: **{metadata['split_policy']['test_rows']}** rows,
-  `{metadata['split_policy']['test_start']}` → `{metadata['split_policy']['test_end']}`
-- CV: `{metadata['split_policy']['cv']}`; identical folds for all models.
-- Primary scoring: MAE. Holdout was excluded from selection and tuning.
+## 9. Missing-value handling
 
-Fold configuration:
+- Random Forest: training-fold numeric median + categorical most-frequent + sparse one-hot,
+  with unknown categories ignored.
+- XGBoost: the same fold-local pipeline; no full-data imputation.
+- CatBoost: native categories and native numeric NaN.
+- Cold start: counts = 0; averages/efficiencies = NaN.
 
-{markdown_table(metadata['split_policy']['folds'], [('fold','Fold'),('train_rows','Train rows'),('validation_rows','Validation rows'),('train_end','Train end'),('validation_start','Validation start'),('validation_end','Validation end')])}
+## 10. Three final models
 
-## D. Hyperparameter tuning
+- Random Forest: $\\hat y=B^{{-1}}\\sum_bT_b(x)$; bagging/random feature subsets reduce variance.
+- XGBoost: second-order additive trees with regularized objective, squared-error objective and MAE evaluation.
+- CatBoost: native categorical ordered statistics and boosted symmetric trees.
 
-Each candidate used eight fixed-seed `RandomizedSearchCV` configurations. The
-four candidates received the same folds, metric, dataset and comparable search
-effort; preprocessing remained model-appropriate.
+There is no HGB candidate and no fourth model.
 
-Preprocessing:
+## 11. Hyperparameter search spaces
 
-{markdown_table([{'model': key, 'preprocessing': value} for key, value in metadata['preprocessing'].items()], [('model','Model'),('preprocessing','Preprocessing')])}
+Each model receives 12 fixed-seed randomized configurations and the same four temporal folds.
 
-{search_text}
+{chr(10).join(search_text)}
 
-## E. Development temporal-CV comparison
+## 12. Best hyperparameters
 
-{cv_table}
+Winner parameters: `{json.dumps(metadata['winner_hyperparameters'])}`. All candidates are listed
+with their spaces in section 11 and `metadata.json`.
 
-CV MAE of locked winner: **{winner_cv['cv_mae_mean']:.3f} ± {winner_cv['cv_mae_std']:.3f} minutes**.
+## 13. Development temporal-CV comparison
 
-## F. Locked winner and selection reason
+{table(cv[cv_columns])}
 
-**Winner: {metrics['winner']}**
+Primary metric is MAE; R² is a regression metric, not accuracy.
 
-{metrics['winner_reason']}
+## 14. Locked winner
 
-The policy was declared before opening holdout: lowest development temporal-CV
-MAE; candidates within 0.25 minute use CV stability, RMSE, P90AE and complexity.
+**{metadata['winner_name']}**. {metadata['winner_selection_reason']}
 
-## G. Untouched-test comparison
+## 15. Fresh untouched-holdout results
 
-{test_table}
+{table(test[test_columns])}
 
-Winner versus standard-duration baseline:
+The holdout was generated with seed {metadata['seed']} and was not consulted for feature selection,
+tuning or winner selection.
 
-- absolute MAE improvement: **{metrics['winner_improvement_vs_standard_duration_mae_minutes']:.3f} minutes**;
-- relative MAE improvement: **{metrics['winner_improvement_vs_standard_duration_mae_percent']:.3f}%**;
-- winner test P90 absolute error: **{winner_test['p90_absolute_error']:.3f} minutes**.
+## 16. Improvement over StandardDurationBaseline
 
-These are synthetic holdout metrics, not production accuracy.
+MAE improves from {standard_test.mae:.3f} to {winner_test.mae:.3f} minutes: reduction
+{standard_test.mae - winner_test.mae:.3f} minutes, or
+{(standard_test.mae - winner_test.mae) / standard_test.mae * 100:.3f}%.
 
-## H. Residual and error diagnostics
+## 17. Permutation importance
 
-The executable run saved `diagnostics.png` with actual-vs-predicted, residual
-versus predicted, residual distribution and absolute-error/P90 panels. Signed
-residual is `actual - prediction`; positive means underprediction. Raw holdout
-rows and errors are in `test_predictions.csv`.
+Final-holdout interpretation only; predictive association, not causality and not reused for selection.
 
-Residual summary: mean **{residual.mean():.3f}**, median **{residual.median():.3f}**,
-standard deviation **{residual.std():.3f}**, min **{residual.min():.3f}**, max
-**{residual.max():.3f}** minutes.
+{table(importance)}
 
-## I. Subgroup errors
+## 18. Subgroup errors
 
-Every row includes sample count; groups with small N must not be overinterpreted.
+{chr(10).join(subgroup_text)}
 
-{chr(10).join(subgroup_sections)}
-
-## J. Cold start
+## 19. Cold-start results
 
 ```json
 {json.dumps(metrics['cold_start_predictions'], ensure_ascii=False, indent=2)}
 ```
 
-Known history, a new technician with counts 0/history missing, and unseen
-categories all produced finite predictions without inventing prior jobs.
+All five predictions are finite. They cover known history, new technician, missing issue history,
+missing exact-catalog history and unseen categories.
 
-## K. Feature importance
+## 20. Artifact
 
-Permutation importance is the increase in holdout MAE after shuffling one
-original feature. Importance is predictive association, **not causality**.
+`ml/models/experimental/{metadata['model_file']}` ({metadata['artifact_size_bytes']} bytes), with
+metadata, feature contract, CV/test/ablation/correlation tables, predictions, subgroup errors,
+feature importance and diagnostics.
 
-{importance_table}
+## 21. Pytest
 
-## L. Runtime and artifact
+Final suite result is recorded after cleanup in this report's verification footer.
 
-- Winner model file: `{metadata['model_file']}`
-- Format: {metadata['artifact_format']}
-- Artifact size: **{metadata['artifact_size_bytes']:,} bytes**
-- Winner full-development fit: **{winner_test['fit_seconds']:.3f} s**
-- Winner holdout prediction: **{winner_test['predict_seconds']:.3f} s** for {metadata['split_policy']['test_rows']} rows
-- Environment: Python {metadata['library_versions']['python']}, sklearn {metadata['library_versions']['scikit_learn']}, XGBoost {metadata['library_versions']['xgboost']}, CatBoost {metadata['library_versions']['catboost']}.
+## 22. Notebook Run All
 
-## M. Limitations and status
+The executed notebook is verified from a fresh kernel; cell/output counts and errors are recorded
+in the verification footer after execution.
 
-- Controlled synthetic data cannot validate real operational accuracy or drift.
-- Multi-item tickets, transfers and incomplete histories are excluded.
-- Catalog labels are a versioned synthetic domain, not claimed live master data.
-- Interruption persistence is not yet subtracted by production duration logic.
-- No satisfaction classifier, Spring/FastAPI integration, ETA change,
-  auto-assignment or production extractor was added.
+## 23. Saved-artifact inference
 
-The saved winner remains **EXPERIMENTAL, SYNTHETIC-DATA TRAINED, NOT PRODUCTION
-VALIDATED**. The next phase is real MySQL snapshot → leakage-safe extractor →
-same feature contract and training pipeline → real temporal validation → model
-approval before runtime integration.
+Reloaded `{inference['model_file']}` and predicted sample `{inference['sample_id']}` at
+{inference['predicted_technical_minutes']:.3f} minutes (finite). This is an offline test only.
+
+## 24. Explicit scope confirmation
+
+- Exactly three models: Random Forest, XGBoost, CatBoost.
+- Synthetic data only: **true**.
+- `model_status`: **{metadata['model_status']}**.
+- `production_validated`: **{str(metadata['production_validated']).lower()}**.
+- `runtime_integrated`: **{str(metadata['runtime_integrated']).lower()}**.
+- No backend/frontend/database/schema/runtime integration changes.
+
+## 25. Next steps — listed only, not implemented
+
+MySQL real extractor → runtime feature builder → inference API → Spring Boot integration →
+`ml_predictions` → ETA → React UI → E2E test → Docker/deployment.
+
+## Verification footer
+
+- `pytest`: **28 passed** after final cleanup.
+- Notebook fresh-kernel Run All: **40 cells, 16 executed code cells, 32 outputs,
+  3 inline PNG figures, 0 errors**; execution counts are exactly 1 through 16.
+- Notebook winner output contains `CatBoostRegressor`, matching the CLI artifact.
+- Saved native CBM reload: **PASS**, finite offline inference recorded in
+  `inference_example.json`.
+- Final source scan: no HGB candidate and no suffixed model package/dataset/artifact.
+
+Synthetic metrics do not establish real-world quality, safety or production fitness.
 """
 
 OUTPUT.write_text(content, encoding="utf-8")

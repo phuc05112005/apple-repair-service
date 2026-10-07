@@ -15,6 +15,7 @@ import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.AssignmentSource;
 import com.applecare.apple_repair_service.enums.AssignmentStatus;
 import com.applecare.apple_repair_service.enums.PredictionType;
+import com.applecare.apple_repair_service.enums.PredictionSource;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.enums.TechnicianScheduleStatus;
 import com.applecare.apple_repair_service.enums.TransferMode;
@@ -136,9 +137,21 @@ class TechnicianServiceTest {
         var old = TestData.ticket(ServiceTicketStatus.REPAIRING);
         old.setId(10L);
         a.setServiceTicket(old);
+        a.setAssignedAt(java.time.LocalDateTime.now(TestData.CLOCK).minusMinutes(30));
         when(assignments.findAllByTechnician_IdAndStatus(2L, AssignmentStatus.ACTIVE)).thenReturn(List.of(a));
         when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(TestData.item(1, ticket, ApprovalStatus.APPROVED), TestData.item(2, ticket, ApprovalStatus.APPROVED)));
-        var recommendations = new TechnicianRecommendationService(schedules, assignments, predictions, repairs, access, TestData.CLOCK);
+        var candidateEstimates = mock(MlCandidateEstimateService.class);
+        var timingSettings = mock(TimingSettings.class);
+        when(timingSettings.values()).thenReturn(new TimingSettings.Values(10, 15));
+        when(schedules.findTimingSchedules(any(), any())).thenReturn(List.of(shift(tech), shift(second)));
+        when(candidateEstimates.estimate(eq(ticket), anyList(), any())).thenReturn(java.util.Map.of(
+                2L, new MlCandidateEstimateService.TechnicalEstimate(2L, 45, 45, PredictionSource.ML,
+                        List.of(), "CatBoostRegressor", "v1", "EXPERIMENTAL_DEMO", "v1.1", true, false, null),
+                3L, new MlCandidateEstimateService.TechnicalEstimate(3L, 60, 60,
+                        PredictionSource.STANDARD_DURATION_FALLBACK, List.of("ML_DISABLED"),
+                        null, null, null, null, false, false, null)));
+        var recommendations = new TechnicianRecommendationService(schedules, assignments, predictions, repairs,
+                access, candidateEstimates, timingSettings, TestData.CLOCK);
         var result = recommendations.recommend(1L);
         assertEquals(3L, result.getFirst().technicianId());
         assertTrue(result.getFirst().eligible());
@@ -146,6 +159,15 @@ class TechnicianServiceTest {
         assertEquals(90, result.getLast().estimatedWorkloadMinutes());
         assertEquals(60, result.getFirst().predictedNewJobMinutes());
         assertEquals(45, result.getLast().predictedNewJobMinutes());
+        assertEquals(PredictionSource.STANDARD_DURATION_FALLBACK, result.getFirst().predictionSource());
+        assertEquals(PredictionSource.ML, result.getLast().predictionSource());
+        assertNotNull(result.getFirst().estimatedStartAt());
+        assertNotNull(result.getFirst().estimatedCompletionAt());
+        assertEquals(List.of("ML_DISABLED"), result.getFirst().predictionWarnings());
+        verify(candidateEstimates).estimate(eq(ticket), eq(List.of(2L, 3L)), any());
+        when(access.get(ServiceTicket.class, 99L)).thenThrow(new com.applecare.apple_repair_service.exception.ResourceNotFoundException("not found"));
+        assertThrows(com.applecare.apple_repair_service.exception.ResourceNotFoundException.class,
+                () -> recommendations.recommend(99L));
         assertThrows(BusinessRuleViolationException.class, () -> recommendations.estimate(99L));
     }
 

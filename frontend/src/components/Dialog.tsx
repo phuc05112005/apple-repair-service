@@ -10,11 +10,13 @@ function containsSubmittingLabel(node: ReactNode): boolean {
   return submitting
 }
 
-export function ConfirmDialog({ title, children, busy, confirmLabel = 'Xóa', onCancel, onConfirm }: {
+export function ConfirmDialog({ title, children, busy, confirmLabel = 'Xóa', busyLabel = 'Đang xử lý…', danger = true, onCancel, onConfirm }: {
   title: string
   children: ReactNode
   busy?: boolean
   confirmLabel?: string
+  busyLabel?: string
+  danger?: boolean
   onCancel: () => void
   onConfirm: () => void
 }) {
@@ -26,10 +28,10 @@ export function ConfirmDialog({ title, children, busy, confirmLabel = 'Xóa', on
     return () => { if (dialog.open) dialog.close() }
   }, [])
   return <dialog ref={ref} className="confirm-dialog" aria-labelledby="confirm-title" aria-busy={busy} onCancel={event => { event.preventDefault(); if (!busy) onCancel() }} onMouseDown={event => { if (event.target === event.currentTarget && !busy) onCancel() }}>
-    <div className="dialog-icon dialog-icon--danger" aria-hidden="true">!</div>
+    <div className={`dialog-icon ${danger ? 'dialog-icon--danger' : 'dialog-icon--info'}`} aria-hidden="true">!</div>
     <h2 id="confirm-title">{title}</h2>
     <div className="dialog-copy">{children}</div>
-    <div className="dialog-actions"><button className="button button--quiet" disabled={busy} onClick={onCancel}>Hủy</button><button className="button button--danger" disabled={busy} onClick={onConfirm}>{busy ? 'Đang xóa…' : confirmLabel}</button></div>
+    <div className="dialog-actions"><button className="button button--quiet" disabled={busy} onClick={onCancel}>Hủy</button><button className={`button ${danger ? 'button--danger' : 'button--primary'}`} disabled={busy} onClick={onConfirm}>{busy ? busyLabel : confirmLabel}</button></div>
   </dialog>
 }
 

@@ -161,7 +161,21 @@ class PhaseOneWarrantyIntegrationTest {
         assertEquals(originalStart, claim.getWarrantyStartDate());
         assertEquals(originalEnd, claim.getWarrantyEndDate());
 
-        claim.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
+        claim.getServiceTicket().setStatus(ServiceTicketStatus.INSPECTING);
+        var assignment = new Assignment();
+        assignment.setServiceTicket(claim.getServiceTicket());
+        assignment.setTechnician(f.technician);
+        assignment.setAssignedBy(f.receptionist);
+        assignment.setSource(AssignmentSource.MANUAL_OVERRIDE);
+        assignment.setAssignedAt(LocalDateTime.now(clock));
+        em.persist(assignment);
+        var inspected = tickets.recordInspection(claim.getServiceTicket().getId(), new RecordInspectionRequest(
+                "Xác nhận lỗi thuộc phạm vi bảo hành", f.technician.getId(), false,
+                List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.ZERO, BigDecimal.ZERO, source.getId())),
+                ConfirmationMethod.DIRECT, "Khách xác nhận sửa bảo hành"));
+        assertEquals(ServiceTicketStatus.REPAIRING, inspected.ticket().status());
+        assertEquals(claim.getId(), inspected.repairItems().getFirst().id());
+        assertTrue(inspected.repairItems().getFirst().itemNameSnapshot().startsWith("Bảo hành · "));
         tickets.finishRepair(claim.getServiceTicket().getId(), f.technician.getId());
         assertEquals(originalEnd, claim.getWarrantyEndDate());
         var history = warrantyClaims.history(source.getServiceTicket().getCustomerDevice().getCustomer().getPhone(), null);

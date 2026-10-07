@@ -1,4 +1,4 @@
-"""End-to-end V2 temporal model competition and artifact writer."""
+﻿"""End-to-end final temporal model competition and artifact writer."""
 
 from __future__ import annotations
 
@@ -31,7 +31,9 @@ from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 from .config import (
     CATEGORICAL_FEATURES,
     CV_SPLITS,
+    DEFAULT_SEARCH_ITERATIONS,
     EXPERIMENT_VERSION,
+    FEATURE_CONTRACT_VERSION,
     FEATURE_COLUMNS,
     INTENTIONAL_MISSING_COLUMNS,
     MODEL_NAMES,
@@ -46,13 +48,16 @@ from .config import (
 from .data import feature_target, load_dataset, temporal_holdout_split
 from .evaluation import (
     cold_start_examples,
+    development_numeric_correlations,
     feature_importance,
     regression_metrics,
     subgroup_errors,
     temporal_baseline_metrics,
     temporal_cv_metrics,
 )
+from .features import FEATURE_ABLATION_STAGES, FEATURE_EVIDENCE
 from .models import ModelSpec, NativeCatBoostRegressor, build_model_specs
+from .models import build_reference_xgb
 
 @dataclass
 class CompetitionResult:
@@ -70,6 +75,9 @@ class CompetitionResult:
     split_summary: dict[str, Any]
     search_spaces: dict[str, dict[str, list[Any]]]
     preprocessing: dict[str, str]
+    feature_ablation: pd.DataFrame
+    numeric_correlations: pd.DataFrame
+    target_correlations: pd.Series
 
 
 def _json_default(value: Any) -> Any:
@@ -101,10 +109,9 @@ def sha256_file(path: str | Path) -> str:
 
 def _complexity_rank(model_name: str) -> int:
     return {
-        "HistGradientBoostingRegressor": 1,
-        "RandomForestRegressor": 2,
-        "XGBRegressor": 3,
-        "CatBoostRegressor": 4,
+        "RandomForestRegressor": 1,
+        "XGBRegressor": 2,
+        "CatBoostRegressor": 3,
     }[model_name]
 
 
@@ -112,7 +119,7 @@ def select_winner(cv_table: pd.DataFrame) -> tuple[str, str]:
     """Select exclusively from development CV metrics, never holdout metrics."""
     candidates = cv_table[cv_table["model"].isin(MODEL_NAMES)].copy()
     if set(candidates["model"]) != set(MODEL_NAMES):
-        raise ValueError("CV table must contain all four candidate models")
+        raise ValueError("CV table must contain all three candidate models")
     best_mae = float(candidates["cv_mae_mean"].min())
     near_ties = candidates[
         candidates["cv_mae_mean"] <= best_mae + NEAR_TIE_MINUTES
@@ -228,16 +235,46 @@ def _test_candidate(
     }
 
 
+def run_feature_ablation(
+    development: pd.DataFrame,
+    folds: list[tuple[np.ndarray, np.ndarray]],
+) -> pd.DataFrame:
+    """Evaluate cumulative feature groups without accessing the holdout."""
+    rows: list[dict[str, Any]] = []
+    previous_mae: float | None = None
+    y_dev = development[TARGET].astype(float)
+    for stage, columns in FEATURE_ABLATION_STAGES.items():
+        estimator = build_reference_xgb(list(columns))
+        summary, _ = temporal_cv_metrics(
+            estimator, development[list(columns)].copy(), y_dev, folds
+        )
+        current_mae = float(summary["cv_mae_mean"])
+        rows.append({
+            "stage": stage,
+            "feature_count": len(columns),
+            "cv_mae_mean": current_mae,
+            "cv_mae_std": float(summary["cv_mae_std"]),
+            "cv_rmse": float(summary["cv_rmse"]),
+            "cv_r2": float(summary["cv_r2"]),
+            "cv_p90_absolute_error": float(summary["cv_p90_absolute_error"]),
+            "delta_mae_vs_previous": np.nan if previous_mae is None else current_mae - previous_mae,
+        })
+        previous_mae = current_mae
+    return pd.DataFrame(rows)
+
+
 def run_competition(
     data_path: str | Path,
     *,
     output_dir: str | Path | None = None,
     cv_splits: int = CV_SPLITS,
     test_fraction: float = TEST_FRACTION,
-    search_iterations: int = 8,
+    search_iterations: int = DEFAULT_SEARCH_ITERATIONS,
     smoke: bool = False,
 ) -> CompetitionResult:
-    """Run the fair V2 competition and optionally persist the winner artifact."""
+    """Run the fair final competition and optionally persist the winner artifact."""
+    if not smoke and not 12 <= search_iterations <= 16:
+        raise ValueError("Full search requires 12 to 16 configurations per model")
     np.random.seed(SEED)
     data_path = Path(data_path).resolve()
     frame = load_dataset(data_path)
@@ -247,6 +284,8 @@ def run_competition(
     if cv_splits < 2:
         raise ValueError("At least two temporal CV folds are required")
     folds = list(TimeSeriesSplit(n_splits=cv_splits).split(X_dev))
+    numeric_correlations, target_correlations = development_numeric_correlations(split.development)
+    feature_ablation = run_feature_ablation(split.development, folds)
 
     cv_rows, fold_metrics = _baseline_cv_rows(X_dev, y_dev, folds)
     specs = build_model_specs(smoke=smoke)
@@ -294,7 +333,13 @@ def run_competition(
     winner_predictions = model_predictions[winner_name]
     subgroup_metrics = {
         column: subgroup_errors(split.test, winner_predictions, column)
-        for column in ["technician_id", "device_type", "service_issue", "service_type"]
+        for column in [
+            "technician_id",
+            "device_type",
+            "service_issue",
+            "technical_action",
+            "is_warranty",
+        ]
     }
     importances = feature_importance(winner_estimator, X_test, y_test)
     cold_rows = cold_start_examples(X_dev)
@@ -340,6 +385,9 @@ def run_competition(
         },
         search_spaces={name: spec.parameters for name, spec in specs.items()},
         preprocessing={name: spec.preprocessing for name, spec in specs.items()},
+        feature_ablation=feature_ablation,
+        numeric_correlations=numeric_correlations,
+        target_correlations=target_correlations,
     )
     if output_dir is not None:
         save_experiment(result, frame, split.test, data_path, Path(output_dir))
@@ -386,6 +434,11 @@ def save_experiment(
         dataset_path = data_path.name
     result.cv_table.to_csv(output_dir / "development_cv_comparison.csv", index=False)
     result.test_table.to_csv(output_dir / "test_comparison.csv", index=False)
+    result.feature_ablation.to_csv(output_dir / "feature_ablation.csv", index=False)
+    result.numeric_correlations.to_csv(output_dir / "development_numeric_correlations.csv")
+    result.target_correlations.rename("target_correlation").to_csv(
+        output_dir / "development_target_correlations.csv"
+    )
     pd.DataFrame(result.feature_importances).to_csv(
         output_dir / "feature_importance.csv", index=False
     )
@@ -426,6 +479,8 @@ def save_experiment(
         "subgroup_errors": result.subgroup_metrics,
         "cold_start_predictions": result.cold_start_predictions,
         "feature_importance": result.feature_importances,
+        "feature_ablation": result.feature_ablation.to_dict(orient="records"),
+        "development_target_correlations": result.target_correlations.to_dict(),
     }
     _json_write(output_dir / "metrics.json", metrics)
 
@@ -440,8 +495,9 @@ def save_experiment(
         "dataset_columns": int(len(frame.columns)),
         "features": FEATURE_COLUMNS,
         "target": TARGET,
-        "sample_grain": "completed ticket with exactly one approved item, one assignment, no transfer, complete status history",
+        "sample_grain": "completed ticket with exactly one APPROVED repair item, one concrete catalog item, exactly one ended assignment, no accepted transfer, complete ordered status history, and positive target",
         "target_semantics": "minutes in INSPECTING and REPAIRING intersected with the assignment interval",
+        "warranty_semantics": "is_warranty derives from warranty_source_item_id; technical_action resolves to REPAIR or REPLACEMENT from the repair item remedy, catalog remedy, or actual technical catalog",
         "split_policy": result.split_summary,
         "cv_policy": "same TimeSeriesSplit folds for all candidates; MAE primary; test excluded from selection",
         "winner_name": result.winner_name,
@@ -467,11 +523,12 @@ def save_experiment(
         "synthetic_data": True,
         "production_validated": False,
         "runtime_integrated": False,
+        "model_status": "EXPERIMENTAL_DEMO",
     }
     _json_write(output_dir / "metadata.json", metadata)
 
     feature_contract = {
-        "contract_version": "repair-duration-features-v2",
+        "contract_version": FEATURE_CONTRACT_VERSION,
         "prediction_timestamp": "first assignment time after the approved single-item plan is known",
         "features_in_order": FEATURE_COLUMNS,
         "numeric_features": NUMERIC_FEATURES,
@@ -481,8 +538,18 @@ def save_experiment(
         "non_feature_columns": ["sample_id", TIME_COLUMN, "completed_at", TARGET],
         "schema": OUTPUT_COLUMNS,
         "history_as_of_rule": "previous_job.completed_at < current_prediction_timestamp",
-        "cold_start": "counts are zero; historical averages and efficiency remain missing",
+        "cold_start": "overall, issue and catalog counts are zero where absent; corresponding averages and efficiencies remain missing",
+        "catalog_service_semantics": "canonical service/catalog display-name label, preserving Unicode, case, internal whitespace and punctuation; surrounding whitespace only is trimmed",
+        "internal_catalog_identity": "service_catalog_items.id is retained outside the model feature vector and exclusively keys exact-catalog historical aggregates",
+        "warranty_mapping": {
+            "is_warranty": "repair_items.warranty_source_item_id IS NOT NULL",
+            "technical_action": "normalize repair_items.warranty_remedy, service_catalog_items.warranty_remedy, or actual technical catalog to REPAIR|REPLACEMENT",
+            "legacy_service_type": "service_types.code WARRANTY remains for compatibility and is not an ML technical action",
+        },
         "service_interruption_limitation": "persisted service interruptions are not yet subtracted by production duration services",
+        "feature_evidence": FEATURE_EVIDENCE,
+        "ablation_policy": "fixed conservative XGB parameters, same TimeSeriesSplit folds, development rows only; holdout untouched",
+        "final_feature_decision": "All 20 predeclared candidate features retained after business availability, leakage, correlation and cumulative ablation review; no automatic correlation threshold was used.",
         "synthetic_domain": True,
     }
     _json_write(output_dir / "feature_contract.json", feature_contract)

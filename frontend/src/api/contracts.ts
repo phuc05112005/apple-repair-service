@@ -135,8 +135,11 @@ export interface OperationalTicketResponse {
 }
 export interface TechnicianRecommendationResponse {
   technicianId: number; technicianName: string; branchId: number; estimatedWorkloadMinutes: number
-  predictedNewJobMinutes: number; remainingShiftMinutes: number; estimatedAvailableAt: string
-  eligible: boolean; reason: string
+  predictedNewJobMinutes: number; remainingShiftMinutes: number; estimatedAvailableAt: string | null
+  eligible: boolean; reason: string; queuedJobs: number; predictedTechnicalMinutes: number
+  predictionSource: 'ML' | 'STANDARD_DURATION_FALLBACK'; predictionWarnings: string[]
+  estimatedStartAt: string | null; estimatedCompletionAt: string | null; modelStatus: string | null
+  syntheticData: boolean; productionValidated: boolean
 }
 export interface AssignmentResponse {
   id: number; serviceTicketId: number; technicianId: number; technicianName: string; assignedById: number

@@ -34,8 +34,8 @@ class ReceptionistApiIntegrationTest {
     void openArrivalWindow() {
         var now = LocalDateTime.now(clock);
         f.slot.setAppointmentDate(now.toLocalDate());
-        f.slot.setStartTime(now.toLocalTime().minusMinutes(30));
-        f.slot.setEndTime(now.toLocalTime().plusMinutes(30));
+        f.slot.setStartTime(java.time.LocalTime.MIN);
+        f.slot.setEndTime(java.time.LocalTime.of(23, 59, 59));
         em.flush();
     }
     String login(User user) throws Exception {

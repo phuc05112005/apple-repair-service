@@ -1,7 +1,7 @@
-"""Executable V3 repair-duration model competition.
+"""Executable final repair-duration model competition.
 
 Example from the repository root:
-    python ml/train_repair_duration_models.py --data ml/data/synthetic_repair_duration_v3.csv --output-dir ml/models/experimental_v3
+    python ml/train_repair_duration_models.py
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ ML_ROOT = Path(__file__).resolve().parent
 os.environ.setdefault("MPLBACKEND", "Agg")
 sys.path.insert(0, str(ML_ROOT / "src"))
 
-from repair_duration_ml_v3.training import run_competition  # noqa: E402
+from repair_duration_ml.training import run_competition  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,12 +23,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data",
         type=Path,
-        default=ML_ROOT / "data" / "synthetic_repair_duration_v3.csv",
+        default=ML_ROOT / "data" / "synthetic_repair_duration.csv",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ML_ROOT / "models" / "experimental_v3",
+        default=ML_ROOT / "models" / "experimental",
     )
     parser.add_argument("--cv-splits", type=int, default=4)
     parser.add_argument("--test-fraction", type=float, default=0.15)

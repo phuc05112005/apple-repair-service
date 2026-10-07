@@ -1,99 +1,95 @@
-# Repair Technical Duration Regression — Data Contract V3
+# Final data contract — repair technical duration
 
-Trạng thái: **EXPERIMENTAL — SYNTHETIC-DATA TRAINED — NOT PRODUCTION
-VALIDATED**. V3 không đọc MySQL và chưa tích hợp runtime.
+## Prediction problem
 
-## Bài toán, thời điểm dự đoán và target
+The model estimates `actual_technical_minutes`, not ETA. For active status
+intervals `[b_k,e_k)` and the single assignment interval `[a_s,a_e)`:
 
-Một sample là một ServiceTicket đã hoàn tất, có đúng một RepairItem APPROVED,
-đúng một ServiceCatalogItem cụ thể, đúng một Assignment đã có ended_at, không
-có transfer được chấp nhận, status history đầy đủ và target dương. Ticket nhiều
-hạng mục hoặc nhiều KTV bị loại vì schema không có timer thực tế theo từng hạng
-mục.
+\[
+y=\frac{1}{60}\sum_{k:s_k\in\{INSPECTING,REPAIRING\}}
+\max\left(0,\min(e_k,a_e)-\max(b_k,a_s)\right)_{seconds}.
+\]
 
-Thời điểm dự đoán là lần phân công duy nhất sau khi phương án một hạng mục đã
-biết. Target:
+Queue time, waiting for approval, waiting for parts, configured break, transfer
+gap and waiting for handover are excluded. The current production duration
+service does not yet subtract persisted `service_interruptions`; the experiment
+documents that limit and does not silently invent corrected targets.
 
-actual_technical_minutes = tổng (INSPECTING + REPAIRING) giao assignment interval.
+## Sample grain and prediction timestamp
 
-Không tính queue ASSIGNED, WAITING_APPROVAL, WAITING_PART, break, transfer gap,
-WAITING_HANDOVER hoặc thời gian chờ lịch. service_interruptions đã được lưu
-nhưng RepairDurationService hiện chưa tự trừ, nên V3 không giả vờ đã trừ.
+One sample is a completed ticket with exactly one APPROVED `RepairItem`, one
+concrete `ServiceCatalogItem`, exactly one ended `Assignment`, no accepted
+transfer, complete ordered status history and a positive target. Multi-item and
+transferred tickets are excluded because ticket duration cannot be allocated to
+an item without an additional timing source.
 
-## Sửa semantic bảo hành trong V3
+`prediction_timestamp` is the first assignment time after the approved
+single-item plan is known. Every feature must exist at that instant.
 
-V2 dùng service_type = REPAIR | REPLACEMENT | WARRANTY. V3 tách đúng nghiệp vụ:
+## Warranty semantics
 
-- technical_action = REPAIR | REPLACEMENT;
-- is_warranty = 0 | 1.
+- `technical_action`: only `REPAIR` or `REPLACEMENT`.
+- `is_warranty`: binary business context.
+- Production extraction would derive warranty from
+  `repair_items.warranty_source_item_id IS NOT NULL` and normalize the actual
+  remedy/catalog action to repair or replacement.
+- Legacy service type `WARRANTY` is not a third ML action.
+- Synthetic target generation applies no hidden warranty duration multiplier.
 
-is_warranty trong extractor thật sẽ lấy từ
-repair_items.warranty_source_item_id IS NOT NULL. Với ca bảo hành,
-technical_action phải resolve theo thứ tự dữ liệu sẵn có từ
-repair_items.warranty_remedy, service_catalog_items.warranty_remedy, hoặc
-catalog kỹ thuật thực tế, rồi chuẩn hóa thành REPAIR/REPLACEMENT.
-service_types.code = WARRANTY vẫn được giữ ở production để tương thích; V3 chỉ
-chuẩn hóa ở tầng ML.
+## Exact final feature order
 
-## Feature contract chính xác
+1. `device_type`
+2. `device_model`
+3. `service_issue`
+4. `technical_action`
+5. `is_warranty`
+6. `catalog_service`
+7. `standard_duration_minutes`
+8. `technician_id`
+9. `branch_id`
+10. `prediction_month`
+11. `prediction_weekday`
+12. `technician_jobs_completed_before`
+13. `technician_average_duration_before`
+14. `technician_historical_efficiency_before`
+15. `technician_issue_jobs_before`
+16. `technician_issue_average_duration_before`
+17. `technician_issue_efficiency_before`
+18. `technician_catalog_jobs_before`
+19. `technician_catalog_average_duration_before`
+20. `technician_catalog_efficiency_before`
 
-| Feature | Kiểu | Nguồn production dự kiến | Quy tắc availability/cold start |
-|---|---|---|---|
-| device_type | category | ticket → customer device → model → type | biết trước dự đoán |
-| device_model | category | ticket device model | biết trước dự đoán |
-| service_issue | category | approved item → catalog → issue | biết trước dự đoán |
-| technical_action | category | service type/remedy/catalog kỹ thuật, chuẩn hóa | chỉ REPAIR, REPLACEMENT |
-| is_warranty | binary numeric | warranty_source_item_id IS NOT NULL | 0/1, không phải action |
-| catalog_service | category | concrete catalog item/name snapshot | biết trước dự đoán |
-| standard_duration_minutes | numeric | catalog | giữ nguyên định mức |
-| technician_id | category | single assignment | không dùng PII |
-| branch_id | category | ticket branch | biết trước dự đoán |
-| prediction_month | category | business timestamp | M01…M12 |
-| prediction_weekday | category | business timestamp | MON…SUN |
-| technician_jobs_completed_before | numeric | lịch sử KTV hợp lệ | 0 nếu chưa có |
-| technician_average_duration_before | numeric | mean target lịch sử KTV | NaN nếu count 0 |
-| technician_historical_efficiency_before | numeric | mean(actual/standard) lịch sử KTV | NaN nếu count 0 |
-| technician_issue_jobs_before | numeric | lịch sử KTV + issue | 0 nếu chưa có |
-| technician_issue_average_duration_before | numeric | mean target KTV + issue | NaN nếu count 0 |
-| technician_issue_efficiency_before | numeric | mean(actual/standard) KTV + issue | NaN nếu count 0 |
-| technician_catalog_jobs_before | numeric | lịch sử KTV + exact catalog | 0 nếu chưa có |
-| technician_catalog_average_duration_before | numeric | mean target KTV + catalog | NaN nếu count 0 |
-| technician_catalog_efficiency_before | numeric | mean(actual/standard) KTV + catalog | NaN nếu count 0 |
+The output schema adds `sample_id`, `prediction_timestamp`, `completed_at` and
+the target, for 24 columns total.
 
-Dataset có 20 feature, cộng sample_id, prediction_timestamp, completed_at và
-target thành 24 cột.
+## Strict history and missing values
 
-## Quy tắc chống leakage
+For overall, issue and exact-catalog history, a prior job is eligible only when:
 
-Mọi history dùng đúng điều kiện:
+`previous_job.completed_at < current_prediction_timestamp`.
 
-previous_job.completed_at < current_prediction_timestamp.
+An earlier-started but unfinished job is excluded. Cold-start counts are zero;
+averages and efficiencies remain missing. Random Forest and XGBoost use median
+numeric imputation learned inside each training fold and one-hot encoding with
+unknown-category support. CatBoost receives native categorical values and
+numeric `NaN`. No statistic is filled from the full dataset.
 
-Job bắt đầu trước nhưng hoàn tất sau thời điểm dự đoán không được tính. Generator
-dùng priority queue theo completion event cho cả overall, technician×issue và
-technician×catalog. Không groupby toàn bộ dataset rồi expanding/backfill.
-Preprocessing được fit bên trong từng temporal fold.
+## Split and feature evidence
 
-## Missing và cold start
+The earliest 85% is development data. Its four forward `TimeSeriesSplit` folds
+are reused for correlation review, cumulative feature-group ablation, tuning
+and model selection. The latest 15% is opened only after winner lock.
 
-Count bằng 0. Average/efficiency tương ứng giữ NaN; không gán standard hoặc 1.0
-vì đó là bịa hiệu năng lịch sử. RF/XGBoost/HGB dùng median học từ train;
-CatBoost giữ numeric NaN native. Category chưa thấy được encoder/pipeline xử lý.
+The final features require four kinds of evidence: business meaning,
+availability at prediction, leakage safety and development predictive
+contribution. Numeric Pearson correlation is descriptive only. It neither
+automatically selects features nor justifies arbitrary integer encoding of
+nominal categories. The fixed XGBoost ablation adds base job, technician
+overall, technician×issue and technician×catalog groups cumulatively.
 
-## Chia dữ liệu và phê duyệt
+## Synthetic-data boundary
 
-Sort theo prediction_timestamp: 85% đầu là development, 15% cuối là final
-holdout mới của V3. Chỉ development được dùng cho EDA, feature decision,
-TimeSeriesSplit(n_splits=4), tuning và khóa winner. Holdout chỉ được đánh giá
-sau khi winner đã khóa bằng CV MAE và near-tie policy.
-
-## Ranh giới synthetic/real
-
-Catalog V3 là master data tổng hợp có quan hệ hợp lý cho iPhone, iPad, MacBook,
-Apple Watch và AirPods; không phải snapshot dữ liệu người dùng. Hidden
-capability/specialty/complexity/noise/outlier chỉ sinh target và không xuất.
-is_warranty không có multiplier kỹ thuật ẩn.
-
-Phase tiếp theo mới xây extractor snapshot MySQL nhất quán, áp dụng grain,
-target và history này, tạo dataset real versioned, chạy lại temporal validation
-và yêu cầu phê duyệt trước mọi tích hợp runtime.
+The generator models plausible catalog relationships, technicians, branches,
+ordinary noise, rare complexity and outliers. Latent factors are never exported
+as features. Synthetic metrics demonstrate the pipeline and cannot establish
+real operational accuracy, fairness, drift resistance or production fitness.

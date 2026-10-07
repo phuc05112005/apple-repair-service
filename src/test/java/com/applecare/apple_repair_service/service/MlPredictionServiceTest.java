@@ -15,6 +15,7 @@ import jakarta.validation.Validation;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,5 +99,16 @@ class MlPredictionServiceTest {
         assertNotSame(saved.get(0), saved.get(1));
         assertEquals(30, saved.get(0).getPredictedDurationMinutes());
         assertEquals("Model", saved.get(0).getModelName());
+    }
+
+    @Test
+    void assignmentAuditKeepsCandidateEvaluationTimestampAndNoPii() {
+        var evaluatedAt = LocalDateTime.of(2026, 10, 6, 14, 10);
+        var result = service.saveDurationAudit(1L, 2L, 55, "CatBoostRegressor", "v1", evaluatedAt);
+        assertEquals(evaluatedAt, result.predictedAt());
+        assertEquals(2L, result.technicianId());
+        assertEquals(55, result.predictedDurationMinutes());
+        assertEquals("CatBoostRegressor", result.modelName());
+        assertNull(result.confidence());
     }
 }

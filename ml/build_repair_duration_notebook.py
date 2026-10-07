@@ -1,4 +1,4 @@
-"""Build the V2 research notebook from auditable source cells."""
+"""Build the single final repair-duration notebook from auditable source cells."""
 
 from __future__ import annotations
 
@@ -7,70 +7,53 @@ from pathlib import Path
 import nbformat as nbf
 
 ROOT = Path(__file__).resolve().parent
-OUTPUT = ROOT / "01_repair_duration_regression.ipynb"
+OUTPUT = ROOT / "repair_duration_regression.ipynb"
 
 
-def md(text: str):
-    return nbf.v4.new_markdown_cell(text.strip())
+def md(value: str):
+    return nbf.v4.new_markdown_cell(value.strip())
 
 
-def code(text: str):
-    return nbf.v4.new_code_cell(text.strip())
+def code(value: str):
+    return nbf.v4.new_code_cell(value.strip())
 
 
 cells = [
-    md(r"""
-# 1. Repair Duration Regression — Model Competition V2
-
-Thực nghiệm hồi quy số phút kỹ thuật chủ động cho Apple Repair Service.
-**EXPERIMENTAL — SYNTHETIC-DATA TRAINED — NOT PRODUCTION VALIDATED.**
-"""),
     md("""
-## 2. Business problem
+# Dự đoán thời lượng kỹ thuật sửa chữa thiết bị Apple
 
-Cửa hàng cần một ước lượng thời lượng kỹ thuật để hỗ trợ lập ETA và điều phối.
-Kết quả mô hình không tự nó là ETA và không tự quyết định phân công.
+**Trạng thái: EXPERIMENTAL_DEMO — chỉ dùng dữ liệu tổng hợp — chưa kiểm chứng sản xuất — chưa tích hợp runtime.**
+
+Notebook này là luồng final duy nhất: dữ liệu → EDA → bằng chứng feature → tiền xử lý →
+chia thời gian → baseline → Random Forest / XGBoost / CatBoost → tuning → temporal CV →
+khóa winner → final holdout → diagnostics → artifact → inference mẫu.
 """),
     md(r"""
-## 3. ML problem
+## 1. Bài toán hồi quy và target
 
-Với $D=\{(x_i,y_i)\}_{i=1}^{n}$, mô hình hồi quy học
-$\hat y_i=f(x_i)$, trong đó $y_i$ là `actual_technical_minutes`.
+Với $D=\{(x_i,y_i)\}_{i=1}^{n}$, mô hình học $\hat y_i=f(x_i)$ cho biến liên tục
+`actual_technical_minutes`. Đây không phải ETA và không phải phân loại.
+
+$$y=\frac{1}{60}\sum_{k:s_k\in\{INSPECTING,REPAIRING\}}
+\max(0,\min(e_k,a_e)-\max(b_k,a_s))_{seconds}.$$
+
+Mỗi khoảng trạng thái kỹ thuật $[b_k,e_k)$ được giao với assignment duy nhất
+$[a_s,a_e)$. Queue, chờ duyệt, chờ linh kiện, break, transfer gap và chờ bàn giao bị loại.
 """),
     md("""
-## 4. Prediction-time definition
+## 2. Sample grain, thời điểm dự đoán và bảo hành
 
-Thời điểm dự đoán là assignment đầu tiên sau khi phương án một hạng mục APPROVED
-đã biết. Mọi feature phải tồn tại tại hoặc trước thời điểm này.
+Một mẫu là ticket hoàn tất có đúng một RepairItem APPROVED, một catalog cụ thể,
+một assignment đã kết thúc, không transfer được chấp nhận, history đầy đủ và target dương.
+Prediction timestamp là lúc assignment đầu tiên bắt đầu sau khi phương án đã biết.
+
+`technical_action` chỉ có REPAIR/REPLACEMENT. `is_warranty` là ngữ cảnh nhị phân;
+không có action WARRANTY và không có hệ số thời lượng bảo hành ẩn.
 """),
-    md("""
-## 5. Sample grain
-
-Một completed ticket, đúng một approved repair item, một assignment, không
-transfer và status history liên tục. Schema hiện không có timer per-item nên
-không phân bổ giả thời lượng cho phiếu nhiều hạng mục.
-"""),
-    md(r"""
-## 6. Target definition
-
-$$y=\frac1{60}\sum_{k:u_k\in\{INSPECTING,REPAIRING\}}
-\max(0,\min(e_k,a_e)-\max(s_k,a_s))_{seconds}.$$
-
-Không tính queue, chờ khách, chờ linh kiện, break, transfer gap hay chờ bàn giao.
-Persistence interruption hiện chưa được duration service tự trừ.
-"""),
-    md("""
-## 7. Synthetic limitation
-
-V2 dùng controlled synthetic catalog vì repository không có full canonical
-master seed. Quan hệ device→model→issue→service hợp lý nhưng không được xem là
-record production. Hidden target factors không được xuất ra dataset.
-"""),
-    md("## 8. Imports, seed and library versions"),
     code("""
 %matplotlib inline
 from pathlib import Path
-import sys, platform
+import json, platform, sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -80,292 +63,259 @@ ML_ROOT = Path('ml') if Path('ml').exists() else Path.cwd()
 sys.path.insert(0, str((ML_ROOT / 'src').resolve()))
 from repair_duration_ml.config import *
 from repair_duration_ml.data import load_dataset, temporal_holdout_split, feature_target
+from repair_duration_ml.evaluation import cold_start_examples, development_numeric_correlations
+from repair_duration_ml.features import FEATURE_ABLATION_STAGES, FEATURE_EVIDENCE
 from repair_duration_ml.models import build_model_specs
-from repair_duration_ml.training import (
-    _baseline_cv_rows, _tune_candidate, _test_candidate, select_winner
-)
-from repair_duration_ml.evaluation import (
-    cold_start_examples, feature_importance, subgroup_errors
-)
-from sklearn.model_selection import TimeSeriesSplit
+from repair_duration_ml.training import run_competition, sha256_file
 
-np.random.seed(SEED)
-versions = {
-    'python': platform.python_version(), 'numpy': np.__version__,
-    'pandas': pd.__version__, 'scikit-learn': sklearn.__version__,
-    'xgboost': xgboost.__version__, 'catboost': catboost.__version__,
-    'seed': SEED,
-}
-versions
-"""),
-    md("## 9. Load dataset"),
-    code("""
-DATA_PATH = ML_ROOT / 'data' / 'synthetic_repair_duration_v2.csv'
+DATA_PATH = ML_ROOT / 'data' / 'synthetic_repair_duration.csv'
+ARTIFACT_DIR = ML_ROOT / 'models' / 'experimental'
 frame = load_dataset(DATA_PATH)
-frame.head(3)
-"""),
-    md("## 10. Dataset validation"),
-    code("""
 {
-    'shape': frame.shape,
+    'versions': {'python': platform.python_version(), 'sklearn': sklearn.__version__,
+                 'xgboost': xgboost.__version__, 'catboost': catboost.__version__},
+    'seed': SEED, 'sha256': sha256_file(DATA_PATH), 'shape': frame.shape,
     'duplicates': int(frame.duplicated().sum()),
-    'chronological': bool(frame.prediction_timestamp.is_monotonic_increasing),
     'missing': frame.isna().sum()[frame.isna().sum().gt(0)].to_dict(),
-    'devices': frame.device_type.value_counts().to_dict(),
 }
 """),
     md("""
-## 11. Data dictionary and features
+## 3. Data dictionary và kiểm tra quan hệ
 
-14 features gồm 5 numeric và 9 categorical. `DATA_CONTRACT.md` ánh xạ từng
-feature về nguồn DB, availability, leakage risk và cold-start rule.
+Các trường lịch sử đều kết thúc bằng `_before` để thể hiện đúng thời điểm. Count = 0
+khi chưa có lịch sử; average/efficiency = NaN. Danh mục tổng hợp chỉ sinh các tổ hợp
+device type, model, issue, action và catalog đã khai báo; latent capability, specialty,
+complexity, noise và outlier không được xuất thành feature.
 """),
-    code("{'numeric': NUMERIC_FEATURES, 'categorical': CATEGORICAL_FEATURES}"),
-    md("""
-## 12. Excluded columns
-
-`sample_id`, `prediction_timestamp`, `completed_at` và target phục vụ audit,
-không vào X. Không dùng feedback, PII, future status, ETA error, serial, free
-text, prediction cũ hoặc hidden synthetic factors.
-"""),
-    md("## 13. Temporal split"),
     code("""
-split = temporal_holdout_split(frame, test_fraction=0.15)
+data_dictionary = pd.DataFrame([
+    {'feature': c, 'type': 'numeric' if c in NUMERIC_FEATURES else 'categorical',
+     'available_at_prediction': True, 'leakage_safe': True}
+    for c in FINAL_FEATURE_COLUMNS
+])
+display(data_dictionary)
+display(frame.head(3))
+display(frame.dtypes.rename('dtype').to_frame())
+display(frame[TARGET].describe(percentiles=[.5,.9,.95]).round(3))
+"""),
+    md("""
+## 4. Chia thời gian trước mọi phân tích có target
+
+85% đầu là development; 15% cuối là holdout nguyên vẹn. Correlation, EDA, ablation,
+tuning và chọn winner chỉ dùng development. Holdout không được dùng để sửa feature,
+hyperparameter hay đổi winner.
+"""),
+    code("""
+split = temporal_holdout_split(frame)
 X_dev, y_dev = feature_target(split.development)
 X_test, y_test = feature_target(split.test)
-folds = list(TimeSeriesSplit(n_splits=4).split(X_dev))
-{
-    'development_rows': len(X_dev), 'test_rows': len(X_test),
-    'development_end': split.development.prediction_timestamp.max(),
-    'test_start': split.test.prediction_timestamp.min(),
-    'fold_sizes': [(len(a), len(b)) for a, b in folds],
-}
+pd.DataFrame([
+    {'partition':'development','rows':len(split.development),
+     'start':split.development[TIME_COLUMN].min(),'end':split.development[TIME_COLUMN].max()},
+    {'partition':'untouched_holdout','rows':len(split.test),
+     'start':split.test[TIME_COLUMN].min(),'end':split.test[TIME_COLUMN].max()},
+])
 """),
-    md("## 14. Train-only EDA"),
+    md("## 5. EDA chỉ trên development"),
     code("""
-split.development.groupby(['device_type', 'service_type'], observed=True).agg(
-    samples=(TARGET, 'size'), mean_minutes=(TARGET, 'mean'), median_minutes=(TARGET, 'median')
-).round(2)
-"""),
-    md("## 15. Target distribution"),
-    code("""
-ax = y_dev.hist(bins=40, figsize=(9, 4), color='#2563eb', alpha=.8)
-ax.set(title='Development target distribution', xlabel='Actual technical minutes', ylabel='Count')
-plt.show()
-y_dev.describe(percentiles=[.5, .9, .95]).round(2)
-"""),
-    md("## 16. Numeric relationships"),
-    code("split.development[NUMERIC_FEATURES + [TARGET]].corr(numeric_only=True).round(3)"),
-    md("## 17. Category distributions"),
-    code("""
-{column: split.development[column].value_counts().head(8).to_dict()
- for column in ['device_type', 'service_issue', 'service_type', 'technician_id']}
-"""),
-    md("""
-## 18. Leakage discussion
-
-History uses only `previous_job.completed_at < prediction_timestamp`. Không
-`groupby` toàn dataset rồi backfill. Preprocessing được fit trong từng temporal
-fold. Holdout 15% cuối chưa được đọc khi tuning và khóa winner.
+eda = split.development
+fig, axes = plt.subplots(1, 3, figsize=(16, 4))
+axes[0].hist(eda[TARGET], bins=40, color='#2563eb', alpha=.82)
+axes[0].set(title='Phân phối target — development', xlabel='Phút kỹ thuật')
+eda.groupby('technical_action', observed=True)[TARGET].mean().plot.bar(ax=axes[1], color='#0f766e')
+axes[1].set(title='Trung bình theo thao tác', ylabel='Phút')
+eda.groupby('device_type', observed=True)[TARGET].median().sort_values().plot.barh(ax=axes[2], color='#9333ea')
+axes[2].set(title='Trung vị theo loại thiết bị', xlabel='Phút')
+plt.tight_layout(); plt.show()
 """),
     md(r"""
-## 19. Baselines and regression metrics
+## 6. Bằng chứng correlation
 
-Mean baseline học $\bar y_{train}$; business baseline dùng
+Pearson $r_{XY}=\frac{\operatorname{cov}(X,Y)}{\sigma_X\sigma_Y}$ chỉ mô tả liên hệ
+tuyến tính giữa các biến số trên development. Correlation không tự động quyết định giữ/bỏ
+feature và không phải lý do biến category thành số nguyên tùy ý.
+"""),
+    code("""
+corr_matrix, target_corr = development_numeric_correlations(split.development)
+display(target_corr.rename('correlation_with_target').to_frame())
+fig, ax = plt.subplots(figsize=(11, 9))
+image = ax.imshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
+ax.set_xticks(range(len(corr_matrix)), corr_matrix.columns, rotation=90, fontsize=8)
+ax.set_yticks(range(len(corr_matrix)), corr_matrix.index, fontsize=8)
+fig.colorbar(image, ax=ax); ax.set_title('Development-only numeric correlation')
+plt.tight_layout(); plt.show()
+"""),
+    md("""
+## 7. Bốn tầng bằng chứng feature
+
+Mỗi nhóm phải có ý nghĩa nghiệp vụ, tồn tại tại prediction time, an toàn leakage và có
+đóng góp dự báo trên development. Ablation dùng một XGBoost bảo thủ cố định và cùng bốn
+fold; không tune theo holdout.
+"""),
+    code("""
+pd.DataFrame(FEATURE_EVIDENCE).T
+"""),
+    md(r"""
+## 8. Tiền xử lý và missing value
+
+- RF/XGB: median numeric được học riêng trong training fold; category dùng one-hot và
+  `handle_unknown='ignore'`.
+- CatBoost: category native và numeric NaN native.
+- Không fit imputer/encoder trên toàn bộ dữ liệu; không dùng StandardScaler vì mô hình cây.
+
+Median trong fold là $\tilde x_j=\operatorname{median}\{x_{ij}:i\in train\}$.
+"""),
+    md(r"""
+## 9. Baseline và metric
+
+Mean baseline: $\hat y=\bar y_{train}$ trong từng fold. Business baseline:
 $\hat y=standard\_duration\_minutes$.
 
-$$MAE=\frac1n\sum|y_i-\hat y_i|,\quad
-MSE=\frac1n\sum(y_i-\hat y_i)^2,\quad RMSE=\sqrt{MSE}.$$
-$$R^2=1-\frac{\sum(y_i-\hat y_i)^2}{\sum(y_i-\bar y)^2}.$$
-Với $AE_i=|y_i-\hat y_i|$, $P90AE=percentile_{90}(\{AE_i\})$; 90% dự đoán có
-sai số tuyệt đối không vượt mức này. $R^2$ không phải phần trăm accuracy.
-"""),
-    code("""
-baseline_rows, fold_metrics = _baseline_cv_rows(X_dev, y_dev, folds)
-cv_rows = list(baseline_rows)
-best_estimators, best_parameters = {}, {}
-pd.DataFrame(baseline_rows)
+$$MAE=\frac1n\sum|y_i-\hat y_i|,\quad MSE=\frac1n\sum(y_i-\hat y_i)^2,$$
+$$RMSE=\sqrt{MSE},\quad R^2=1-\frac{\sum(y_i-\hat y_i)^2}{\sum(y_i-\bar y)^2}.$$
+
+$P90AE=Q_{0.90}(|y-\hat y|)$ và
+$Within_t=100n^{-1}\sum\mathbf1(|y_i-\hat y_i|\le t)$ với $t\in\{15,30,45\}$.
+R² không phải accuracy.
 """),
     md(r"""
-## 20. Theory — Random Forest
+## 10. Random Forest Regressor
 
 $$\hat y_{RF}(x)=\frac1B\sum_{b=1}^{B}T_b(x).$$
-Mỗi cây học từ bootstrap sample và subset feature ngẫu nhiên. Trung bình nhiều
-cây giảm variance. Split hồi quy tối thiểu hóa tổng squared errors hai nút con.
-"""),
-    md("## 21. Train/tune Random Forest"),
-    code("""
-specs = build_model_specs(smoke=False)
-name = 'RandomForestRegressor'
-est, params, summary, rows, _ = _tune_candidate(name, specs[name], X_dev, y_dev, folds, 8)
-best_estimators[name], best_parameters[name], fold_metrics[name] = est, params, rows
-cv_rows.append({'model': name, **summary})
-params, summary
+
+Bootstrap, lấy mẫu feature ngẫu nhiên và trung bình nhiều cây giúp giảm variance. Search:
+`n_estimators`, `max_depth`, `min_samples_split`, `min_samples_leaf`, `max_features`.
 """),
     md(r"""
-## 22. Theory — HistGradientBoosting
+## 11. XGBoost Regressor
 
-$$F_0(x)=initial,\qquad F_m(x)=F_{m-1}(x)+\eta h_m(x).$$
-Với squared-error intuition, $r_i^{(m)}=y_i-F_{m-1}(x_i)$ và learner mới học
-residual/negative gradient. Histogram binning gom giá trị feature để tìm split
-hiệu quả; đó không phải target binning. HGB dùng ordinal dense + native
-categorical splits, không nhận sparse one-hot không phù hợp.
-"""),
-    md("## 23. Train/tune HistGradientBoosting"),
-    code("""
-name = 'HistGradientBoostingRegressor'
-est, params, summary, rows, _ = _tune_candidate(name, specs[name], X_dev, y_dev, folds, 8)
-best_estimators[name], best_parameters[name], fold_metrics[name] = est, params, rows
-cv_rows.append({'model': name, **summary})
-params, summary
+$$Obj^{(t)}\approx\sum_i[g_if_t(x_i)+\tfrac12h_if_t(x_i)^2]+\Omega(f_t),$$
+$$g_i=\partial_{\hat y}l,\ h_i=\partial^2_{\hat y}l,\
+\Omega(f)=\gamma T+\tfrac12\lambda\lVert w\rVert^2.$$
+
+Objective là `reg:squarederror` để có gradient/Hessian bậc hai; đánh giá và chọn model
+vẫn theo MAE. Search learning rate, depth, child weight, sampling và regularization.
 """),
     md(r"""
-## 24. Theory — XGBoost
+## 12. CatBoost Regressor
 
-$$Obj^{(t)}=\sum_i l(y_i,\hat y_i^{(t-1)}+f_t(x_i))+\Omega(f_t),$$
-$$\Omega(f)=\gamma T+\frac12\lambda\lVert w\rVert^2.$$
-XGBoost dùng Taylor bậc hai với
-$g_i=\partial l/\partial\hat y_i$ và
-$h_i=\partial^2l/\partial\hat y_i^2$. $T$ là số leaf; $w$ là leaf weights;
-$\gamma,\lambda$ kiểm soát độ phức tạp. Row/feature subsampling giúp regularize.
-"""),
-    md("## 25. Train/tune XGBoost"),
-    code("""
-name = 'XGBRegressor'
-est, params, summary, rows, _ = _tune_candidate(name, specs[name], X_dev, y_dev, folds, 8)
-best_estimators[name], best_parameters[name], fold_metrics[name] = est, params, rows
-cv_rows.append({'model': name, **summary})
-params, summary
-"""),
-    md(r"""
-## 26. Theory — CatBoost
+CatBoost xử lý category native bằng ordered statistics. Trực giác rút gọn:
+$$TS_i=\frac{\sum_{\sigma(j)<\sigma(i)}1[x_j=x_i]y_j+aP}
+{\sum_{\sigma(j)<\sigma(i)}1[x_j=x_i]+a}.$$
 
-CatBoost là gradient-boosted trees với xử lý categorical native. Ordered target
-statistic minh họa có smoothing:
-
-$$TS_i=\frac{\sum_{j:\sigma(j)<\sigma(i)}\mathbf1[x_j=x_i]y_j+aP}
-{\sum_{j:\sigma(j)<\sigma(i)}\mathbf1[x_j=x_i]+a}.$$
-
-$\sigma$ là permutation, $P$ là prior, $a$ là smoothing. Mẫu hiện tại không
-dùng trực tiếp target của chính nó để encode category. Đây là nguyên lý minh
-họa, không phải toàn bộ thuật toán CatBoost; ordered boosting tiếp tục giảm
-prediction shift/leakage.
-"""),
-    md("## 27. Train/tune CatBoost"),
-    code("""
-name = 'CatBoostRegressor'
-est, params, summary, rows, _ = _tune_candidate(name, specs[name], X_dev, y_dev, folds, 8)
-best_estimators[name], best_parameters[name], fold_metrics[name] = est, params, rows
-cv_rows.append({'model': name, **summary})
-params, summary
-"""),
-    md("## 28. Temporal CV comparison"),
-    code("""
-cv_table = pd.DataFrame(cv_rows).sort_values('cv_mae_mean').reset_index(drop=True)
-cv_table[['model','cv_mae_mean','cv_mae_std','cv_mse','cv_rmse','cv_r2','cv_p90_absolute_error']].round(3)
+Thứ tự permutation tránh dùng target của chính hàng đang encode. Loss train là RMSE,
+eval/model selection là MAE. Search iterations, learning rate, depth, L2 và random strength.
 """),
     md("""
-## 29. Lock winner
+## 13. Full temporal experiment
 
-Winner dùng development CV MAE. Chênh ≤0,25 phút là near tie; lần lượt xét
-CV-MAE std, RMSE, P90AE và complexity. Test chưa tham gia quyết định.
+Ba candidate dùng đúng cùng `TimeSeriesSplit(4)`, 12 cấu hình ngẫu nhiên có seed cố định
+cho mỗi model và scoring `neg_mean_absolute_error`. Cell này thực thi toàn bộ ablation,
+tuning, CV, khóa winner rồi mới đánh giá holdout.
 """),
-    code("winner_name, winner_reason = select_winner(cv_table); (winner_name, winner_reason)"),
-    md("## 30. Untouched test evaluation"),
     code("""
-test_rows = []
-from repair_duration_ml.evaluation import regression_metrics
-mean_pred = np.full(len(y_test), y_dev.mean())
-std_pred = X_test.standard_duration_minutes.to_numpy(float)
-test_rows += [
-    {'model':'MeanBaseline', **regression_metrics(y_test, mean_pred), 'fit_seconds':0., 'predict_seconds':0.},
-    {'model':'StandardDurationBaseline', **regression_metrics(y_test, std_pred), 'fit_seconds':0., 'predict_seconds':0.},
-]
-fitted_models, predictions = {}, {}
-for name in MODEL_NAMES:
-    fitted, pred, metrics = _test_candidate(best_estimators[name], X_dev, y_dev, X_test, y_test)
-    fitted_models[name], predictions[name] = fitted, pred
-    test_rows.append({'model': name, **metrics})
-test_table = pd.DataFrame(test_rows).sort_values('mae').reset_index(drop=True)
-winner_estimator, winner_predictions = fitted_models[winner_name], predictions[winner_name]
-test_table.round(3)
+result = run_competition(
+    DATA_PATH, output_dir=None, cv_splits=4, test_fraction=.15,
+    search_iterations=12, smoke=False,
+)
+result.feature_ablation.round(4)
 """),
-    md("## 31. Actual vs Predicted"),
+    md("## 14. Feature freeze sau ablation"),
     code("""
-plt.figure(figsize=(6,5)); plt.scatter(y_test, winner_predictions, alpha=.35, s=15)
-lo=min(y_test.min(), winner_predictions.min()); hi=max(y_test.max(), winner_predictions.max())
-plt.plot([lo,hi],[lo,hi],'k--'); plt.xlabel('Actual'); plt.ylabel('Predicted'); plt.title(winner_name); plt.show()
+display(result.feature_ablation.round(4))
+print('FINAL_FEATURE_COLUMNS =')
+print(FINAL_FEATURE_COLUMNS)
 """),
-    md("## 32. Residual analysis"),
+    md("## 15. Search spaces và best hyperparameters"),
     code("""
-residual = y_test.to_numpy() - winner_predictions
-fig, ax = plt.subplots(1,2,figsize=(11,4))
-ax[0].scatter(winner_predictions,residual,alpha=.35,s=15); ax[0].axhline(0,color='k',ls='--')
-ax[0].set(xlabel='Predicted',ylabel='Residual',title='Residual vs predicted')
-ax[1].hist(residual,bins=35); ax[1].set(title='Residual distribution',xlabel='Actual - predicted')
-plt.show()
-pd.Series(residual).describe().round(2)
+display(pd.DataFrame([
+    {'model': name, 'search_space': result.search_spaces[name],
+     'best_parameters': result.best_parameters[name],
+     'preprocessing': result.preprocessing[name]}
+    for name in MODEL_NAMES
+]))
 """),
-    md("## 33. P90 absolute-error analysis"),
+    md("## 16. Development temporal-CV và khóa winner"),
     code("""
-absolute_error = np.abs(residual); p90 = np.percentile(absolute_error,90)
-plt.figure(figsize=(8,4)); plt.hist(absolute_error,bins=35); plt.axvline(p90,color='red',ls='--',label=f'P90={p90:.2f}')
-plt.legend(); plt.xlabel('Absolute error (minutes)'); plt.show(); p90
-"""),
-    md("## 34. Subgroup errors"),
-    code("""
-subgroups = {c: subgroup_errors(split.test, winner_predictions, c)
-             for c in ['technician_id','device_type','service_issue','service_type']}
-{c: pd.DataFrame(rows).head(8) for c, rows in subgroups.items()}
+cv_columns = ['model','cv_mae_mean','cv_mae_std','cv_mse','cv_rmse','cv_r2',
+              'cv_p90_absolute_error','cv_within_15_percent',
+              'cv_within_30_percent','cv_within_45_percent','search_seconds']
+display(result.cv_table[cv_columns].round(3))
+{'locked_winner': result.winner_name, 'reason': result.winner_reason}
 """),
     md("""
-## 35. Feature importance and explainability
+## 17. Final holdout
 
-Permutation importance đo mức MAE tăng khi xáo trộn một feature trên holdout.
-Importance cho biết giá trị dự báo của model, **không chứng minh quan hệ nhân quả**.
+Winner đã khóa bằng CV trước cell này. Bảng có cả ba model để audit, nhưng không model nào
+được đổi theo test. Đây là lần đọc final holdout duy nhất trong pipeline.
 """),
-    code("pd.DataFrame(feature_importance(winner_estimator, X_test, y_test)).head(14).round(3)"),
-    md("## 36. Cold-start predictions"),
     code("""
-cold = cold_start_examples(X_dev)
-pd.DataFrame({'scenario':cold.index, 'prediction':winner_estimator.predict(cold)})
+test_columns = ['model','mae','mse','rmse','r2','p90_absolute_error',
+                'within_15_percent','within_30_percent','within_45_percent',
+                'fit_seconds','predict_seconds']
+result.test_table[test_columns].round(3)
 """),
-    md("## 37. Example new-job prediction"),
+    md("## 18. Residual diagnostics"),
     code("""
-example = cold.loc[['new_technician']]
-{'input': example.to_dict(orient='records')[0],
- 'predicted_technical_minutes': float(winner_estimator.predict(example)[0])}
+residual = y_test.to_numpy() - result.test_predictions
+absolute_error = np.abs(residual)
+fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+axes[0,0].scatter(y_test, result.test_predictions, alpha=.35, s=14)
+lo=min(y_test.min(),result.test_predictions.min()); hi=max(y_test.max(),result.test_predictions.max())
+axes[0,0].plot([lo,hi],[lo,hi],'k--'); axes[0,0].set(title='Actual vs predicted')
+axes[0,1].scatter(result.test_predictions,residual,alpha=.35,s=14)
+axes[0,1].axhline(0,color='k',ls='--'); axes[0,1].set(title='Residual vs predicted')
+axes[1,0].hist(residual,bins=35); axes[1,0].set(title='Residual distribution')
+axes[1,1].hist(absolute_error,bins=35); axes[1,1].axvline(np.percentile(absolute_error,90),color='red',ls='--')
+axes[1,1].set(title='Absolute error with P90')
+plt.tight_layout(); plt.show()
+pd.Series(residual).describe().round(3)
 """),
     md("""
-## 38. Relationship to ETA
+## 19. Permutation importance — diễn giải final
 
-Prediction là active technical minutes. ETA engine tương lai mới kết hợp queue,
-working schedule, break, current state và interruption semantics đã được chốt.
-Phase này không ghi prediction vào Spring/MySQL và không đổi ETA hiện tại.
+Giá trị là mức MAE tăng khi hoán vị một feature. Đây là association với dự báo, không phải
+quan hệ nhân quả. Vì được tính trên holdout, bảng chỉ diễn giải winner; không quay lại bỏ
+feature hoặc đổi model.
+"""),
+    code("pd.DataFrame(result.feature_importances).round(4)"),
+    md("## 20. Sai số theo subgroup"),
+    code("""
+for group_name, rows in result.subgroup_metrics.items():
+    print()
+    print(group_name)
+    display(pd.DataFrame(rows).round(3))
+"""),
+    md("## 21. Năm tình huống cold-start"),
+    code("pd.Series(result.cold_start_predictions, name='predicted_technical_minutes')"),
+    md("## 22. Artifact đã lưu và inference mẫu"),
+    code("""
+metadata = json.loads((ARTIFACT_DIR / 'metadata.json').read_text(encoding='utf-8'))
+assert metadata['model_status'] == 'EXPERIMENTAL_DEMO'
+assert metadata['synthetic_data'] and not metadata['production_validated'] and not metadata['runtime_integrated']
+if metadata['model_file'].endswith('.cbm'):
+    from catboost import CatBoostRegressor
+    reloaded = CatBoostRegressor()
+    reloaded.load_model(ARTIFACT_DIR / metadata['model_file'])
+else:
+    import joblib
+    reloaded = joblib.load(ARTIFACT_DIR / metadata['model_file'])
+example = cold_start_examples(X_dev).loc[['new_technician']]
+{'model': metadata['winner_name'],
+ 'prediction_minutes': float(reloaded.predict(example)[0]),
+ 'finite': bool(np.isfinite(reloaded.predict(example)[0]))}
 """),
     md("""
-## 39. Limitations
+## 23. Kết luận và giới hạn
 
-- synthetic distribution không chứng minh generalization ngoài thực tế;
-- grain loại multi-item/transfer/incomplete history;
-- persisted interruptions chưa được production duration service trừ;
-- catalog là controlled synthetic catalog, không phải snapshot master thật;
-- subgroup nhỏ phải đọc cùng sample count;
-- permutation importance không phải causality.
-"""),
-    md("""
-## 40. Next production-data phase
+- Kết quả chỉ chứng minh pipeline trên dữ liệu tổng hợp, không chứng minh chất lượng thực tế.
+- Multi-item, transfer và history thiếu bị loại; production interruptions chưa được trừ.
+- Subgroup nhỏ phải đọc cùng sample count; importance không phải causality.
+- Không có classifier hài lòng, API inference, Spring/ETA/UI, ghi DB hay deployment.
 
-MySQL snapshot → leakage-safe real extractor → `real_repair_duration_vX` → cùng
-feature contract/training pipeline → real temporal holdout → explicit approval
-→ mới xem xét runtime integration.
-"""),
-    md("""
-## 41. Final conclusion
-
-Notebook khóa winner tự động bằng development temporal CV và chỉ sau đó mở
-holdout. Kết luận phải đọc từ output thực tế phía trên. Artifact CLI vẫn là
-**experimental, synthetic-data trained, not production validated**.
+**Các bước kế tiếp, chưa triển khai:** MySQL real extractor → runtime feature builder →
+inference API → Spring Boot integration → `ml_predictions` → ETA → React UI → E2E test →
+Docker/deployment.
 """),
 ]
 

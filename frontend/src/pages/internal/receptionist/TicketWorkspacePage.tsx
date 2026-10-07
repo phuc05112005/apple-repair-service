@@ -2,13 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { receptionistApi } from '../../../api/receptionistApi'
-import type { ApprovalStatus, AssignmentSource, ConfirmationMethod, PaymentMethod } from '../../../api/contracts'
+import { ApiError } from '../../../api/client'
+import type { ApprovalStatus, AssignmentSource, ConfirmationMethod, PaymentMethod, TechnicianRecommendationResponse } from '../../../api/contracts'
 import { EmptyState, ErrorState, LoadingState } from '../../../components/AsyncState'
 import { ConfirmationFields } from '../../../components/ConfirmationFields'
+import { ConfirmDialog } from '../../../components/Dialog'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { TicketTimingPanel } from '../../../components/TicketTimingPanel'
 import { confirmationLabels, paymentStatusLabels, ticketStatusLabels, ticketStatusTones } from '../../../types/labels'
 import { businessDateTimeInput, formatClock, formatDateTime, formatMoney } from '../../../utils/format'
+import { canAssignCandidate, predictionSourceLabel, predictionWarningLabel } from '../../../utils/recommendation'
 
 const paymentMethods: { value: PaymentMethod; label: string }[] = [
   { value: 'CASH', label: 'Tiền mặt' }, { value: 'BANK_TRANSFER', label: 'Chuyển khoản' },
@@ -28,6 +31,7 @@ export function TicketWorkspacePage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
   const [cancelReason, setCancelReason] = useState('')
   const [copiedCode, setCopiedCode] = useState(false)
+  const [selectedCandidate, setSelectedCandidate] = useState<TechnicianRecommendationResponse>()
 
   async function refresh() {
     await Promise.all([
@@ -37,7 +41,13 @@ export function TicketWorkspacePage() {
     ])
   }
 
-  const assign = useMutation({ mutationFn: ({ technicianId, source }: { technicianId: number; source: AssignmentSource }) => receptionistApi.assign(id, technicianId, source), onSuccess: refresh })
+  const assign = useMutation({
+    mutationFn: ({ technicianId, source }: { technicianId: number; source: AssignmentSource }) => receptionistApi.assign(id, technicianId, source),
+    onSuccess: async () => { setSelectedCandidate(undefined); await refresh() },
+    onError: async error => {
+      if (error instanceof ApiError && [400, 409].includes(error.status)) await refresh()
+    },
+  })
   const approval = useMutation({ mutationFn: ({ itemId, decision }: { itemId: number; decision: ApprovalStatus }) => receptionistApi.approval(itemId, decision, noteByItem[itemId], methodByItem[itemId] || undefined, approvalResolvedAt || undefined), onSuccess: refresh })
   const pay = useMutation({ mutationFn: () => receptionistApi.payment(id, paymentMethod), onSuccess: refresh })
   const settle = useMutation({ mutationFn: () => receptionistApi.settleZero(id), onSuccess: refresh })
@@ -51,7 +61,7 @@ export function TicketWorkspacePage() {
 
   const context = detail.data.context
   const hasPendingApproval = detail.data.repairItems.some(item => item.approvalStatus === 'PENDING')
-  const pendingError = assign.error ?? approval.error ?? pay.error ?? settle.error ?? handover.error ?? cancel.error
+  const pendingError = (selectedCandidate ? undefined : assign.error) ?? approval.error ?? pay.error ?? settle.error ?? handover.error ?? cancel.error
 
   return <div className="workspace-page ticket-workspace">
     <header className="ticket-header"><div><span className="record-code">Phiếu #{ticket.id}</span><h1>Phiếu dịch vụ</h1><p>{context.branchName} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}</p></div><StatusBadge label={ticketStatusLabels[ticket.status]} tone={ticketStatusTones[ticket.status]} /></header>
@@ -65,11 +75,26 @@ export function TicketWorkspacePage() {
 
       <section className="ops-section"><div className="ops-section__title"><span>03</span><h2>Lịch sử trạng thái</h2></div><ol className="history-list">{detail.data.history.map(event => <li key={event.id}><span /><div><strong>{ticketStatusLabels[event.toStatus]}</strong><p><time dateTime={event.changedAt}>{formatDateTime(event.changedAt)}</time>{event.note ? ` · ${event.note === 'Intake' ? 'Tiếp nhận thiết bị' : event.note}` : ''}</p>{event.resolvedAt && <small>Điều kiện chờ kết thúc lúc {formatDateTime(event.resolvedAt)} · ghi nhận lúc {formatDateTime(event.resolutionRecordedAt)}{event.resolutionNote ? ` · ${event.resolutionNote}` : ''}</small>}</div></li>)}</ol></section>
     </main><aside className="action-rail"><h2>Việc cần làm tiếp theo</h2>
-      {ticket.status === 'WAITING_ASSIGNMENT' && <section><h3>Phân công kỹ thuật viên</h3>{recommendations.isLoading ? <LoadingState /> : recommendations.isError ? <ErrorState error={recommendations.error} retry={() => recommendations.refetch()} /> : !recommendations.data?.length ? <EmptyState title="Không có kỹ thuật viên trong ca hiện tại" /> : recommendations.data.map(person => <article className="recommendation" key={person.technicianId}><div><strong>{person.technicianName}</strong><StatusBadge label={person.eligible ? 'Phù hợp ca' : 'Ngoài khả năng ca'} tone={person.eligible ? 'success' : 'warning'} /></div><p>Khối lượng công việc {person.estimatedWorkloadMinutes} phút · Rảnh dự kiến {formatClock(person.estimatedAvailableAt)}</p><button className="button button--primary" disabled={!person.eligible || assign.isPending} onClick={() => assign.mutate({ technicianId: person.technicianId, source: 'ACCEPTED_RECOMMENDATION' })}>Chọn kỹ thuật viên</button></article>)}</section>}
+      {ticket.status === 'WAITING_ASSIGNMENT' && <section><h3>Phân công kỹ thuật viên</h3><p className="action-hint">Danh sách đã tính cả hàng đợi, ca làm việc và thời gian nghỉ. Bạn là người quyết định kỹ thuật viên phù hợp.</p>{recommendations.isLoading ? <LoadingState /> : recommendations.isError ? <ErrorState error={recommendations.error} retry={() => recommendations.refetch()} /> : !recommendations.data?.length ? <EmptyState title="Không có kỹ thuật viên trong ca hiện tại" /> : recommendations.data.map(person => {
+        const warnings = person.predictionWarnings.map(predictionWarningLabel).filter((value): value is string => Boolean(value))
+        return <article className="recommendation recommendation--estimate" key={person.technicianId}>
+          <div><strong>{person.technicianName}</strong><StatusBadge label={person.eligible ? 'Có thể xếp lịch' : 'Chưa thể xếp lịch'} tone={person.eligible ? 'success' : 'warning'} /></div>
+          <span className={`prediction-source prediction-source--${person.predictionSource === 'ML' ? 'ml' : 'fallback'}`}>{predictionSourceLabel(person.predictionSource)}</span>
+          <dl className="recommendation-metrics"><div><dt>Thời lượng kỹ thuật</dt><dd>{Math.round(person.predictedTechnicalMinutes)} phút</dd></div><div><dt>Việc đang xếp hàng</dt><dd>{person.queuedJobs} phiếu · {person.estimatedWorkloadMinutes} phút</dd></div><div><dt>Dự kiến bắt đầu</dt><dd>{formatDateTime(person.estimatedStartAt)}</dd></div><div><dt>Dự kiến hoàn tất</dt><dd>{formatDateTime(person.estimatedCompletionAt)}</dd></div></dl>
+          <p className="recommendation-reason">{person.reason}{person.estimatedAvailableAt ? ` · Có thể nhận từ ${formatClock(person.estimatedAvailableAt)}` : ''}</p>
+          {warnings.length > 0 && <ul className="recommendation-warnings">{[...new Set(warnings)].map(warning => <li key={warning}>{warning}</li>)}</ul>}
+          <button className="button button--primary" disabled={!canAssignCandidate(person) || assign.isPending} title={!person.eligible ? person.reason : undefined} onClick={() => setSelectedCandidate(person)}>Chọn kỹ thuật viên</button>
+        </article>
+      })}</section>}
       {ticket.status === 'WAITING_APPROVAL' && <div className="phase-notice phase-notice--warning"><strong>{hasPendingApproval ? 'Chờ quyết định khách hàng' : 'Đã xác nhận – chờ kỹ thuật viên tiếp tục xử lý'}</strong><p>{hasPendingApproval ? 'Ghi nhận phản hồi cho từng hạng mục ở phần bên trái.' : 'Phiếu vẫn ở trạng thái chờ và chưa tự động chuyển sang đang sửa.'}</p></div>}
       {ticket.status === 'WAITING_HANDOVER' && <section><h3>Thanh toán & bàn giao</h3>{paymentSummary.isLoading ? <LoadingState /> : paymentSummary.isError ? <ErrorState error={paymentSummary.error} retry={() => paymentSummary.refetch()} /> : paymentSummary.data && <div className="payment-box"><span>Tổng cần thanh toán</span><strong>{formatMoney(paymentSummary.data.totalAmount)}</strong><p>{paymentStatusLabels[paymentSummary.data.paymentStatus]}</p>{paymentSummary.data.paymentStatus === 'PENDING' && paymentSummary.data.totalAmount > 0 && <><label className="field"><span>Phương thức</span><select value={paymentMethod} onChange={event => setPaymentMethod(event.target.value as PaymentMethod)}>{paymentMethods.map(method => <option value={method.value} key={method.value}>{method.label}</option>)}</select></label><button className="button button--primary" disabled={pay.isPending} onClick={() => pay.mutate()}>Ghi nhận thanh toán</button></>}{paymentSummary.data.paymentStatus === 'PENDING' && paymentSummary.data.totalAmount === 0 && <button className="button button--primary" disabled={settle.isPending} onClick={() => settle.mutate()}>Quyết toán 0 đồng</button>}{paymentSummary.data.paymentStatus === 'PAID' && <button className="button button--primary" disabled={handover.isPending} onClick={() => handover.mutate()}>Xác nhận bàn giao</button>}</div>}</section>}
       {!['HANDED_OVER', 'CANCELLED'].includes(ticket.status) && <section className="danger-zone"><h3>Hủy phiếu</h3><label className="field"><span>Lý do</span><textarea placeholder="Nhập lý do hủy phiếu" value={cancelReason} onChange={event => setCancelReason(event.target.value)} /></label><button className="button button--quiet" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate()}>Hủy phiếu dịch vụ</button></section>}
       {pendingError && <ErrorState error={pendingError} />}
     </aside></div>
+    {selectedCandidate && <ConfirmDialog title="Xác nhận phân công kỹ thuật viên?" confirmLabel="Xác nhận phân công" busyLabel="Đang phân công…" danger={false} busy={assign.isPending} onCancel={() => { setSelectedCandidate(undefined); assign.reset() }} onConfirm={() => assign.mutate({ technicianId: selectedCandidate.technicianId, source: 'ACCEPTED_RECOMMENDATION' })}>
+      <p>Hệ thống sẽ kiểm tra lại ca làm việc, trạng thái phiếu và khả năng nhận việc trước khi lưu.</p>
+      <strong>{selectedCandidate.technicianName} · hoàn tất dự kiến {formatDateTime(selectedCandidate.estimatedCompletionAt)}</strong>
+      {assign.isError && <ErrorState error={assign.error} />}
+    </ConfirmDialog>}
   </div>
 }
