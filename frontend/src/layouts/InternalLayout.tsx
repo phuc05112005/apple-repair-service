@@ -6,7 +6,7 @@ import { useAuth } from '../auth/useAuth'
 interface NavGroup { label: string; links: [string, string, string][] }
 const roleConfig: Record<UserRole, { title: string; groups: NavGroup[] }> = {
   ADMIN: { title: 'Quản trị hệ thống', groups: [
-    { label: 'Tổng quan', links: [['', 'Tổng quan', '⌂'], ['statistics', 'Thống kê', '⌁']] },
+    { label: 'Tổng quan', links: [['', 'Tổng quan', '⌂'], ['statistics', 'Thống kê & phản hồi', '⌁'], ['ml', 'Giám sát ML', '◇']] },
     { label: 'Vận hành', links: [['settings', 'Thời gian & cấu hình', '◷']] },
     { label: 'Nhân sự', links: [['users', 'Tài khoản', '◎'], ['schedules', 'Lịch làm việc', '◷']] },
     { label: 'Danh mục', links: [['catalog', 'Dịch vụ', '◇'], ['parts', 'Linh kiện', '▣'], ['inventory', 'Tồn kho linh kiện', '▤'], ['branches', 'Chi nhánh', '⌖'], ['slots', 'Khung giờ & lịch hẹn', '◫']] },

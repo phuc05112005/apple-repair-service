@@ -344,6 +344,14 @@
   "response" : "com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/admin/ml/overview",
+  "controller" : "AdminConfigurationController",
+  "handler" : "mlOverview",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.AdminMlOverviewResponse"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/admin/parts",
   "controller" : "AdminPartController",
   "handler" : "list",
@@ -574,6 +582,14 @@
   "access" : "hasRole('ADMIN')",
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTypeResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/statistics/feedback",
+  "controller" : "AdminConfigurationController",
+  "handler" : "feedback",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.FeedbackStatisticsResponse"
 }, {
   "method" : "GET",
   "path" : "/api/v1/admin/statistics/overview",

@@ -1,5 +1,5 @@
 import { ApiError, apiDownload, apiRequest, apiUpload } from './client'
-import type { BranchInventoryResponse, BranchResponse, DateOverrideResponse, InventoryImportResultResponse, InventoryLotResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, StockInResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
+import type { AdminMlOverviewResponse, BranchInventoryResponse, BranchResponse, DateOverrideResponse, FeedbackStatisticsResponse, InventoryImportResultResponse, InventoryLotResponse, InventoryTransactionResponse, PartResponse, SlotAvailabilityResponse, SlotRule, StatisticsOverviewResponse, StockInResponse, SystemSettingResponse, TechnicianScheduleResponse, UserResponse, WeeklyScheduleResponse } from './contracts'
 import { inventoryTransactionCode } from '../utils/inventory'
 
 type InventoryHistoryFilters = { branchId?: number; partId?: number; transactionType?: string; from?: string; to?: string; code?: string }
@@ -34,6 +34,9 @@ async function inventoryTransactionHistory(filters: InventoryHistoryFilters = {}
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
     apiRequest<StatisticsOverviewResponse>('/api/v1/admin/statistics/overview', { auth: true, query: filters, signal }),
+  feedbackStatistics: (filters: { from: string; to: string }, signal?: AbortSignal) =>
+    apiRequest<FeedbackStatisticsResponse>('/api/v1/admin/statistics/feedback', { auth: true, query: filters, signal }),
+  mlOverview: (signal?: AbortSignal) => apiRequest<AdminMlOverviewResponse>('/api/v1/admin/ml/overview', { auth: true, signal }),
   settings: (signal?: AbortSignal) => apiRequest<SystemSettingResponse[]>('/api/v1/admin/system-settings', { auth: true, signal }),
   updateSetting: (key: string, settingValue: string) => apiRequest<SystemSettingResponse>(`/api/v1/admin/system-settings/${encodeURIComponent(key)}`, { auth: true, method: 'PUT', body: { settingValue } }),
   resourceList: <T>(resource: string, signal?: AbortSignal) => apiRequest<T[]>(`/api/v1/admin/${resource}`, { auth: true, signal }),
