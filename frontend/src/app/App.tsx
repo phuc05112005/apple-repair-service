@@ -22,6 +22,7 @@ const WarrantyHistoryPage = lazy(() => import('../pages/internal/receptionist/Wa
 const TicketsPage = lazy(() => import('../pages/internal/receptionist/TicketsPage').then(module => ({ default: module.TicketsPage })))
 const TechnicianTicketPage = lazy(() => import('../pages/internal/technician/TechnicianTicketPage').then(module => ({ default: module.TechnicianTicketPage })))
 const StatisticsPage = lazy(() => import('../pages/internal/admin/StatisticsPage').then(module => ({ default: module.StatisticsPage })))
+const MlMonitoringPage = lazy(() => import('../pages/internal/admin/MlMonitoringPage').then(module => ({ default: module.MlMonitoringPage })))
 const SettingsPage = lazy(() => import('../pages/internal/admin/SettingsPage').then(module => ({ default: module.SettingsPage })))
 const MasterDataPage = lazy(() => import('../pages/internal/admin/MasterDataPage').then(module => ({ default: module.MasterDataPage })))
 const UsersPage = lazy(() => import('../pages/internal/admin/UsersPage').then(module => ({ default: module.UsersPage })))
@@ -44,6 +45,7 @@ export function App() {
     <Route path="internal/admin" element={<RequireRole roles={['ADMIN']}><InternalLayout role="ADMIN" /></RequireRole>}>
       <Route index element={<AdminHomePage />} />
       <Route path="statistics" element={<StatisticsPage />} />
+      <Route path="ml" element={<MlMonitoringPage />} />
       <Route path="users" element={<UsersPage />} />
       <Route path="branches" element={<MasterDataPage initial="branches" />} />
       <Route path="catalog" element={<MasterDataPage initial="device-types" grouped />} />

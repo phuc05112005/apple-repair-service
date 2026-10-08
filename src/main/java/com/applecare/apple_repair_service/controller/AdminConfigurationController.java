@@ -23,6 +23,8 @@ public class AdminConfigurationController {
     private final AppointmentScheduleService appointmentSchedules;
     private final TechnicianScheduleService schedules;
     private final StatisticsService statistics;
+    private final FeedbackService feedback;
+    private final AdminMlMonitoringService mlMonitoring;
 
     @GetMapping("/system-settings")
     public List<SystemSettingResponse> settings() { return settings.list(); }
@@ -90,4 +92,12 @@ public class AdminConfigurationController {
             @RequestParam(required=false) @Positive Long branchId, @RequestParam(required=false) @Positive Long deviceTypeId) {
         return statistics.overview(from, to, branchId, deviceTypeId);
     }
+
+    @GetMapping("/statistics/feedback")
+    public FeedbackStatisticsResponse feedback(@RequestParam LocalDate from, @RequestParam LocalDate to) {
+        return feedback.statistics(from, to);
+    }
+
+    @GetMapping("/ml/overview")
+    public AdminMlOverviewResponse mlOverview() { return mlMonitoring.overview(); }
 }

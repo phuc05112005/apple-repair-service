@@ -78,3 +78,9 @@ Chi tiết provenance, confidence, giới hạn compatibility và nguồn tham k
 - ML: `python -m pytest ml/tests --basetemp target/pytest-temp` passed 102 tests. The default Windows temp root was permission-restricted; the test code and artifacts were unchanged.
 - Frontend: typecheck, lint (`--max-warnings 0`) and production build all passed. Vite only reported existing Zod annotation warnings.
 - Catalog seed remained idempotent and the three frozen ML SHA-256 values remained unchanged.
+## FINAL LOCAL SYSTEM COMPLETION ADDITIONS
+
+- Admin now has a read-only `Giám sát ML` route backed by `GET /api/v1/admin/ml/overview`. It reports configured status, model/contract metadata, prediction count, actual-duration coverage and training readiness from `ml_predictions`; it never retrains or invents metrics.
+- Admin statistics now has a feedback statistics API at `GET /api/v1/admin/statistics/feedback`, aggregating `service_feedbacks` by date with total, satisfied, dissatisfied and satisfaction rate. Empty data is reported as zero.
+- OpenAPI/security inventory and frontend route contracts were updated for both endpoints. No schema change was required.
+- Final backend regression after these additions: 232 tests, 0 failures, 0 errors, 1 skipped. Frontend typecheck, lint and build remain passing. Docker Compose services remain healthy.

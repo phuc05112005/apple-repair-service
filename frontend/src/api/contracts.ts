@@ -1,4 +1,7 @@
 export type UserRole = 'ADMIN' | 'RECEPTIONIST' | 'TECHNICIAN'
+export interface AdminMlOverviewResponse { enabled: boolean; status: string; health: string; readiness: string; modelName: string; modelVersion: string; featureContractVersion: string; predictionCount: number; recordsWithActualDuration: number; recordsWithCompleteFeatures: number; trainingEligibleRecords: number; dataFrom?: string; dataTo?: string }
+export interface FeedbackBranchStatisticsResponse { branchId: number; branchName: string; total: number; satisfied: number; dissatisfied: number; satisfactionRate: number }
+export interface FeedbackStatisticsResponse { from: string; to: string; total: number; satisfied: number; dissatisfied: number; satisfactionRate: number; branches: FeedbackBranchStatisticsResponse[] }
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
 export type ActiveStatus = 'ACTIVE' | 'INACTIVE'
 export type AppointmentStatus = 'PENDING_CONFIRMATION' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' | 'EXPIRED'

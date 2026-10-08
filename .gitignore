@@ -17,6 +17,8 @@ docs/*
 !docs/CD_DEPLOYMENT_GUIDE.md
 !docs/DEPENDENCY_SECURITY_REVIEW.md
 !docs/FULL_STACK_LIVE_TEST_REPORT.md
+!docs/SERVICE_CATALOG_DATA_REPORT.md
+!docs/FINAL_LOCAL_SYSTEM_COMPLETION_REPORT.md
 
 ### STS ###
 .apt_generated
@@ -59,3 +61,14 @@ frontend/.env.*.local
 ### Local operational/deployment output ###
 target/operational-data/
 target/live-e2e/
+
+# Python/test and browser-generated local output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+coverage/
+frontend/test-results/
+frontend/playwright-report-live/
+frontend/e2e-live/
+*.log
+backend.log
