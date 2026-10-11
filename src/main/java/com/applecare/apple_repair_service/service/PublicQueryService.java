@@ -99,7 +99,8 @@ public class PublicQueryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new PublicTicketResponse(ticket.getTicketCode(), ticket.getCustomerDevice().getDeviceModel().getName(),
                 ticket.getBranch().getName(), ticket.getStatus(), ticket.getPaymentStatus(), total,
-                ticket.getReceivedAt(), ticket.getHandedOverAt(), items.stream().map(i -> {
+                ticket.getReceivedAt(), ticket.getActualRepairStartedAt(), ticket.getEstimatedCompletionAt(),
+                ticket.getEstimatedDurationMinutes(), ticket.getHandedOverAt(), items.stream().map(i -> {
                     var catalogItem = i.getServiceCatalogItem();
                     var part = catalogItem.getPart();
                     return new PublicRepairItemResponse(i.getId(), catalogItem.getDeviceModel().getDeviceType().getId(), catalogItem.getDeviceModel().getId(),

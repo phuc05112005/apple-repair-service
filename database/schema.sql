@@ -395,7 +395,7 @@ CREATE TABLE `service_tickets` (
   `payment_method` enum('BANK_TRANSFER','CARD','CASH','OTHER') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `payment_status` enum('PAID','PENDING') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `received_at` datetime(6) NOT NULL,
-  `received_condition` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `received_condition` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
   `status` enum('ASSIGNED','CANCELLED','HANDED_OVER','INSPECTING','REPAIRING','WAITING_APPROVAL','WAITING_ASSIGNMENT','WAITING_HANDOVER','WAITING_PART') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `ticket_code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `updated_at` datetime(6) NOT NULL,

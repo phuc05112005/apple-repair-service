@@ -189,7 +189,7 @@ public class ServiceTicketService {
         ticket.setCustomerDevice(physical);
         ticket.setBranch(branch);
         ticket.setCreatedBy(access.get(User.class, userId));
-        ticket.setReceivedCondition(BusinessRules.required(condition, "Received condition"));
+        ticket.setReceivedCondition(BusinessRules.text(condition));
         ticket.setReceivedAt(LocalDateTime.now(clock));
         ticket.setDiscountPercent(BigDecimal.ZERO);
         return ticket;

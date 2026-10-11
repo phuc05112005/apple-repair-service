@@ -20,9 +20,9 @@ export const receptionistApi = {
   cancel: (id: number, reason: string) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/cancel`, { auth: true, method: 'POST', body: { reason } }),
   arrive: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/arrive`, { auth: true, method: 'POST' }),
   expire: (id: number) => apiRequest<AppointmentDetailResponse>(`/api/v1/internal/appointments/${id}/expire`, { auth: true, method: 'POST' }),
-  intake: (appointmentDeviceId: number, request: { serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds?: number[] }) =>
+  intake: (appointmentDeviceId: number, request: { serialNumber?: string; storage?: string; receivedCondition?: string; serviceCatalogItemIds?: number[] }) =>
     apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/appointment-devices/${appointmentDeviceId}/intake`, { auth: true, method: 'POST', body: request }),
-  walkIn: (request: { customerFullName: string; phone: string; branchId: number; deviceModelId: number; serialNumber?: string; storage?: string; receivedCondition: string; serviceCatalogItemIds: number[]; customerReportedIssue?: string; authorizedScope?: string }) =>
+  walkIn: (request: { customerFullName: string; phone: string; branchId: number; deviceModelId: number; serialNumber?: string; storage?: string; receivedCondition?: string; serviceCatalogItemIds: number[]; customerReportedIssue?: string; authorizedScope?: string }) =>
     apiRequest<ServiceTicketDetailResponse>('/api/v1/internal/service-tickets/walk-in', { auth: true, method: 'POST', body: request }),
   warrantyHistory: (query: { phone?: string; ticketCode?: string }, signal?: AbortSignal) =>
     apiRequest<WarrantyHistoryResponse>('/api/v1/internal/warranty-history', { auth: true, query, signal }),
