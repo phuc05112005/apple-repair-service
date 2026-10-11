@@ -80,7 +80,7 @@ public class ServiceTicket {
     private ServiceTicketStatus status = ServiceTicketStatus.WAITING_ASSIGNMENT;
 
     @NotBlank
-    @Column(name = "received_condition", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "received_condition", columnDefinition = "TEXT")
     private String receivedCondition;
 
     @Column(name = "customer_reported_issue", columnDefinition = "TEXT")

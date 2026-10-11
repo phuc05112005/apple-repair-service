@@ -73,7 +73,8 @@ export interface PublicRepairItemResponse {
 }
 export interface PublicTicketResponse {
   ticketCode: string; deviceModelName: string; branchName: string; status: ServiceTicketStatus
-  paymentStatus: PaymentStatus; approvedTotal: number; receivedAt: string; handedOverAt: string | null
+  paymentStatus: PaymentStatus; approvedTotal: number; receivedAt: string; actualRepairStartedAt: string | null
+  estimatedCompletionAt: string | null; estimatedDurationMinutes: number | null; handedOverAt: string | null
   repairItems: PublicRepairItemResponse[]
 }
 export interface WarrantyEligibilityResponse {

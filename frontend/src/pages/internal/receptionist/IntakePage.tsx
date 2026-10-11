@@ -90,7 +90,7 @@ export function IntakePage() {
       ? receptionistApi.intake(appointmentDeviceId!, {
         serialNumber: serialNumber || undefined,
         storage: storage || undefined,
-        receivedCondition: condition,
+        receivedCondition: condition.trim() || undefined,
         serviceCatalogItemIds: changeBookedService && appointmentSelectedService ? [appointmentSelectedService.id] : undefined,
       })
       : receptionistApi.walkIn({
@@ -100,7 +100,7 @@ export function IntakePage() {
         deviceModelId: modelId!,
         serialNumber: serialNumber || undefined,
         storage: storage || undefined,
-        receivedCondition: condition.trim(),
+        receivedCondition: condition.trim() || undefined,
         customerReportedIssue: reportedIssue.trim() || undefined,
         authorizedScope: authorizedScope.trim() || undefined,
         serviceCatalogItemIds: [selectedService!.id],
@@ -113,9 +113,9 @@ export function IntakePage() {
     if (valid) create.mutate()
   }
 
-  const valid = Boolean(condition.trim() && (mode === 'appointment'
+  const valid = Boolean(mode === 'appointment'
     ? selectedBooking && (!changeBookedService || appointmentSelectedService)
-    : fullName.trim() && phone.trim() && branchId && modelId && issueId && selectedService))
+    : fullName.trim() && phone.trim() && branchId && modelId && issueId && selectedService)
 
   return <div className="workspace-page intake-page">
     <header>
@@ -203,7 +203,7 @@ export function IntakePage() {
           <label className="field"><span>Số sê-ri <i>Không bắt buộc</i></span><input placeholder="Nhập số sê-ri thiết bị" maxLength={255} value={serialNumber} onChange={event => setSerialNumber(event.target.value)} /></label>
           <label className="field"><span>Dung lượng lưu trữ <i>Không bắt buộc</i></span><input placeholder="Nhập dung lượng lưu trữ" maxLength={255} value={storage} onChange={event => setStorage(event.target.value)} /></label>
         </div>
-        <label className="field"><span>Tình trạng khi tiếp nhận</span><textarea placeholder="Nhập tình trạng máy và phụ kiện khách giao kèm" required maxLength={5000} value={condition} onChange={event => setCondition(event.target.value)} /></label>
+        <label className="field"><span>Tình trạng khi tiếp nhận <i>Không bắt buộc</i></span><textarea placeholder="Nhập tình trạng máy và phụ kiện khách giao kèm" maxLength={5000} value={condition} onChange={event => setCondition(event.target.value)} /></label>
       </section>}
 
       {create.isError && <ErrorState error={create.error} />}
