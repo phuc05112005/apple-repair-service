@@ -79,7 +79,6 @@ public class WarrantyClaimService {
         ticket.setCustomerDevice(source.getServiceTicket().getCustomerDevice());
         ticket.setBranch(branch);
         ticket.setCreatedBy(actor);
-        ticket.setReceivedCondition(request.receivedCondition().trim());
         ticket.setCustomerReportedIssue(request.customerReportedIssue().trim());
         ticket.setAuthorizedScope(BusinessRules.text(request.authorizedScope()));
         ticket.setInspectionResult(BusinessRules.text(request.note()));

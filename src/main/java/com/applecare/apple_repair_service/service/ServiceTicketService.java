@@ -10,6 +10,7 @@ import com.applecare.apple_repair_service.dto.response.ServiceTicketSummaryRespo
 import com.applecare.apple_repair_service.dto.response.TicketContextResponse;
 import com.applecare.apple_repair_service.entity.Appointment;
 import com.applecare.apple_repair_service.entity.AppointmentDevice;
+import com.applecare.apple_repair_service.entity.AppointmentServiceItem;
 import com.applecare.apple_repair_service.entity.Branch;
 import com.applecare.apple_repair_service.entity.CustomerDevice;
 import com.applecare.apple_repair_service.entity.DeviceModel;
@@ -92,14 +93,12 @@ public class ServiceTicketService {
         var appointment = access.lock(Appointment.class, device.getAppointment().getId());
         BusinessRules.require(appointment.getStatus() == AppointmentStatus.ARRIVED, "Appointment must be ARRIVED");
         if (tickets.findByAppointmentDevice_Id(device.getId()).isPresent())
-            throw new ConflictException("Device already received");
+            throw new ConflictException("Thiết bị của lịch hẹn này đã được tiếp nhận thành phiếu dịch vụ trước đó. Tải lại danh sách lịch chờ tiếp nhận.");
         var bookedItems = bookingItems.findAllByAppointmentDevice_Id(device.getId());
         var replacements = r.serviceCatalogItemIds();
         BusinessRules.require(replacements != null ? !replacements.isEmpty() : !bookedItems.isEmpty(),
                 "Mỗi thiết bị tiếp nhận phải có ít nhất một dịch vụ cụ thể.");
         if (replacements != null) {
-            BusinessRules.require(bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null),
-                    "Không thể đổi dịch vụ của lịch hẹn bảo hành tại bước tiếp nhận.");
             BusinessRules.require(new HashSet<>(replacements).size() == replacements.size(), "Dịch vụ được chọn bị trùng.");
             for (var id : replacements) {
                 var selected = catalog(id, device.getDeviceModel().getId());
@@ -109,13 +108,18 @@ public class ServiceTicketService {
             }
         }
         var physical = customers.resolveDevice(appointment.getCustomer().getId(), new CustomerDeviceInfoRequest(device.getDeviceModel().getId(), r.serialNumber(), r.storage()));
-        var ticket = newTicket(physical, appointment.getAppointmentSlot().getBranch().getId(), r.createdByUserId(), r.receivedCondition());
+        var ticket = newTicket(physical, appointment.getAppointmentSlot().getBranch().getId(), r.createdByUserId());
         ticket.setAppointmentDevice(device);
         ticket.setCustomerReportedIssue(BusinessRules.text(device.getSymptomDescription()));
-        ticket.setDiscountPercent(isDiscountEligible(appointment) ? appointment.getDiscountPercent() : BigDecimal.ZERO);
+        ticket.setDiscountPercent(isDiscountEligible(appointment) && bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null)
+                ? appointment.getDiscountPercent() : BigDecimal.ZERO);
         tickets.saveAndFlush(ticket);
         if (replacements == null) {
             for (var booked : bookedItems) {
+                if (booked.getWarrantySourceItem() != null) {
+                    repairItems.save(warrantyClaimItem(ticket, booked));
+                    continue;
+                }
                 var item = new RepairItem();
                 item.setServiceTicket(ticket);
                 item.setServiceCatalogItem(booked.getServiceCatalogItem());
@@ -127,6 +131,7 @@ public class ServiceTicketService {
                 repairItems.save(item);
             }
         } else {
+            var warrantyItems = bookedItems.stream().filter(item -> item.getWarrantySourceItem() != null).toList();
             for (var id : replacements) {
                 var selected = catalog(id, device.getDeviceModel().getId());
                 var item = new RepairItem();
@@ -140,6 +145,8 @@ public class ServiceTicketService {
                 repairItems.save(item);
             }
         }
+        if (replacements != null) bookedItems.stream().filter(item -> item.getWarrantySourceItem() != null)
+                .forEach(booked -> repairItems.save(warrantyClaimItem(ticket, booked)));
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
     }
@@ -161,7 +168,7 @@ public class ServiceTicketService {
         selected.forEach(id -> catalog(id, r.deviceModelId()));
         var customer = customers.resolve(r.customerFullName(), r.phone());
         var physical = customers.resolveDevice(customer.getId(), new CustomerDeviceInfoRequest(r.deviceModelId(), r.serialNumber(), r.storage()));
-        var ticket = newTicket(physical, r.branchId(), createdByUserId, r.receivedCondition());
+        var ticket = newTicket(physical, r.branchId(), createdByUserId);
         ticket.setCustomerReportedIssue(BusinessRules.text(r.customerReportedIssue()));
         ticket.setAuthorizedScope(BusinessRules.text(r.authorizedScope()));
         tickets.saveAndFlush(ticket);
@@ -181,7 +188,7 @@ public class ServiceTicketService {
         return detail(ticket);
     }
 
-    private ServiceTicket newTicket(CustomerDevice physical, Long branchId, Long userId, String condition) {
+    private ServiceTicket newTicket(CustomerDevice physical, Long branchId, Long userId) {
         var branch = access.get(Branch.class, branchId);
         BusinessRules.require(branch.getStatus() == ActiveStatus.ACTIVE, "Branch is inactive");
         var ticket = new ServiceTicket();
@@ -189,7 +196,7 @@ public class ServiceTicketService {
         ticket.setCustomerDevice(physical);
         ticket.setBranch(branch);
         ticket.setCreatedBy(access.get(User.class, userId));
-        ticket.setReceivedCondition(BusinessRules.text(condition));
+        ticket.setReceivedCondition(null);
         ticket.setReceivedAt(LocalDateTime.now(clock));
         ticket.setDiscountPercent(BigDecimal.ZERO);
         return ticket;
@@ -230,6 +237,24 @@ public class ServiceTicketService {
             BusinessRules.require(repairItems.findAllByServiceTicket_Id(id).stream().noneMatch(x -> x.getApprovalStatus() == ApprovalStatus.PENDING),
                     "Phiếu vẫn còn hạng mục chờ ý kiến khách hàng.");
         return move(id, userId, ServiceTicketStatus.REPAIRING, null);
+    }
+
+    private RepairItem warrantyClaimItem(ServiceTicket ticket, AppointmentServiceItem booked) {
+        var source = booked.getWarrantySourceItem();
+        var claim = new RepairItem();
+        claim.setServiceTicket(ticket);
+        claim.setServiceCatalogItem(booked.getServiceCatalogItem());
+        claim.setItemNameSnapshot("Bảo hành · " + source.getItemNameSnapshot());
+        claim.setBasePrice(BigDecimal.ZERO);
+        claim.setFinalPrice(BigDecimal.ZERO);
+        claim.setApprovalStatus(ApprovalStatus.APPROVED);
+        claim.setWarrantySourceItem(source);
+        claim.setWarrantyDecision(com.applecare.apple_repair_service.enums.WarrantyDecision.APPROVED);
+        claim.setWarrantyDecisionNote("Tiếp nhận theo lịch bảo hành còn hạn");
+        claim.setWarrantyRemedy(source.getServiceCatalogItem().getWarrantyRemedy());
+        claim.setWarrantyStartDate(source.getWarrantyStartDate());
+        claim.setWarrantyEndDate(source.getWarrantyEndDate());
+        return claim;
     }
 
     private static boolean isDiscountEligible(Appointment appointment) {

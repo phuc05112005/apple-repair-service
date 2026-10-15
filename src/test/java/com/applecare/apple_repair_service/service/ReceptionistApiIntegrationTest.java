@@ -77,11 +77,12 @@ class ReceptionistApiIntegrationTest {
         long deviceId=em.createQuery("select d.id from AppointmentDevice d where d.appointment.id=:id",Long.class)
                 .setParameter("id",id).getSingleResult();
         String result=mvc.perform(post("/api/v1/internal/appointment-devices/"+deviceId+"/intake").header("Authorization",bearer)
-                .contentType("application/json").content(json.writeValueAsString(new IntakeDeviceCommand(f.prefix,"128 GB","Received"))))
+                .contentType("application/json").content(json.writeValueAsString(new IntakeDeviceCommand(f.prefix,"128 GB",null))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.ticket.createdById").value(f.receptionist.getId()))
                 .andExpect(jsonPath("$.ticket.status").value("WAITING_ASSIGNMENT")).andReturn().getResponse().getContentAsString();
         long ticketId=json.readTree(result).get("ticket").get("id").asLong();
         em.flush(); assertEquals(f.receptionist.getId(),em.find(ServiceTicket.class,ticketId).getCreatedBy().getId());
+        assertNull(em.find(ServiceTicket.class,ticketId).getReceivedCondition());
         mvc.perform(post("/api/v1/internal/appointments/"+id+"/confirm").header("Authorization",bearer))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
     }
@@ -92,6 +93,18 @@ class ReceptionistApiIntegrationTest {
         mvc.perform(post("/api/v1/internal/service-tickets/1/payment").header("Authorization",bearer)
                 .contentType("application/json").content("{\"paymentMethod\":\"CASH\"}")).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/internal/appointments/1/confirm").header("Authorization",bearer)).andExpect(status().isForbidden());
+    }
+
+    @Test void walkInCanBeCreatedWithoutReceivedConditionInRequestBody() throws Exception {
+        String bearer = "Bearer " + login(f.receptionist);
+        var request = new WalkInIntakeRequest(f.prefix + " no-condition", f.prefix + "empty-condition",
+                f.branch.getId(), f.model.getId(), null, null, List.of(f.catalog.getId()), "Không lên nguồn", null);
+        var body = mvc.perform(post("/api/v1/internal/service-tickets/walk-in").header("Authorization", bearer)
+                        .contentType("application/json").content(json.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.ticket.id").exists())
+                .andReturn().getResponse().getContentAsString();
+        long ticketId = json.readTree(body).get("ticket").get("id").asLong();
+        assertNull(em.find(ServiceTicket.class, ticketId).getReceivedCondition());
     }
 
     @Test void checkInReturnsClearEarlyAndExpiredErrorsAtServerTime() throws Exception {

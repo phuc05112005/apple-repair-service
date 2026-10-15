@@ -47,6 +47,7 @@ public class AppointmentService {
     private final AppointmentDeviceRepository devices;
     private final AppointmentServiceItemRepository items;
     private final ServiceTicketRepository tickets;
+    private final com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository catalogs;
     private final CustomerIdentity customers;
     private final SystemSettingService settings;
     private final DomainAccess access;
@@ -71,8 +72,12 @@ public class AppointmentService {
             CatalogPolicy.requireModel(access.get(DeviceModel.class, d.deviceModelId()));
             var seen = new HashSet<Long>();
             for (var i : d.serviceItems()) {
-                BusinessRules.require(seen.add(i.serviceCatalogItemId()), "Thiết bị có dịch vụ bị chọn trùng.");
-                validCatalog(i.serviceCatalogItemId(), d.deviceModelId());
+                BusinessRules.require(i.warrantySourceItemId() != null || i.serviceCatalogItemId() != null,
+                        "Mỗi hạng mục đặt lịch cần có dịch vụ hoặc nguồn bảo hành.");
+                if (i.warrantySourceItemId() == null) {
+                    BusinessRules.require(seen.add(i.serviceCatalogItemId()), "Thiết bị có dịch vụ bị chọn trùng.");
+                    validCatalog(i.serviceCatalogItemId(), d.deviceModelId());
+                } else BusinessRules.require(seen.add(-i.warrantySourceItemId()), "Hạng mục bảo hành bị chọn trùng.");
             }
         }
         var customer = customers.resolve(r.customerFullName(), r.phone());
@@ -90,22 +95,50 @@ public class AppointmentService {
             device.setSymptomDescription(BusinessRules.text(d.symptomDescription()));
             devices.save(device);
             for (var request : d.serviceItems()) {
-                var catalog = validCatalog(request.serviceCatalogItemId(), d.deviceModelId());
-                BusinessRules.require(catalog.getServiceType().getCode() != ServiceTypeCode.WARRANTY
-                                || request.warrantySourceItemId() != null,
-                        "Vui lòng chọn dịch vụ gốc còn bảo hành trước khi đặt lịch bảo hành.");
+                var source = request.warrantySourceItemId() == null ? null : access.get(RepairItem.class, request.warrantySourceItemId());
+                ServiceCatalogItem catalogItem;
+                var basePrice = java.math.BigDecimal.ZERO.setScale(2);
+                if (source != null) {
+                    BusinessRules.require(source.getWarrantySourceItem() == null,
+                            "Lịch bảo hành phải được đặt từ hạng mục dịch vụ gốc.");
+                    BusinessRules.require(warranty.eligible(source, LocalDate.now(clock)),
+                            "Dịch vụ nguồn đã hết hạn hoặc không đủ điều kiện bảo hành.");
+                    BusinessRules.require(source.getServiceTicket().getCustomerDevice().getCustomer().getId().equals(customer.getId()),
+                            "Bảo hành không thuộc số điện thoại này.");
+                    var sourceCatalog = source.getServiceCatalogItem();
+                    BusinessRules.require(sourceCatalog.getWarrantyDays() != null && sourceCatalog.getWarrantyDays() > 0
+                                    && sourceCatalog.getWarrantyRemedy() != null,
+                            "Dịch vụ nguồn chưa được cấu hình phương án bảo hành.");
+                    BusinessRules.require(source.getServiceTicket().getCustomerDevice().getDeviceModel().getId().equals(d.deviceModelId()),
+                            "Thiết bị đặt lịch không khớp dịch vụ bảo hành.");
+                    var expectedType = sourceCatalog.getWarrantyRemedy() == com.applecare.apple_repair_service.enums.WarrantyRemedy.REPLACEMENT
+                            ? ServiceTypeCode.REPLACEMENT : ServiceTypeCode.REPAIR;
+                    catalogItem = request.serviceCatalogItemId() == null
+                            ? catalogs.findAllByDeviceModel_IdAndServiceIssue_Id(d.deviceModelId(), sourceCatalog.getServiceIssue().getId()).stream()
+                                    .filter(candidate -> candidate.getServiceType().getCode() == expectedType)
+                                    .filter(candidate -> candidate.getStatus() == ActiveStatus.ACTIVE)
+                                    .findFirst().orElseThrow(() -> new com.applecare.apple_repair_service.exception.BusinessRuleViolationException(
+                                            "Chưa có dịch vụ kỹ thuật phù hợp với chính sách bảo hành đã cấu hình."))
+                            : validCatalog(request.serviceCatalogItemId(), d.deviceModelId());
+                    CatalogPolicy.requireUsable(catalogItem, d.deviceModelId());
+                    warranty.validateBooking(source, customer.getId(), catalogItem, LocalDate.now(clock));
+                } else {
+                    catalogItem = validCatalog(request.serviceCatalogItemId(), d.deviceModelId());
+                    basePrice = PricePolicy.catalogBasePrice(catalogItem);
+                    BusinessRules.require(catalogItem.getServiceType().getCode() != ServiceTypeCode.WARRANTY,
+                            "Dịch vụ bảo hành phải được đặt từ hạng mục gốc còn hạn.");
+                }
                 var item = new AppointmentServiceItem();
                 item.setAppointmentDevice(device);
-                item.setServiceCatalogItem(catalog);
-                item.setServiceNameSnapshot(catalog.getName());
-                var basePrice = PricePolicy.catalogBasePrice(catalog);
+                item.setServiceCatalogItem(catalogItem);
+                if (source != null) {
+                    item.setWarrantySourceItem(source);
+                    item.setServiceNameSnapshot("Bảo hành · " + source.getItemNameSnapshot());
+                } else {
+                    item.setServiceNameSnapshot(catalogItem.getName());
+                }
                 item.setBasePriceSnapshot(basePrice);
                 item.setFinalPriceSnapshot(PricePolicy.discounted(basePrice, discount));
-                if (request.warrantySourceItemId() != null) {
-                    var source = access.get(RepairItem.class, request.warrantySourceItemId());
-                    warranty.validateBooking(source, customer.getId(), catalog, LocalDate.now(clock));
-                    item.setWarrantySourceItem(source);
-                }
                 items.save(item);
             }
         }

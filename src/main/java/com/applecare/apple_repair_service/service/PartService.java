@@ -41,7 +41,7 @@ public class PartService {
     public PartResponse create(CreatePartRequest r) {
         rules.validate(r);
         var e = new Part();
-        apply(e, new UpdatePartRequest(r.partCode(), r.name(), r.brand(), r.variant(), r.salePrice()));
+        apply(e, new UpdatePartRequest(r.partCode(), r.name(), r.brand(), r.variant(), r.salePrice(), r.origin(), r.manufacturer(), r.supplier()));
         return save(e);
     }
 
@@ -88,6 +88,9 @@ public class PartService {
         e.setName(BusinessRules.text(r.name()));
         e.setBrand(BusinessRules.text(r.brand()));
         e.setVariant(BusinessRules.text(r.variant()));
+        e.setOrigin(BusinessRules.text(r.origin()));
+        e.setManufacturer(BusinessRules.text(r.manufacturer()));
+        if (r.supplier() != null) e.setSupplier(BusinessRules.text(r.supplier()));
         e.setSalePrice(r.salePrice());
 
     }

@@ -79,7 +79,6 @@ public class ServiceTicket {
     @Column(name = "status", nullable = false)
     private ServiceTicketStatus status = ServiceTicketStatus.WAITING_ASSIGNMENT;
 
-    @NotBlank
     @Column(name = "received_condition", columnDefinition = "TEXT")
     private String receivedCondition;
 

@@ -50,7 +50,7 @@ export interface SlotAvailabilityResponse {
 export interface SlotRule { startTime: string; endTime: string; enabled: boolean }
 export interface WeeklyScheduleResponse { branchId: number; weekday: number; enabled: boolean; slots: SlotRule[] }
 export interface DateOverrideResponse { branchId: number; date: string; mode: 'INHERIT' | 'DISABLED' | 'REPLACE'; slots: SlotRule[] }
-export interface AppointmentServiceItemRequest { serviceCatalogItemId: number; warrantySourceItemId?: number | null }
+export interface AppointmentServiceItemRequest { serviceCatalogItemId?: number; warrantySourceItemId?: number | null }
 export interface AppointmentDeviceRequest {
   deviceModelId: number; symptomDescription?: string; serviceItems: AppointmentServiceItemRequest[]
 }
@@ -69,7 +69,7 @@ export interface PublicRepairItemResponse {
   serviceTypeCode: ServiceTypeCode; serviceTypeName: string
   partId: number | null; partName: string | null; partBrand: string | null; partVariant: string | null
   name: string; approvalStatus: ApprovalStatus; finalPrice: number | null
-  warrantyStartDate: string | null; warrantyEndDate: string | null; warrantyDecision: WarrantyDecision
+  warrantyStartDate: string | null; warrantyEndDate: string | null; warrantyDecision: WarrantyDecision; warrantyRemedy: WarrantyRemedy | null; warrantySourceItemId: number | null
 }
 export interface PublicTicketResponse {
   ticketCode: string; deviceModelName: string; branchName: string; status: ServiceTicketStatus
@@ -104,7 +104,7 @@ export interface AppointmentDetailResponse {
 }
 export interface ServiceTicketResponse {
   id: number; ticketCode: string; appointmentDeviceId: number | null; customerDeviceId: number; branchId: number
-  createdById: number; status: ServiceTicketStatus; receivedCondition: string; inspectionResult: string | null
+  createdById: number; status: ServiceTicketStatus; receivedCondition: string | null; inspectionResult: string | null
   inspectedById: number | null; discountPercent: number; paymentStatus: PaymentStatus; paymentMethod: PaymentMethod | null
   paidAt: string | null; handedOverById: number | null; handedOverAt: string | null; cancelReason: string | null
   receivedAt: string; updatedAt: string; authorizedScope: string | null; timing: TicketTiming
@@ -195,7 +195,7 @@ export interface WarrantyHistoryItemResponse {
   eligible: boolean; claimCount: number; lastClaimAt: string | null; claims: WarrantyClaimSummaryResponse[]
 }
 export interface WarrantyHistoryResponse { customerId: number; customerFullName: string; customerPhone: string; items: WarrantyHistoryItemResponse[] }
-export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
+export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; origin: string | null; manufacturer: string | null; supplier: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface BranchInventoryResponse { id: number; branchId: number; partId: number; quantity: number; createdAt: string; updatedAt: string }
 export interface InventoryTransactionResponse {
   id: number; transactionCode?: string; partId: number; transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER'

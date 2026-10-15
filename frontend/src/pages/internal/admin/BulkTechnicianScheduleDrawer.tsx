@@ -4,6 +4,7 @@ import type { BranchResponse, UserResponse } from '../../../api/contracts'
 import { adminApi } from '../../../api/adminApi'
 import { DetailDrawer } from '../../../components/Dialog'
 import { ErrorState } from '../../../components/AsyncState'
+import { deselectAllEligible, removeSavedSelections, selectAllEligible, toggleSelection } from '../../../utils/technicianSelection'
 
 type SaveResult = { id: number; name: string; ok: boolean; message: string }
 
@@ -28,12 +29,7 @@ export function BulkTechnicianScheduleDrawer({
     return technicians.filter(user => !query || `${user.fullName} ${user.username}`.toLocaleLowerCase('vi').includes(query))
   }, [technicians, search])
   const eligibleVisible = visible.filter(user => user.status === 'ACTIVE')
-  const toggle = (id: number) => setSelected(previous => {
-    const next = new Set(previous)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    return next
-  })
+  const toggle = (id: number) => setSelected(previous => toggleSelection(previous, id))
   const save = useMutation({
     mutationFn: async () => {
       const targets = technicians.filter(user => selected.has(user.id) && user.status === 'ACTIVE')
@@ -47,6 +43,7 @@ export function BulkTechnicianScheduleDrawer({
         message: outcome.status === 'fulfilled' ? 'Đã lưu ca làm việc.' : 'Không thể lưu ca. Kiểm tra lịch trùng hoặc trạng thái nhân viên.',
       }))
       setResults(next)
+      setSelected(previous => removeSavedSelections(previous, next))
       await onSaved()
       return next
     },
@@ -57,7 +54,7 @@ export function BulkTechnicianScheduleDrawer({
       <p className="form-note">Ngày và khung giờ được áp dụng một lần cho các kỹ thuật viên đã chọn. Mỗi ca vẫn được kiểm tra xung đột ở backend trước khi lưu.</p>
       <div className="form-grid"><label className="field"><span>Ngày làm việc</span><input type="date" value={date} readOnly /></label><label className="field"><span>Chi nhánh</span><select value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Chọn chi nhánh</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label><label className="field"><span>Bắt đầu</span><input type="time" value={startTime} onChange={event => setStartTime(event.target.value)} /></label><label className="field"><span>Kết thúc</span><input type="time" value={endTime} onChange={event => setEndTime(event.target.value)} /></label></div>
       <label className="field"><span>Tìm kỹ thuật viên</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nhập tên hoặc tài khoản kỹ thuật viên" /></label>
-      <div className="bulk-schedule__toolbar"><strong>{selected.size} kỹ thuật viên đã chọn</strong><button type="button" className="text-action" onClick={() => setSelected(previous => { const next = new Set(previous); eligibleVisible.forEach(user => next.add(user.id)); return next })}>Chọn tất cả đang hiển thị</button><button type="button" className="text-action" onClick={() => setSelected(previous => { const next = new Set(previous); eligibleVisible.forEach(user => next.delete(user.id)); return next })}>Bỏ chọn đang hiển thị</button></div>
+      <div className="bulk-schedule__toolbar"><strong>{selected.size} kỹ thuật viên đã chọn</strong><button type="button" className="text-action" onClick={() => setSelected(previous => selectAllEligible(previous, eligibleVisible.map(user => user.id)))}>Chọn tất cả đang hiển thị</button><button type="button" className="text-action" onClick={() => setSelected(previous => deselectAllEligible(previous, eligibleVisible.map(user => user.id)))}>Bỏ chọn đang hiển thị</button></div>
       <div className="bulk-schedule__list">{visible.map(user => <label key={user.id} className={`bulk-schedule__person ${user.status !== 'ACTIVE' ? 'is-disabled' : ''}`}><input type="checkbox" checked={selected.has(user.id)} disabled={user.status !== 'ACTIVE'} onChange={() => toggle(user.id)} /><span><strong>{user.fullName}</strong><small>{user.username} · {user.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã ngừng hoạt động'}</small></span></label>)}</div>
       {results && <section className="bulk-schedule__results"><strong>Kết quả lưu lịch</strong>{results.map(result => <p key={result.id} className={result.ok ? 'is-success' : 'is-error'}>{result.name}: {result.message}</p>)}</section>}
       {save.isError && <ErrorState error={save.error} />}

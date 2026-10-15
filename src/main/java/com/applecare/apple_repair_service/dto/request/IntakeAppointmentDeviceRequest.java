@@ -12,7 +12,13 @@ public record IntakeAppointmentDeviceRequest(
         @NotNull @Positive Long createdByUserId
 ) {
     public IntakeAppointmentDeviceRequest(Long appointmentDeviceId, String serialNumber, String storage,
-                                          String receivedCondition, Long createdByUserId) {
-        this(appointmentDeviceId, serialNumber, storage, receivedCondition, null, createdByUserId);
+                                          List<Long> serviceCatalogItemIds, Long createdByUserId) {
+        this(appointmentDeviceId, serialNumber, storage, null, serviceCatalogItemIds, createdByUserId);
     }
+
+    public IntakeAppointmentDeviceRequest(Long appointmentDeviceId, String serialNumber, String storage,
+                                          String ignoredReceivedCondition, Long createdByUserId) {
+        this(appointmentDeviceId, serialNumber, storage, null, null, createdByUserId);
+    }
+
 }

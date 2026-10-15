@@ -16,6 +16,20 @@ public record WalkInIntakeRequest(
         @Size(max = 5000) String customerReportedIssue, @Size(max = 5000) String authorizedScope
 ) {
     public WalkInIntakeRequest(String customerFullName, String phone, Long branchId, Long deviceModelId,
+            String serialNumber, String storage, List<Long> serviceCatalogItemIds,
+            String customerReportedIssue, String authorizedScope) {
+        this(customerFullName, phone, branchId, deviceModelId, serialNumber, storage, null,
+                serviceCatalogItemIds, customerReportedIssue, authorizedScope);
+    }
+
+    public WalkInIntakeRequest(String customerFullName, String phone, Long branchId, Long deviceModelId,
+            String serialNumber, String storage, List<Long> serviceCatalogItemIds,
+            String customerReportedIssue) {
+        this(customerFullName, phone, branchId, deviceModelId, serialNumber, storage, null,
+                serviceCatalogItemIds, customerReportedIssue, null);
+    }
+
+    public WalkInIntakeRequest(String customerFullName, String phone, Long branchId, Long deviceModelId,
             String serialNumber, String storage, String receivedCondition, List<Long> serviceCatalogItemIds, String customerReportedIssue) {
         this(customerFullName, phone, branchId, deviceModelId, serialNumber, storage, receivedCondition, serviceCatalogItemIds, customerReportedIssue, null);
     }
