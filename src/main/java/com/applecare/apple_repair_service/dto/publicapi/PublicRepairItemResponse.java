@@ -3,6 +3,7 @@ package com.applecare.apple_repair_service.dto.publicapi;
 import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.enums.WarrantyDecision;
+import com.applecare.apple_repair_service.enums.WarrantyRemedy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,6 +25,8 @@ public record PublicRepairItemResponse(
         BigDecimal finalPrice,
         LocalDate warrantyStartDate,
         LocalDate warrantyEndDate,
-        WarrantyDecision warrantyDecision
+        WarrantyDecision warrantyDecision,
+        WarrantyRemedy warrantyRemedy,
+        Long warrantySourceItemId
 ) {
 }

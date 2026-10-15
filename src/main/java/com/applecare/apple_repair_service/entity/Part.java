@@ -49,6 +49,15 @@ public class Part {
     @Column(name = "variant")
     private String variant;
 
+    @Column(name = "origin")
+    private String origin;
+
+    @Column(name = "manufacturer")
+    private String manufacturer;
+
+    @Column(name = "supplier")
+    private String supplier;
+
     @NotNull
     @DecimalMin("0.00")
     @Column(name = "sale_price", nullable = false, precision = 18, scale = 2)

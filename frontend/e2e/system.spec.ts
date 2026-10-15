@@ -224,6 +224,57 @@ test('assignment actions are hidden outside WAITING_ASSIGNMENT', async ({ page }
   await expect(page.getByText('Phân công kỹ thuật viên')).toHaveCount(0)
 })
 
+test('bulk technician schedules retain only failed selections and allow retry', async ({ page }) => {
+  await authenticated(page, 'ADMIN')
+  const technicians = [
+    { id: 31, username: 'kt.an', fullName: 'Nguyễn An', role: 'TECHNICIAN', status: 'ACTIVE' },
+    { id: 32, username: 'kt.binh', fullName: 'Trần Bình', role: 'TECHNICIAN', status: 'ACTIVE' },
+    { id: 33, username: 'kt.chi', fullName: 'Lê Chi', role: 'TECHNICIAN', status: 'INACTIVE' },
+  ]
+  await page.route('**/api/v1/admin/users', route => json(route, technicians))
+  await page.route('**/api/v1/admin/branches', route => json(route, [{ id: 7, name: 'TáoCare Trung tâm', status: 'ACTIVE' }]))
+  let binAttempts = 0
+  const saved: number[] = []
+  await page.route('**/api/v1/admin/technician-schedules**', async route => {
+    if (route.request().method() !== 'POST') return json(route, [])
+    const body = route.request().postDataJSON() as { technicianId: number; branchId: number; startTime: string; endTime: string; status: string }
+    expect(body.branchId).toBe(7)
+    expect(body.startTime).toBe('08:00')
+    expect(body.endTime).toBe('17:00')
+    expect(body.status).toBe('WORKING')
+    if (body.technicianId === 32 && binAttempts++ === 0) {
+      return json(route, { message: 'Ca bị trùng với lịch hiện có.' }, 409)
+    }
+    saved.push(body.technicianId)
+    return json(route, { id: 500 + saved.length, technicianId: body.technicianId }, 201)
+  })
+
+  await page.goto('/internal/admin/schedules')
+  await page.getByRole('button', { name: '+ Xếp lịch nhiều KTV' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Tìm kỹ thuật viên' }).fill('binh')
+  await expect(dialog.getByText('Trần Bình')).toBeVisible()
+  await expect(dialog.getByText('Nguyễn An')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Chọn tất cả đang hiển thị' }).click()
+  await expect(dialog.getByText('1 kỹ thuật viên đã chọn')).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Tìm kỹ thuật viên' }).fill('')
+  await dialog.getByRole('checkbox', { name: /Nguyễn An/ }).check()
+  await expect(dialog.getByRole('checkbox', { name: /Lê Chi/ })).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Lưu lịch cho 2 KTV' }).click()
+
+  await expect(dialog.getByText('Nguyễn An: Đã lưu ca làm việc.')).toBeVisible()
+  await expect(dialog.getByText('Trần Bình: Không thể lưu ca. Kiểm tra lịch trùng hoặc trạng thái nhân viên.')).toBeVisible()
+  await expect(dialog.getByText('1 kỹ thuật viên đã chọn')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Lưu lịch cho 1 KTV' })).toBeEnabled()
+  expect(saved).toEqual([31])
+
+  await dialog.getByRole('button', { name: 'Lưu lịch cho 1 KTV' }).click()
+  await expect(dialog.getByText('Trần Bình: Đã lưu ca làm việc.')).toBeVisible()
+  await expect(dialog.getByText('0 kỹ thuật viên đã chọn')).toBeVisible()
+  expect(saved).toEqual([31, 32])
+})
+
 test('changing device type or model clears dependent selections', async ({ page }) => {
   await page.route('**/api/v1/device-types', route => json(route, [{ id: 1, name: 'iPhone' }, { id: 2, name: 'iPad' }]))
   await page.route('**/api/v1/device-models?deviceTypeId=1', route => json(route, [{ id: 11, deviceTypeId: 1, name: 'iPhone 16 Pro' }, { id: 12, deviceTypeId: 1, name: 'iPhone 15' }]))

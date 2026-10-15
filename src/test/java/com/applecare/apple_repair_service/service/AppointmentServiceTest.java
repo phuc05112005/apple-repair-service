@@ -55,11 +55,12 @@ class AppointmentServiceTest {
     final AppointmentDeviceRepository devices = mock(AppointmentDeviceRepository.class);
     final AppointmentServiceItemRepository items = mock(AppointmentServiceItemRepository.class);
     final com.applecare.apple_repair_service.repository.ServiceTicketRepository tickets = mock(com.applecare.apple_repair_service.repository.ServiceTicketRepository.class);
+    final com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository catalogRepository = mock(com.applecare.apple_repair_service.repository.ServiceCatalogItemRepository.class);
     final CustomerIdentity customers = mock(CustomerIdentity.class);
     final SystemSettingService settings = mock(SystemSettingService.class);
     final DomainAccess access = mock(DomainAccess.class);
     final WarrantyPolicy warranty = new WarrantyPolicy();
-    final AppointmentService service = new AppointmentService(appointments, devices, items, tickets, customers, settings, access,
+    final AppointmentService service = new AppointmentService(appointments, devices, items, tickets, catalogRepository, customers, settings, access,
             new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), warranty, new EntityResponses(), clock, new RetryingWrites(new WriteTransaction()));
     final AppointmentSlot slot = new AppointmentSlot();
     final DeviceModel model = new DeviceModel();
@@ -332,10 +333,20 @@ class AppointmentServiceTest {
 
     @Test
     void validWarrantyBookingKeepsSource() {
-        source();
-        catalog(4L, model).getServiceType().setCode(ServiceTypeCode.WARRANTY);
-        service.createAppointment(request(List.of(new AppointmentDeviceRequest(2L, null, List.of(new AppointmentServiceItemRequest(4L, 99L))))));
+        var source = source();
+        var original = catalog(4L, model);
+        original.getServiceType().setCode(ServiceTypeCode.REPAIR);
+        original.setWarrantyDays(30);
+        original.setWarrantyRemedy(com.applecare.apple_repair_service.enums.WarrantyRemedy.REPAIR);
+        source.setServiceCatalogItem(original);
+        when(access.get(RepairItem.class, 99L)).thenReturn(source);
+        when(access.get(DeviceModel.class, 2L)).thenReturn(model);
+        when(catalogRepository.findAllByDeviceModel_IdAndServiceIssue_Id(2L, original.getServiceIssue().getId())).thenReturn(List.of(original));
+        service.createAppointment(request(List.of(new AppointmentDeviceRequest(2L, null, List.of(new AppointmentServiceItemRequest(null, 99L))))));
         assertEquals(99L, savedItems.getFirst().getWarrantySourceItem().getId());
+        assertEquals(99L, savedItems.getFirst().getWarrantySourceItem().getId());
+        assertEquals(0, BigDecimal.ZERO.compareTo(savedItems.getFirst().getBasePriceSnapshot()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(savedItems.getFirst().getFinalPriceSnapshot()));
     }
 
     @Test
@@ -350,8 +361,17 @@ class AppointmentServiceTest {
     void expiredWarrantyRejected() {
         var s = source();
         s.setWarrantyEndDate(LocalDate.now(clock).minusDays(1));
-        catalog(4L, model).getServiceType().setCode(ServiceTypeCode.WARRANTY);
-        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(new AppointmentDeviceRequest(2L, null, List.of(new AppointmentServiceItemRequest(4L, 99L)))))));
+        var original = catalog(4L, model);
+        original.getServiceType().setCode(ServiceTypeCode.REPAIR);
+        original.setWarrantyDays(30);
+        original.setWarrantyRemedy(com.applecare.apple_repair_service.enums.WarrantyRemedy.REPAIR);
+        s.setServiceCatalogItem(original);
+        when(access.get(DeviceModel.class, 2L)).thenReturn(model);
+        when(access.get(RepairItem.class, 99L)).thenReturn(s);
+        when(access.get(DeviceModel.class, 2L)).thenReturn(model);
+        when(catalogRepository.findAllByDeviceModel_IdAndServiceIssue_Id(2L, original.getServiceIssue().getId())).thenReturn(List.of(original));
+        assertThrows(BusinessRuleViolationException.class, () -> service.createAppointment(request(List.of(
+                new AppointmentDeviceRequest(2L, null, List.of(new AppointmentServiceItemRequest(null, 99L)))))));
     }
 
     @Test

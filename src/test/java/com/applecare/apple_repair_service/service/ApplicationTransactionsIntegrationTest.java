@@ -361,11 +361,12 @@ class ApplicationTransactionsIntegrationTest {
                      new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
                      new String[]{"InventoryLot", "e.branch.id"},
                     new String[]{"PartUsage", "e.repairItem.serviceTicket.branch.id"},
+                    new String[]{"RepairItem", "e.warrantySourceItem.serviceTicket.branch.id"},
                     new String[]{"ServiceStatusHistory", "e.serviceTicket.branch.id"},
                     new String[]{"Assignment", "e.serviceTicket.branch.id"},
+                    new String[]{"AppointmentServiceItem", "e.appointmentDevice.appointment.appointmentSlot.branch.id"},
                     new String[]{"RepairItem", "e.serviceTicket.branch.id"},
                     new String[]{"ServiceTicket", "e.branch.id"},
-                    new String[]{"AppointmentServiceItem", "e.appointmentDevice.appointment.appointmentSlot.branch.id"},
                     new String[]{"AppointmentDevice", "e.appointment.appointmentSlot.branch.id"},
                     new String[]{"Appointment", "e.appointmentSlot.branch.id"},
                     new String[]{"AppointmentSlot", "e.branch.id"},
@@ -668,6 +669,41 @@ class ApplicationTransactionsIntegrationTest {
         });
         assertEquals(ServiceTicketStatus.HANDED_OVER, tickets.getById(ticketId).ticket().status());
         assertEquals(PaymentMethod.CASH, payments.getSummary(ticketId).paymentMethod());
+    }
+
+    @Test
+    void warrantyAppointmentNeedsNoServiceSelectionAndKeepsFreeWarrantyWhenAddingPaidWork() {
+        tx(() -> {
+            var sourceTicket = em.find(ServiceTicket.class, ticketId);
+            sourceTicket.setStatus(ServiceTicketStatus.HANDED_OVER);
+            var sourceItem = em.find(RepairItem.class, itemId);
+            sourceItem.setWarrantyStartDate(LocalDate.now(TestData.CLOCK).minusDays(1));
+            sourceItem.setWarrantyEndDate(LocalDate.now(TestData.CLOCK).plusDays(29));
+            return null;
+        });
+        var request = new CreateAppointmentRequest(prefix, prefix, slotId, null, List.of(
+                new AppointmentDeviceRequest(modelId, "Lỗi quay lại", List.of(
+                        new AppointmentServiceItemRequest(null, itemId)))));
+        var booking = appointments.createAppointment(request);
+        var serviceItem = appointments.getById(booking.appointment().id()).devices().getFirst().serviceItems().getFirst();
+        assertEquals(itemId, serviceItem.warrantySourceItemId());
+        assertTrue(serviceItem.serviceNameSnapshot().startsWith("Bảo hành · "));
+        assertEquals(0, BigDecimal.ZERO.compareTo(serviceItem.finalPriceSnapshot()));
+
+        openArrivalWindow();
+        appointments.confirmAppointment(booking.appointment().id(), new ConfirmAppointmentRequest(userId));
+        appointments.markArrived(booking.appointment().id());
+        var appointmentDeviceId = appointments.getById(booking.appointment().id()).devices().getFirst().device().id();
+        var ticket = tickets.intakeAppointmentDevice(new IntakeAppointmentDeviceRequest(appointmentDeviceId, null, null,
+                null, List.of(secondCatalogId), userId));
+        var warrantyClaim = ticket.repairItems().stream().filter(repairItem -> repairItem.warrantySourceItemId() != null).findFirst().orElseThrow();
+        var paidExtra = ticket.repairItems().stream().filter(repairItem -> repairItem.warrantySourceItemId() == null).findFirst().orElseThrow();
+        assertEquals(itemId, warrantyClaim.warrantySourceItemId());
+        assertEquals(0, BigDecimal.ZERO.compareTo(warrantyClaim.finalPrice()));
+        assertEquals("Bảo hành · " + prefix, warrantyClaim.itemNameSnapshot());
+        assertEquals(0, new BigDecimal("50.00").compareTo(paidExtra.finalPrice()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(tickets.getById(ticket.ticket().id()).ticket().discountPercent()));
+        assertNull(ticket.ticket().receivedCondition());
     }
 
     @Test

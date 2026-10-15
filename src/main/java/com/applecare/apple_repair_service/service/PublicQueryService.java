@@ -29,6 +29,7 @@ public class PublicQueryService {
     private final DomainAccess access;
     private final SystemSettingService settings;
     private final WarrantyService warranties;
+    private final WarrantyPolicy warrantyPolicy;
 
     public List<PublicNamedResponse> deviceTypes() {
         return types.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE).stream()
@@ -108,7 +109,9 @@ public class PublicQueryService {
                             catalogItem.getServiceType().getName(), part == null ? null : part.getId(),
                             part == null ? null : part.getName(), part == null ? null : part.getBrand(),
                             part == null ? null : part.getVariant(), i.getItemNameSnapshot(), i.getApprovalStatus(),
-                            i.getFinalPrice(), i.getWarrantyStartDate(), i.getWarrantyEndDate(), i.getWarrantyDecision());
+                            i.getFinalPrice(), i.getWarrantyStartDate(), i.getWarrantyEndDate(), i.getWarrantyDecision(),
+                            i.getWarrantyRemedy() != null ? i.getWarrantyRemedy() : catalogItem.getWarrantyRemedy(),
+                            i.getWarrantySourceItem() == null ? null : i.getWarrantySourceItem().getId());
                 }).toList());
     }
     public WarrantyEligibilityResponse eligibility(Long itemId, String phone) {

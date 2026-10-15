@@ -33,6 +33,9 @@ interface Row {
   partCode?: string
   brand?: string | null
   variant?: string | null
+  origin?: string | null
+  manufacturer?: string | null
+  supplier?: string | null
   salePrice?: number
   createdAt?: string
   updatedAt?: string
@@ -103,7 +106,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
         warrantyReplacementCatalogId: null,
       }
     }
-    if (resource === 'parts') return { partCode: form.partCode, name: form.name, brand: form.brand || null, variant: form.variant || null, salePrice: Number(form.salePrice) }
+    if (resource === 'parts') return { partCode: form.partCode, name: form.name, brand: form.brand || null, variant: form.variant || null, origin: form.origin || null, manufacturer: form.manufacturer || null, supplier: form.supplier || null, salePrice: Number(form.salePrice) }
     if (resource === 'branches') return { name: form.name, address: form.address, phone: form.phone || null }
     return { name: form.name }
   }
@@ -158,7 +161,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
         {resource === 'device-models' && <>{select('deviceTypeId', 'Loại thiết bị', deviceTypes.data ?? [])}{field('name', 'Tên model')}</>}
         {resource === 'service-issues' && <>{field('name', 'Tên vấn đề')}<fieldset className="field issue-scope-picker"><legend>Áp dụng cho loại thiết bị</legend><p>Chọn tất cả nhóm thiết bị có thể gặp vấn đề này.</p><div className="issue-scope-picker__options">{deviceTypes.isLoading ? <LoadingState /> : deviceTypes.isError ? <ErrorState error={deviceTypes.error} retry={() => deviceTypes.refetch()} /> : (deviceTypes.data ?? []).filter(type => type.status === 'ACTIVE' || (form.deviceTypeIds ?? '').split(',').includes(String(type.id))).map(type => { const selected = (form.deviceTypeIds ?? '').split(',').includes(String(type.id)); return <label key={type.id} className="check-option"><input type="checkbox" checked={selected} onChange={() => setForm(value => ({ ...value, deviceTypeIds: Array.from(new Set((value.deviceTypeIds ?? '').split(',').filter(Boolean).filter(id => id !== String(type.id)).concat(selected ? [] : [String(type.id)]))).join(',') }))} /><span>{type.name}</span></label> })}</div></fieldset></>}
         {resource === 'service-types' && <>{select('code', 'Mã loại dịch vụ', (Object.keys(serviceTypeLabels) as ServiceTypeCode[]).map(value => ({ value, name: `${serviceTypeLabels[value]} — ${value}` })))}{field('name', 'Tên hiển thị')}</>}
-        {resource === 'parts' && <>{field('partCode', 'Mã linh kiện')}{field('name', 'Tên linh kiện')}{field('brand', 'Hãng', 'text', false)}{field('variant', 'Phiên bản', 'text', false)}{field('salePrice', 'Giá bán', 'number')}</>}
+        {resource === 'parts' && <>{field('partCode', 'Mã linh kiện')}{field('name', 'Tên linh kiện')}{field('brand', 'Hãng', 'text', false)}{field('variant', 'Phiên bản', 'text', false)}{field('origin', 'Nước sản xuất', 'text', false)}{field('manufacturer', 'Nhà sản xuất', 'text', false)}{field('supplier', 'Nhà cung cấp', 'text', false)}{field('salePrice', 'Giá bán', 'number')}</>}
         {resource === 'service-catalog-items' && <>{groupedSelect('deviceModelId', 'Model', modelGroups)}{select('serviceIssueId', 'Vấn đề', (issues.data ?? []).filter(issue => issue.deviceTypeIds.includes(modelMap.get(Number(form.deviceModelId))?.deviceTypeId ?? -1)))}{select('serviceTypeId', 'Loại dịch vụ', (serviceTypes.data ?? []).map(item => ({ ...item, name: serviceTypeLabels[item.code] })))}{select('partId', 'Linh kiện', (parts.data ?? []).map(item => ({ ...item, name: `${item.name} · ${item.brand ?? 'Chưa rõ hãng'} · ${item.variant ?? 'Bản tiêu chuẩn'}` })), true)}{field('configuredPrice', 'Giá cấu hình', 'number', false)}{field('standardDurationMinutes', 'Tổng thời lượng kỹ thuật (phút)', 'number')}{field('warrantyDays', 'Số ngày bảo hành', 'number')}{Number(form.warrantyDays || 0) > 0 && select('warrantyRemedy', 'Đặc trưng xử lý khi bảo hành', [{ value: 'REPAIR', name: 'Sửa chữa' }, { value: 'REPLACEMENT', name: 'Thay thế linh kiện' }])}{Number(form.warrantyDays || 0) > 0 && <p className="form-note form-note--wide">Dịch vụ cụ thể sẽ được nhân viên tiếp nhận chọn khi tạo phiếu bảo hành, theo đúng model và đặc trưng xử lý này.</p>}</>}
       </div>{save.isError && <ErrorState error={save.error} />}
     </DetailDrawer>}
@@ -204,7 +207,7 @@ function ResourceDetail({ resource, row, typeNames, modelMap, issueNames, servic
   if (resource === 'parts') {
     const usedBy = catalogItems.filter(item => item.partId === row.id)
     return <div className="detail-stack">
-      <DetailSection title="Thông tin linh kiện"><dl className="detail-grid"><Data label="Tên" value={row.name} /><Data label="Mã linh kiện" value={row.partCode} /><Data label="Hãng" value={row.brand ?? 'Chưa xác định'} /><Data label="Phiên bản" value={row.variant ?? 'Tiêu chuẩn'} /><Data label="Giá bán" value={formatMoney(row.salePrice)} /><Data label="Trạng thái" value={row.status === 'ACTIVE' ? 'Đang dùng' : 'Ngừng dùng'} /></dl></DetailSection>
+      <DetailSection title="Thông tin linh kiện"><dl className="detail-grid"><Data label="Tên" value={row.name} /><Data label="Mã linh kiện" value={row.partCode} /><Data label="Hãng" value={row.brand ?? 'Chưa xác định'} /><Data label="Phiên bản" value={row.variant ?? 'Tiêu chuẩn'} /><Data label="Nước sản xuất" value={row.origin ?? 'Chưa cập nhật'} /><Data label="Nhà sản xuất" value={row.manufacturer ?? 'Chưa cập nhật'} /><Data label="Nhà cung cấp" value={row.supplier ?? 'Chưa cập nhật'} /><Data label="Giá bán" value={formatMoney(row.salePrice)} /><Data label="Trạng thái" value={row.status === 'ACTIVE' ? 'Đang dùng' : 'Ngừng dùng'} /></dl></DetailSection>
       <DetailSection title="Danh mục dịch vụ đang sử dụng"><RelationshipList empty="Chưa có dịch vụ nào sử dụng linh kiện này.">{usedBy.map(item => { const model = modelMap.get(item.deviceModelId); const type = serviceTypeMap.get(item.serviceTypeId); return <li key={item.id}><strong>{item.name}</strong><span>{model?.name} · {issueNames.get(item.serviceIssueId)} · {type ? serviceTypeLabels[type.code] : ''}</span></li> })}</RelationshipList></DetailSection>
       <DetailSection title="Tồn kho theo chi nhánh">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa phát sinh tồn kho tại chi nhánh.">{inventories.map(item => <li key={item.id}><strong>{branchNames.get(item.branchId) ?? `Chi nhánh #${item.branchId}`}</strong><span>{item.quantity} linh kiện · cập nhật {formatDateTime(item.updatedAt)}</span></li>)}</RelationshipList>}</DetailSection>
       <DetailSection title="Lịch sử biến động">{loadingRelations ? <LoadingState /> : <RelationshipList empty="Chưa có biến động tồn kho.">{transactions.slice(0, 12).map(item => <li key={item.id}><strong>{transactionLabel(item.transactionType)} · {item.quantity}</strong><span>{formatDateTime(item.createdAt)} · {movementBranches(item, branchNames)}</span></li>)}</RelationshipList>}</DetailSection>

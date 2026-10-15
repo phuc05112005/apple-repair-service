@@ -127,7 +127,7 @@ public class EntityResponses {
     }
 
     public PartResponse map(Part e) {
-        return new PartResponse(e.getId(), e.getPartCode(), e.getName(), e.getBrand(), e.getVariant(), e.getSalePrice(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+        return new PartResponse(e.getId(), e.getPartCode(), e.getName(), e.getBrand(), e.getVariant(), e.getOrigin(), e.getManufacturer(), e.getSupplier(), e.getSalePrice(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
     }
 
     public PartUsageResponse map(PartUsage e) {

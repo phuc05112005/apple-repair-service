@@ -60,7 +60,7 @@ public class ReceptionistController {
     @ResponseStatus(HttpStatus.CREATED)
     public ServiceTicketDetailResponse intake(@PathVariable @Positive Long appointmentDeviceId, @Valid @RequestBody IntakeDeviceCommand request) {
         return tickets.intakeAppointmentDevice(new IntakeAppointmentDeviceRequest(appointmentDeviceId,request.serialNumber(),
-                request.storage(),request.receivedCondition(),request.serviceCatalogItemIds(),actor.id()));
+                request.storage(),null,request.serviceCatalogItemIds(),actor.id()));
     }
     @PostMapping("/service-tickets/walk-in")
     @ResponseStatus(HttpStatus.CREATED)

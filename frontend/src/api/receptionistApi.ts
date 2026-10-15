@@ -26,7 +26,7 @@ export const receptionistApi = {
     apiRequest<ServiceTicketDetailResponse>('/api/v1/internal/service-tickets/walk-in', { auth: true, method: 'POST', body: request }),
   warrantyHistory: (query: { phone?: string; ticketCode?: string }, signal?: AbortSignal) =>
     apiRequest<WarrantyHistoryResponse>('/api/v1/internal/warranty-history', { auth: true, query, signal }),
-  createWarrantyClaim: (sourceItemId: number, request: { branchId: number; serviceCatalogItemId: number; receivedCondition: string; customerReportedIssue: string; note?: string; authorizedScope?: string }) =>
+  createWarrantyClaim: (sourceItemId: number, request: { branchId: number; serviceCatalogItemId: number; receivedCondition?: string; customerReportedIssue: string; note?: string; authorizedScope?: string }) =>
     apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/repair-items/${sourceItemId}/warranty-claims`, { auth: true, method: 'POST', body: request }),
   tickets: (filters: { branchId?: number; status?: ServiceTicketStatus; query?: string }, signal?: AbortSignal) =>
     apiRequest<OperationalTicketResponse[]>('/api/v1/internal/service-tickets', { auth: true, query: filters, signal }),
