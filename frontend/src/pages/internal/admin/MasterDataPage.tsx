@@ -103,7 +103,7 @@ export function MasterDataPage({ initial, grouped = false }: { initial: Resource
         configuredPrice: form.configuredPrice ? Number(form.configuredPrice) : null,
         standardDurationMinutes: Number(form.standardDurationMinutes), warrantyDays: Number(form.warrantyDays || 0),
         warrantyRemedy: Number(form.warrantyDays || 0) > 0 ? form.warrantyRemedy || null : null,
-        warrantyReplacementCatalogId: null,
+        warrantyReplacementCatalogId: editing?.warrantyReplacementCatalogId ?? null,
       }
     }
     if (resource === 'parts') return { partCode: form.partCode, name: form.name, brand: form.brand || null, variant: form.variant || null, origin: form.origin || null, manufacturer: form.manufacturer || null, supplier: form.supplier || null, salePrice: Number(form.salePrice) }

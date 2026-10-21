@@ -167,6 +167,36 @@ test('public navigation does not expose staff login or internal links', async ({
   await expect(page.getByText(/đăng nhập nhân viên/i)).toHaveCount(0)
 })
 
+test('editing a warranty catalog item preserves its replacement service link', async ({ page }) => {
+  await authenticated(page, 'ADMIN')
+  const service = {
+    id: 301, deviceModelId: 11, serviceTypeId: 41, serviceIssueId: 31, partId: null,
+    name: 'Sửa pin iPhone 16 Pro', configuredPrice: 500000, standardDurationMinutes: 60,
+    warrantyDays: 90, warrantyRemedy: 'REPLACEMENT', warrantyReplacementCatalogId: 302,
+    status: 'ACTIVE', createdAt: '2026-01-01T09:00:00', updatedAt: '2026-01-01T09:00:00',
+  }
+  await page.route('**/api/v1/admin/device-types', route => json(route, [{ id: 1, name: 'iPhone', status: 'ACTIVE' }]))
+  await page.route('**/api/v1/admin/device-models', route => json(route, [{ id: 11, deviceTypeId: 1, name: 'iPhone 16 Pro', status: 'ACTIVE' }]))
+  await page.route('**/api/v1/admin/service-issues', route => json(route, [{ id: 31, name: 'Pin', deviceTypeIds: [1], status: 'ACTIVE' }]))
+  await page.route('**/api/v1/admin/service-types', route => json(route, [{ id: 41, code: 'REPAIR', name: 'Sửa chữa', status: 'ACTIVE' }]))
+  await page.route('**/api/v1/admin/service-catalog-items', route => json(route, [service]))
+
+  let updatePayload: Record<string, unknown> | undefined
+  await page.route('**/api/v1/admin/service-catalog-items/301', async route => {
+    if (route.request().method() === 'PUT') {
+      updatePayload = route.request().postDataJSON() as Record<string, unknown>
+      return json(route, { ...service, ...updatePayload })
+    }
+    return json(route, service)
+  })
+
+  await page.goto('/internal/admin/catalog')
+  await page.getByRole('button', { name: 'Danh mục dịch vụ' }).click()
+  await page.getByRole('button', { name: 'Sửa', exact: true }).click()
+  await page.getByRole('button', { name: 'Lưu dữ liệu' }).click()
+  await expect.poll(() => updatePayload?.warrantyReplacementCatalogId).toBe(302)
+})
+
 test('role guard keeps a receptionist out of the admin workspace', async ({ page }) => {
   await authenticated(page, 'RECEPTIONIST')
   await page.goto('/internal/admin')
