@@ -140,7 +140,7 @@ class ClosureServiceTest {
     RepairItem source() {
         var t = TestData.ticket(ServiceTicketStatus.HANDED_OVER);
         var item = TestData.item(9, t, ApprovalStatus.APPROVED);
-        item.setWarrantyStartDate(LocalDate.now(TestData.CLOCK));
+        item.setWarrantyStartDate(LocalDate.now(TestData.CLOCK).minusDays(30));
         item.setWarrantyEndDate(LocalDate.now(TestData.CLOCK).plusDays(30));
         when(access.get(RepairItem.class, 9L)).thenReturn(item);
         return item;

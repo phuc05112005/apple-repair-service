@@ -14,6 +14,7 @@ import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.enums.ServiceTypeCode;
 import com.applecare.apple_repair_service.enums.UserRole;
 import com.applecare.apple_repair_service.enums.UserStatus;
+import com.applecare.apple_repair_service.enums.WarrantyRemedy;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -67,6 +68,8 @@ final class TestData {
         c.setName("Repair");
         c.setConfiguredPrice(BigDecimal.TEN);
         c.setStandardDurationMinutes(30);
+        c.setWarrantyDays(30);
+        c.setWarrantyRemedy(WarrantyRemedy.REPAIR);
         var m = new DeviceModel();
         m.setId(1L);
         var deviceType = new com.applecare.apple_repair_service.entity.DeviceType();

@@ -74,6 +74,8 @@ class HttpWorkflowIntegrationTest {
             for(var entry:List.of(
                     new String[]{"DefectivePartReturn", "e.branch.id"},
                     new String[]{"ServiceTimeEstimateHistory", "e.serviceTicket.branch.id"},
+                    new String[]{"ServiceTimeEstimateHistory", "e.createdBy.id"},
+                    new String[]{"ServiceTimeEstimateHistory", "e.technician.id"},
                     new String[]{"ServiceFeedback","e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction","e.serviceTicket.branch.id"},
                     new String[]{"Transfer","e.fromAssignment.serviceTicket.branch.id"},

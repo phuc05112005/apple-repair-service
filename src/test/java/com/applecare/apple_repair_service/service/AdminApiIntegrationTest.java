@@ -181,9 +181,10 @@ class AdminApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
                 .andExpect(jsonPath("$[0].lotCode").value(command.lotCode()));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
-                .param("code", "NHAP_"))
+                .param("partId", part.getId().toString()).param("code", "NHAP_"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
-        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token))
+        mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
+                .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
         mvc.perform(get("/api/v1/admin/inventory/import-template").header("Authorization","Bearer "+token))
                 .andExpect(status().isOk())
