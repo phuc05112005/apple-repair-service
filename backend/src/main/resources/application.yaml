@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: local
   application:
     name: apple-repair-service
 
@@ -23,7 +25,7 @@ spring:
 app:
   security:
     jwt:
-      secret: ${JWT_SECRET:}
+      secret: ${JWT_SECRET:apple-repair-local-development-secret-2026-very-secure}
       expiration: ${JWT_EXPIRATION:PT1H}
       issuer: apple-repair-service
     public-docs: ${API_DOCS_ENABLED:false}

@@ -2,8 +2,11 @@ name: apple-repair-service
 
 services:
   mysql:
-    image: mysql:8.4
+    container_name: apple-repair-service-mysql
+    image: mysql:8
     restart: unless-stopped
+    ports:
+      - "3307:3306"
     env_file: .env
     environment:
       TZ: Asia/Ho_Chi_Minh
@@ -50,9 +53,11 @@ services:
 
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     env_file: .env
     environment:
       TZ: Asia/Ho_Chi_Minh
