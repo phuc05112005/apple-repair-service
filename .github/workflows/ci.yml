@@ -40,6 +40,7 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+          cache-dependency-path: backend/pom.xml
 
       - name: Show Java version
         run: java -version
@@ -70,6 +71,7 @@ jobs:
             apple_repair_service_test < database/schema.sql
 
       - name: Run backend tests
+        working-directory: backend                 # <-- Thêm working-directory
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service_test
           SPRING_DATASOURCE_USERNAME: root
@@ -78,6 +80,7 @@ jobs:
         run: mvn --batch-mode test
 
       - name: Package backend
+        working-directory: backend                 # <-- Thêm working-directory
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service_test
           SPRING_DATASOURCE_USERNAME: root

@@ -33,6 +33,7 @@ jobs:
       - name: Import canonical schema
         run: mysql -h127.0.0.1 -uroot -ptest-root-password apple_repair_ci < database/schema.sql
       - name: Backend tests and package
+        working-directory: backend                 # <-- Thêm working-directory
         env:
           TEST_DATABASE_URL: jdbc:mysql://127.0.0.1:3306/apple_repair_ci
           TEST_DATABASE_USERNAME: root
@@ -56,11 +57,14 @@ jobs:
       matrix:
         include:
           - component: backend
-            dockerfile: Dockerfile
+            dockerfile: backend/Dockerfile
+            context: ./backend
           - component: frontend
             dockerfile: frontend/Dockerfile
+            context: .
           - component: ml
             dockerfile: ml/Dockerfile
+            context: .
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
