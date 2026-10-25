@@ -72,8 +72,17 @@ public class AdminInventoryController {
     }
     @PostMapping("/admin/inventory/stock-in")
     public StockInResponse stockIn(@Valid @RequestBody StockInCommand request) {
-        return inventory.stockIn(new StockInRequest(request.lotCode(),request.branchId(),request.partId(),request.quantity(),
-                request.receivedAt(),actor.id(),request.sourceNote()));
+        return inventory.stockIn(new StockInRequest(
+                request.lotCode(),
+                request.branchId(),
+                request.partId(),
+                request.quantity(),
+                request.supplierName(),
+                request.costPrice(),
+                request.receivedAt(),
+                actor.id(),
+                request.sourceNote()
+        ));
     }
     @PostMapping("/admin/inventory/stock-out")
     public BranchInventoryResponse stockOut(@Valid @RequestBody StockAdjustmentCommand request) {

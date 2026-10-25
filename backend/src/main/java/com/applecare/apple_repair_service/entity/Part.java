@@ -1,13 +1,17 @@
 package com.applecare.apple_repair_service.entity;
 
 import com.applecare.apple_repair_service.enums.ActiveStatus;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.DecimalMin;
@@ -21,6 +25,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "parts", uniqueConstraints = {
@@ -34,6 +40,14 @@ public class Part {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "part_device_models", joinColumns = @JoinColumn(name = "part_id"))
+    @Column(name = "device_model_id")
+    private Set<Long> deviceModelIds = new HashSet<>();
+
+    @Column(name = "service_issue_id")
+    private Long serviceIssueId;
 
     @NotBlank
     @Column(name = "part_code", nullable = false)
@@ -58,9 +72,8 @@ public class Part {
     @Column(name = "supplier")
     private String supplier;
 
-    @NotNull
     @DecimalMin("0.00")
-    @Column(name = "sale_price", nullable = false, precision = 18, scale = 2)
+    @Column(name = "sale_price", nullable = true, precision = 18, scale = 2)
     private BigDecimal salePrice;
 
     @NotNull

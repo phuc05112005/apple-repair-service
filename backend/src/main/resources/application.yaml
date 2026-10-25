@@ -9,10 +9,23 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:123456}
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: 1250080145@sv.hcmunre.edu.vn
+    password: jneimtaiqslplrpk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -26,7 +39,7 @@ app:
   security:
     jwt:
       secret: ${JWT_SECRET:apple-repair-local-development-secret-2026-very-secure}
-      expiration: ${JWT_EXPIRATION:PT1H}
+      expiration: ${JWT_EXPIRATION:PT8H}
       issuer: apple-repair-service
     public-docs: ${API_DOCS_ENABLED:false}
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

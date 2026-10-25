@@ -11,6 +11,7 @@ import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.PartRepository;
 import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,7 +42,7 @@ public class PartService {
     public PartResponse create(CreatePartRequest r) {
         rules.validate(r);
         var e = new Part();
-        apply(e, new UpdatePartRequest(r.partCode(), r.name(), r.brand(), r.variant(), r.salePrice(), r.origin(), r.manufacturer(), r.supplier()));
+        apply(e, new UpdatePartRequest(r.deviceModelIds(), r.serviceIssueId(), r.partCode(), r.name(), r.brand(), r.variant(), r.salePrice(), r.origin(), r.manufacturer(), r.supplier()));
         return save(e);
     }
 
@@ -81,9 +82,18 @@ public class PartService {
     }
 
     private void apply(Part e, UpdatePartRequest r) {
-        repository.findByPartCode(r.partCode().trim()).filter(x -> !Objects.equals(x.getId(), e.getId())).ifPresent(x -> {
-            throw new DuplicateResourceException("Part code already exists");
-        });
+        repository.findByPartCode(r.partCode().trim())
+                .filter(x -> !Objects.equals(x.getId(), e.getId()))
+                .ifPresent(x -> {
+                    throw new DuplicateResourceException("Part code already exists");
+                });
+
+        e.getDeviceModelIds().clear();
+        if (r.deviceModelIds() != null && !r.deviceModelIds().isEmpty()) {
+            e.getDeviceModelIds().addAll(r.deviceModelIds());
+        }
+
+        e.setServiceIssueId(r.serviceIssueId()); // <--- Gán Vấn đề dịch vụ
         e.setPartCode(BusinessRules.text(r.partCode()));
         e.setName(BusinessRules.text(r.name()));
         e.setBrand(BusinessRules.text(r.brand()));
@@ -91,8 +101,8 @@ public class PartService {
         e.setOrigin(BusinessRules.text(r.origin()));
         e.setManufacturer(BusinessRules.text(r.manufacturer()));
         if (r.supplier() != null) e.setSupplier(BusinessRules.text(r.supplier()));
-        e.setSalePrice(r.salePrice());
 
+        e.setSalePrice(r.salePrice() != null ? r.salePrice() : BigDecimal.ZERO);
     }
 
     private PartResponse save(Part e) {
