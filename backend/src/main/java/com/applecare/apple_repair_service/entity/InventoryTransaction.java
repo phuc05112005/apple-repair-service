@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -61,6 +62,12 @@ public class InventoryTransaction {
     @Positive
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
+
+    @Column(name = "supplier_name")
+    private String supplierName;
+
+    @Column(name = "cost_price", precision = 18, scale = 2)
+    private BigDecimal costPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "part_usage_id",

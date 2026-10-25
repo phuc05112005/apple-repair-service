@@ -14,13 +14,16 @@ import { businessDate, formatDateTime, formatMoney } from '../../../utils/format
 const statuses: AppointmentStatus[] = ['PENDING_CONFIRMATION', 'CONFIRMED', 'ARRIVED', 'CANCELLED', 'EXPIRED']
 
 type WindowState = 'early' | 'eligible' | 'late'
+
 function windowState(appointment: AppointmentResponse, now: number): WindowState {
   const start = Date.parse(`${appointment.appointmentDate}T${appointment.slotStartTime}+07:00`)
   const end = Date.parse(`${appointment.appointmentDate}T${appointment.slotEndTime}+07:00`)
   if (now < start) return 'early'
   return now < end ? 'eligible' : 'late'
 }
-const slotLabel = (appointment: AppointmentResponse) => `${appointment.slotStartTime.slice(0, 5)}–${appointment.slotEndTime.slice(0, 5)}`
+
+const slotLabel = (appointment: AppointmentResponse) =>
+  `${appointment.slotStartTime.slice(0, 5)}–${appointment.slotEndTime.slice(0, 5)}`
 
 export function AppointmentsPage() {
   const queryClient = useQueryClient()
@@ -29,24 +32,156 @@ export function AppointmentsPage() {
   const [date, setDate] = useState(today)
   const [status, setStatus] = useState<AppointmentStatus>()
   const [selected, setSelected] = useState<AppointmentDetailResponse>()
-  const branches = useQuery({ queryKey: ['public', 'branches'], queryFn: ({ signal }) => publicApi.branches(signal) })
-  const appointments = useQuery({ queryKey: ['internal', 'appointments', branchId, date, status], queryFn: ({ signal }) => receptionistApi.appointments({ branchId, date: date || undefined, status }, signal) })
+
+  const branches = useQuery({
+    queryKey: ['public', 'branches'],
+    queryFn: ({ signal }) => publicApi.branches(signal),
+  })
+
+  const appointments = useQuery({
+    queryKey: ['internal', 'appointments', branchId, date, status],
+    queryFn: ({ signal }) => receptionistApi.appointments({ branchId, date: date || undefined, status }, signal),
+  })
+
   async function refresh(updated?: AppointmentDetailResponse) {
-    if (updated) { setSelected(updated); queryClient.setQueryData(['internal', 'appointment', updated.appointment.id], updated) }
+    if (updated) {
+      setSelected(updated)
+      queryClient.setQueryData(['internal', 'appointment', updated.appointment.id], updated)
+    }
     await queryClient.invalidateQueries({ queryKey: ['internal', 'appointments'] })
   }
-  return <div className="workspace-page"><header><span className="eyebrow">Vận hành trong ngày</span><h1>Lịch hẹn</h1><p>Xác nhận lịch, đổi lịch và ghi nhận khách đến đúng khung giờ đã đặt.</p></header>
-    <div className="toolbar"><label><span>Chi nhánh</span><select value={branchId ?? ''} onChange={event => setBranchId(Number(event.target.value) || undefined)}><option value="">Tất cả được phép</option>{branches.data?.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label><label><span>Ngày</span><input type="date" value={date} onChange={event => setDate(event.target.value)} /></label><label><span>Trạng thái</span><select value={status ?? ''} onChange={event => setStatus(event.target.value as AppointmentStatus || undefined)}><option value="">Tất cả</option>{statuses.map(item => <option value={item} key={item}>{appointmentStatusLabels[item]}</option>)}</select></label></div>
-    {appointments.isLoading ? <LoadingState label="Đang tải lịch hẹn…" /> : appointments.isError ? <ErrorState error={appointments.error} retry={() => appointments.refetch()} /> : !appointments.data?.length ? <EmptyState title="Không có lịch hẹn phù hợp">Thử đổi ngày, chi nhánh hoặc trạng thái.</EmptyState> : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Mã lịch</th><th>Khách hàng</th><th>Thiết bị / dịch vụ</th><th>Khung giờ</th><th>Trạng thái</th><th /></tr></thead><tbody>{appointments.data.map(item => <tr key={item.appointment.id}><td><strong>#{item.appointment.id}</strong></td><td><strong>{item.appointment.customerFullName}</strong><small>{item.appointment.customerPhone}</small></td><td><strong>{item.devices.length} thiết bị</strong><small>{item.devices.flatMap(device => device.serviceItems).map(service => service.serviceNameSnapshot).join(', ')}</small></td><td><strong>{slotLabel(item.appointment)}</strong><small>{item.appointment.appointmentDate}</small></td><td><StatusBadge label={appointmentStatusLabels[item.appointment.status]} tone={appointmentStatusTones[item.appointment.status]} /></td><td><button className="button button--quiet" onClick={() => setSelected(item)}>{item.appointment.status === 'PENDING_CONFIRMATION' ? 'Xác nhận lịch' : item.appointment.status === 'CONFIRMED' ? 'Ghi nhận khách đến' : 'Xem chi tiết'}</button></td></tr>)}</tbody></table></div>}
-    {selected && <AppointmentDrawer detail={selected} close={() => setSelected(undefined)} onUpdated={refresh} />}
-  </div>
+
+  return (
+    <div className="workspace-page">
+      <header>
+        <span className="eyebrow">Vận hành trong ngày</span>
+        <h1>Lịch hẹn</h1>
+        <p>Xác nhận lịch, đổi lịch và ghi nhận khách đến đúng khung giờ đã đặt.</p>
+      </header>
+
+      <div className="toolbar">
+        <label>
+          <span>Chi nhánh</span>
+          <select
+            value={branchId ?? ''}
+            onChange={(event) => setBranchId(Number(event.target.value) || undefined)}
+          >
+            <option value="">Tất cả được phép</option>
+            {branches.data?.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Ngày</span>
+          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        </label>
+
+        <label>
+          <span>Trạng thái</span>
+          <select
+            value={status ?? ''}
+            onChange={(event) => setStatus((event.target.value as AppointmentStatus) || undefined)}
+          >
+            <option value="">Tất cả</option>
+            {statuses.map((item) => (
+              <option value={item} key={item}>
+                {appointmentStatusLabels[item]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {appointments.isLoading ? (
+        <LoadingState label="Đang tải lịch hẹn…" />
+      ) : appointments.isError ? (
+        <ErrorState error={appointments.error} retry={() => appointments.refetch()} />
+      ) : !appointments.data?.length ? (
+        <EmptyState title="Không có lịch hẹn phù hợp">Thử đổi ngày, chi nhánh hoặc trạng thái.</EmptyState>
+      ) : (
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Mã lịch</th>
+                <th>Khách hàng</th>
+                <th>Thiết bị / dịch vụ</th>
+                <th>Khung giờ</th>
+                <th>Trạng thái</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {appointments.data.map((item) => (
+                <tr key={item.appointment.id}>
+                  <td>
+                    <strong>#{item.appointment.id}</strong>
+                  </td>
+                  <td>
+                    <strong>{item.appointment.customerFullName}</strong>
+                    <small>{item.appointment.customerPhone}</small>
+                  </td>
+                  <td>
+                    <strong>{item.devices.length} thiết bị</strong>
+                    <small>
+                      {item.devices
+                        .flatMap((device) => device.serviceItems)
+                        .map((service) => service.serviceNameSnapshot)
+                        .join(', ')}
+                    </small>
+                  </td>
+                  <td>
+                    <strong>{slotLabel(item.appointment)}</strong>
+                    <small>{item.appointment.appointmentDate}</small>
+                  </td>
+                  <td>
+                    <StatusBadge
+                      label={appointmentStatusLabels[item.appointment.status]}
+                      tone={appointmentStatusTones[item.appointment.status]}
+                    />
+                  </td>
+                  <td>
+                    <button className="button button--quiet" onClick={() => setSelected(item)}>
+                      {item.appointment.status === 'PENDING_CONFIRMATION'
+                        ? 'Xác nhận lịch'
+                        : item.appointment.status === 'CONFIRMED'
+                        ? 'Ghi nhận khách đến'
+                        : 'Xem chi tiết'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {selected && <AppointmentDrawer detail={selected} close={() => setSelected(undefined)} onUpdated={refresh} />}
+    </div>
+  )
 }
 
-function AppointmentDrawer({ detail: initialDetail, close, onUpdated }: { detail: AppointmentDetailResponse; close: () => void; onUpdated: (detail: AppointmentDetailResponse) => Promise<void> }) {
+function AppointmentDrawer({
+  detail: initialDetail,
+  close,
+  onUpdated,
+}: {
+  detail: AppointmentDetailResponse
+  close: () => void
+  onUpdated: (detail: AppointmentDetailResponse) => Promise<void>
+}) {
   const queryClient = useQueryClient()
-  const detailQuery = useQuery({ queryKey: ['internal', 'appointment', initialDetail.appointment.id], queryFn: ({ signal }) => receptionistApi.appointment(initialDetail.appointment.id, signal) })
+  const detailQuery = useQuery({
+    queryKey: ['internal', 'appointment', initialDetail.appointment.id],
+    queryFn: ({ signal }) => receptionistApi.appointment(initialDetail.appointment.id, signal),
+  })
   const detail = detailQuery.data ?? initialDetail
   const appointment = detail.appointment
+
   const [now, setNow] = useState(0)
   const [cancelMode, setCancelMode] = useState(false)
   const [rescheduleMode, setRescheduleMode] = useState(false)
@@ -54,10 +189,31 @@ function AppointmentDrawer({ detail: initialDetail, close, onUpdated }: { detail
   const [newBranchId, setNewBranchId] = useState<number>()
   const [newDate, setNewDate] = useState('')
   const [newSlotId, setNewSlotId] = useState<number>()
-  useEffect(() => { const update = () => setNow(Date.now()); const initial = window.setTimeout(update, 0); const timer = window.setInterval(update, 30_000); return () => { window.clearTimeout(initial); window.clearInterval(timer) } }, [])
+
+  useEffect(() => {
+    const update = () => setNow(Date.now())
+    const initial = window.setTimeout(update, 0)
+    const timer = window.setInterval(update, 30_000)
+    return () => {
+      window.clearTimeout(initial)
+      window.clearInterval(timer)
+    }
+  }, [])
+
   const timing = windowState(appointment, now)
-  const branches = useQuery({ queryKey: ['public', 'branches'], queryFn: ({ signal }) => publicApi.branches(signal), enabled: rescheduleMode })
-  const slots = useQuery({ queryKey: ['public', 'slots', newBranchId, newDate], queryFn: ({ signal }) => publicApi.slots(newBranchId!, newDate, signal), enabled: Boolean(rescheduleMode && newBranchId && newDate) })
+
+  const branches = useQuery({
+    queryKey: ['public', 'branches'],
+    queryFn: ({ signal }) => publicApi.branches(signal),
+    enabled: rescheduleMode,
+  })
+
+  const slots = useQuery({
+    queryKey: ['public', 'slots', newBranchId, newDate],
+    queryFn: ({ signal }) => publicApi.slots(newBranchId!, newDate, signal),
+    enabled: Boolean(rescheduleMode && newBranchId && newDate),
+  })
+
   const action = useMutation({
     mutationFn: ({ kind }: { kind: 'confirm' | 'arrive' | 'expire' | 'cancel' | 'reschedule' }) => {
       if (kind === 'confirm') return receptionistApi.confirm(appointment.id)
@@ -66,23 +222,255 @@ function AppointmentDrawer({ detail: initialDetail, close, onUpdated }: { detail
       if (kind === 'reschedule') return receptionistApi.reschedule(appointment.id, newSlotId!)
       return receptionistApi.cancel(appointment.id, reason)
     },
-    onSuccess: async updated => { setCancelMode(false); setRescheduleMode(false); await onUpdated(updated) },
-    onError: async error => { if (error instanceof ApiError && error.code === 'APPOINTMENT_EXPIRED') { await queryClient.invalidateQueries({ queryKey: ['internal', 'appointment', appointment.id] }); await queryClient.invalidateQueries({ queryKey: ['internal', 'appointments'] }) } },
+    onSuccess: async (updated) => {
+      setCancelMode(false)
+      setRescheduleMode(false)
+      await onUpdated(updated)
+    },
+    onError: async (error) => {
+      if (error instanceof ApiError && error.code === 'APPOINTMENT_EXPIRED') {
+        await queryClient.invalidateQueries({ queryKey: ['internal', 'appointment', appointment.id] })
+        await queryClient.invalidateQueries({ queryKey: ['internal', 'appointments'] })
+      }
+    },
   })
-  const timingMessage = timing === 'early'
-    ? `Chưa đến khung giờ tiếp nhận. Lịch hẹn có hiệu lực từ ${slotLabel(appointment)}.`
-    : timing === 'eligible' ? 'Đủ điều kiện check-in theo lịch hẹn.'
+
+  // ĐÃ ĐIỀU CHỈNH: Cập nhật câu thông báo cho trường hợp khách đến sớm
+  const timingMessage =
+    timing === 'early'
+      ? `Khách đến sớm hơn khung giờ hẹn (${slotLabel(appointment)}). Vẫn có thể ghi nhận check-in.`
+      : timing === 'eligible'
+      ? 'Đủ điều kiện check-in theo lịch hẹn.'
       : `Đã quá khung giờ ${slotLabel(appointment)}. Lịch hẹn không còn đủ điều kiện hưởng ưu đãi đặt lịch.`
-  const footer = <>{appointment.status === 'PENDING_CONFIRMATION' && <button className="button button--primary" disabled={action.isPending} onClick={() => action.mutate({ kind: 'confirm' })}>Xác nhận lịch</button>}{appointment.status === 'CONFIRMED' && <button className="button button--primary" disabled={action.isPending || timing !== 'eligible'} title={timing !== 'eligible' ? timingMessage : undefined} onClick={() => action.mutate({ kind: 'arrive' })}>Khách đã đến</button>}{(appointment.status === 'PENDING_CONFIRMATION' || appointment.status === 'CONFIRMED') && <button className="button button--quiet" disabled={action.isPending} onClick={() => { setRescheduleMode(value => !value); setCancelMode(false) }}>Đổi lịch</button>}{rescheduleMode && <button className="button button--secondary" disabled={!newSlotId || action.isPending} onClick={() => action.mutate({ kind: 'reschedule' })}>Lưu khung giờ mới</button>}{(appointment.status === 'PENDING_CONFIRMATION' || appointment.status === 'CONFIRMED') && (cancelMode ? <button className="button button--secondary" disabled={!reason.trim() || action.isPending} onClick={() => action.mutate({ kind: 'cancel' })}>Xác nhận hủy</button> : <button className="button button--quiet" disabled={action.isPending} onClick={() => { setCancelMode(true); setRescheduleMode(false) }}>Hủy lịch</button>)}</>
-  return <DetailDrawer eyebrow={`LỊCH #${appointment.id}`} title="Chi tiết lịch hẹn" onClose={close} busy={action.isPending} footer={footer}>
-    <div className="appointment-customer"><span>Khách đặt lịch</span><strong>{appointment.customerFullName}</strong><a href={`tel:${appointment.customerPhone}`}>{appointment.customerPhone}</a></div>
-    {detailQuery.isLoading && <LoadingState label="Đang tải chi tiết lịch hẹn…" />}
-    <div className={`appointment-window appointment-window--${timing}`}><strong>{slotLabel(appointment)} · {appointment.appointmentDate}</strong><span>{timingMessage}</span>{timing === 'late' && appointment.status !== 'ARRIVED' && <Link className="button button--secondary" to="/internal/receptionist/intake">Tiếp nhận như khách trực tiếp</Link>}</div>
-    <div className="detail-strip"><div><span>Trạng thái</span><StatusBadge label={appointmentStatusLabels[appointment.status]} tone={appointmentStatusTones[appointment.status]} /></div><div><span>{appointment.arrivedAt ? 'Check-in lúc' : appointment.confirmedAt ? 'Xác nhận lúc' : 'Cập nhật gần nhất'}</span><strong>{formatDateTime(appointment.arrivedAt ?? appointment.confirmedAt ?? appointment.updatedAt)}</strong></div><div><span>Đặt lúc</span><strong>{formatDateTime(appointment.bookedAt)}</strong></div><div><span>Ưu đãi đã snapshot</span><strong>{appointment.discountPercent}%</strong></div></div>
-    {appointment.note && <div className="detail-note"><span>Ghi chú</span><p>{appointment.note}</p></div>}
-    <h3>Thiết bị & dịch vụ</h3>{detail.devices.map((entry, index) => <article className="appointment-device" key={entry.device.id}><span>Thiết bị {index + 1} thuộc lịch #{appointment.id}</span>{entry.device.symptomDescription && <p>{entry.device.symptomDescription}</p>}<ul>{entry.serviceItems.map(service => <li key={service.id}><span>{service.serviceNameSnapshot}</span><strong>{formatMoney(service.finalPriceSnapshot)}</strong></li>)}</ul>{appointment.status === 'ARRIVED' && <Link className="button button--primary" to={`/internal/receptionist/intake?appointmentDeviceId=${entry.device.id}`}>Tiếp nhận thiết bị này</Link>}</article>)}
-    {action.isError && <ErrorState error={action.error} />}
-    {cancelMode && <label className="field"><span>Lý do hủy</span><textarea placeholder="Nhập lý do hủy lịch" value={reason} onChange={event => setReason(event.target.value)} maxLength={5000} autoFocus /></label>}
-    {rescheduleMode && <div className="reschedule-box"><h3>Chọn khung giờ mới</h3><label className="field"><span>Chi nhánh</span><select value={newBranchId ?? ''} onChange={event => { setNewBranchId(Number(event.target.value) || undefined); setNewSlotId(undefined) }}><option value="">Chọn chi nhánh</option>{branches.data?.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label><label className="field"><span>Ngày</span><input type="date" value={newDate} onChange={event => { setNewDate(event.target.value); setNewSlotId(undefined) }} /></label>{slots.isLoading ? <LoadingState /> : slots.isError ? <ErrorState error={slots.error} retry={() => slots.refetch()} /> : !slots.data?.length ? <EmptyState title="Không có khung giờ khả dụng" /> : <div className="slot-grid slot-grid--drawer">{slots.data.map(slot => <button type="button" key={slot.slotId} disabled={slot.status === 'CLOSED'} className={newSlotId === slot.slotId ? 'selected' : ''} onClick={() => setNewSlotId(slot.slotId)}><strong>{slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}</strong><span>{slot.activeBookingCount} lượt đã đặt</span></button>)}</div>}</div>}
-  </DetailDrawer>
+
+  // ĐÃ ĐIỀU CHỈNH: Chỉ vô hiệu hóa nút "Khách đã đến" khi lịch hẹn bị quá hạn (timing === 'late'), cho phép bấm khi đến sớm (early) hoặc đúng giờ (eligible)
+  const footer = (
+    <>
+      {appointment.status === 'PENDING_CONFIRMATION' && (
+        <button
+          className="button button--primary"
+          disabled={action.isPending}
+          onClick={() => action.mutate({ kind: 'confirm' })}
+        >
+          Xác nhận lịch
+        </button>
+      )}
+
+      {appointment.status === 'CONFIRMED' && (
+        <button
+          className="button button--primary"
+          disabled={action.isPending || timing === 'late'}
+          title={timing === 'late' ? timingMessage : undefined}
+          onClick={() => action.mutate({ kind: 'arrive' })}
+        >
+          Khách đã đến
+        </button>
+      )}
+
+      {(appointment.status === 'PENDING_CONFIRMATION' || appointment.status === 'CONFIRMED') && (
+        <button
+          className="button button--quiet"
+          disabled={action.isPending}
+          onClick={() => {
+            setRescheduleMode((value) => !value)
+            setCancelMode(false)
+          }}
+        >
+          Đổi lịch
+        </button>
+      )}
+
+      {rescheduleMode && (
+        <button
+          className="button button--secondary"
+          disabled={!newSlotId || action.isPending}
+          onClick={() => action.mutate({ kind: 'reschedule' })}
+        >
+          Lưu khung giờ mới
+        </button>
+      )}
+
+      {(appointment.status === 'PENDING_CONFIRMATION' || appointment.status === 'CONFIRMED') &&
+        (cancelMode ? (
+          <button
+            className="button button--secondary"
+            disabled={!reason.trim() || action.isPending}
+            onClick={() => action.mutate({ kind: 'cancel' })}
+          >
+            Xác nhận hủy
+          </button>
+        ) : (
+          <button
+            className="button button--quiet"
+            disabled={action.isPending}
+            onClick={() => {
+              setCancelMode(true)
+              setRescheduleMode(false)
+            }}
+          >
+            Hủy lịch
+          </button>
+        ))}
+    </>
+  )
+
+  return (
+    <DetailDrawer
+      eyebrow={`LỊCH #${appointment.id}`}
+      title="Chi tiết lịch hẹn"
+      onClose={close}
+      busy={action.isPending}
+      footer={footer}
+    >
+      <div className="appointment-customer">
+        <span>Khách đặt lịch</span>
+        <strong>{appointment.customerFullName}</strong>
+        <a href={`tel:${appointment.customerPhone}`}>{appointment.customerPhone}</a>
+      </div>
+
+      {detailQuery.isLoading && <LoadingState label="Đang tải chi tiết lịch hẹn…" />}
+
+      <div className={`appointment-window appointment-window--${timing}`}>
+        <strong>
+          {slotLabel(appointment)} · {appointment.appointmentDate}
+        </strong>
+        <span>{timingMessage}</span>
+        {timing === 'late' && appointment.status !== 'ARRIVED' && (
+          <Link className="button button--secondary" to="/internal/receptionist/intake">
+            Tiếp nhận như khách trực tiếp
+          </Link>
+        )}
+      </div>
+
+      <div className="detail-strip">
+        <div>
+          <span>Trạng thái</span>
+          <StatusBadge
+            label={appointmentStatusLabels[appointment.status]}
+            tone={appointmentStatusTones[appointment.status]}
+          />
+        </div>
+        <div>
+          <span>{appointment.arrivedAt ? 'Check-in lúc' : appointment.confirmedAt ? 'Xác nhận lúc' : 'Cập nhật gần nhất'}</span>
+          <strong>{formatDateTime(appointment.arrivedAt ?? appointment.confirmedAt ?? appointment.updatedAt)}</strong>
+        </div>
+        <div>
+          <span>Đặt lúc</span>
+          <strong>{formatDateTime(appointment.bookedAt)}</strong>
+        </div>
+        <div>
+          <span>Ưu đãi đã snapshot</span>
+          <strong>{appointment.discountPercent}%</strong>
+        </div>
+      </div>
+
+      {appointment.note && (
+        <div className="detail-note">
+          <span>Ghi chú</span>
+          <p>{appointment.note}</p>
+        </div>
+      )}
+
+      <h3>Thiết bị & dịch vụ</h3>
+      {detail.devices.map((entry, index) => (
+        <article className="appointment-device" key={entry.device.id}>
+          <span>
+            Thiết bị {index + 1} thuộc lịch #{appointment.id}
+          </span>
+          {entry.device.symptomDescription && <p>{entry.device.symptomDescription}</p>}
+          <ul>
+            {entry.serviceItems.map((service) => (
+              <li key={service.id}>
+                <span>{service.serviceNameSnapshot}</span>
+                <strong>{formatMoney(service.finalPriceSnapshot)}</strong>
+              </li>
+            ))}
+          </ul>
+          {appointment.status === 'ARRIVED' && (
+            <Link
+              className="button button--primary"
+              to={`/internal/receptionist/intake?appointmentDeviceId=${entry.device.id}`}
+            >
+              Tiếp nhận thiết bị này
+            </Link>
+          )}
+        </article>
+      ))}
+
+      {action.isError && <ErrorState error={action.error} />}
+
+      {cancelMode && (
+        <label className="field">
+          <span>Lý do hủy</span>
+          <textarea
+            placeholder="Nhập lý do hủy lịch"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={5000}
+            autoFocus
+          />
+        </label>
+      )}
+
+      {rescheduleMode && (
+        <div className="reschedule-box">
+          <h3>Chọn khung giờ mới</h3>
+          <label className="field">
+            <span>Chi nhánh</span>
+            <select
+              value={newBranchId ?? ''}
+              onChange={(event) => {
+                setNewBranchId(Number(event.target.value) || undefined)
+                setNewSlotId(undefined)
+              }}
+            >
+              <option value="">Chọn chi nhánh</option>
+              {branches.data?.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Ngày</span>
+            <input
+              type="date"
+              value={newDate}
+              onChange={(event) => {
+                setNewDate(event.target.value)
+                setNewSlotId(undefined)
+              }}
+            />
+          </label>
+
+          {slots.isLoading ? (
+            <LoadingState />
+          ) : slots.isError ? (
+            <ErrorState error={slots.error} retry={() => slots.refetch()} />
+          ) : !slots.data?.length ? (
+            <EmptyState title="Không có khung giờ khả dụng" />
+          ) : (
+            <div className="slot-grid slot-grid--drawer">
+              {slots.data.map((slot) => (
+                <button
+                  type="button"
+                  key={slot.slotId}
+                  disabled={slot.status === 'CLOSED'}
+                  className={newSlotId === slot.slotId ? 'selected' : ''}
+                  onClick={() => setNewSlotId(slot.slotId)}
+                >
+                  <strong>
+                    {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
+                  </strong>
+                  <span>{slot.activeBookingCount} lượt đã đặt</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </DetailDrawer>
+  )
 }

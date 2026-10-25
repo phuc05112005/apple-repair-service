@@ -13,19 +13,20 @@ public record ServiceTicketResponse(
         Long appointmentDeviceId,
         Long customerDeviceId,
         Long branchId,
-        Long createdById,
+        Long createdByUserId,
         ServiceTicketStatus status,
         String receivedCondition,
         String inspectionResult,
-        Long inspectedById,
+        Long inspectedByUserId,
         BigDecimal discountPercent,
         PaymentStatus paymentStatus,
         PaymentMethod paymentMethod,
         LocalDateTime paidAt,
-        Long handedOverById,
+        Long handedOverByUserId,
         LocalDateTime handedOverAt,
         String cancelReason,
         LocalDateTime receivedAt,
-        LocalDateTime updatedAt, String authorizedScope, TicketTimingResponse timing
-) {
-}
+        LocalDateTime updatedAt,
+        String authorizedScope,
+        TicketTimingResponse timing
+) {}

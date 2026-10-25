@@ -241,8 +241,8 @@ public class AppointmentService {
         var start = LocalDateTime.of(slot.getAppointmentDate(), slot.getStartTime());
         var end = LocalDateTime.of(slot.getAppointmentDate(), slot.getEndTime());
         var label = slot.getStartTime().toString().substring(0, 5) + "–" + slot.getEndTime().toString().substring(0, 5);
-        if (now.isBefore(start))
-            throw new AppointmentTooEarlyException("Chưa đến khung giờ tiếp nhận. Lịch hẹn có hiệu lực từ " + label + ".");
+        /* if (now.isBefore(start))
+            throw new AppointmentTooEarlyException("Chưa đến khung giờ tiếp nhận. Lịch hẹn có hiệu lực từ " + label + ".");*/
         if (!now.isBefore(end)) {
             transition(a, AppointmentStatus.EXPIRED);
             appointments.flush();

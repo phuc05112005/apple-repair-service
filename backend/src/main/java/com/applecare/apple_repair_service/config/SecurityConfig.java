@@ -27,21 +27,26 @@ public class SecurityConfig {
         var registration=new FilterRegistrationBean<>(filter);registration.setEnabled(false);return registration;
     }
     @Bean public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwt, ApiSecurityErrors errors,
-            @Value("${app.security.public-docs:false}") boolean publicDocs) throws Exception {
+                                                         @Value("${app.security.public-docs:false}") boolean publicDocs) throws Exception {
         http.sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .csrf(c->c.disable()).formLogin(f->f.disable()).httpBasic(b->b.disable())
-            .requestCache(c->c.disable()).cors(org.springframework.security.config.Customizer.withDefaults())
-            .exceptionHandling(e->e.authenticationEntryPoint(errors).accessDeniedHandler(errors))
-            .authorizeHttpRequests(a->{
-                a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
-                if(publicDocs) a.requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll();
-                a.requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/appointments","/api/v1/service-tickets/*/feedback").permitAll()
-                    .requestMatchers(HttpMethod.GET,"/api/v1/device-types","/api/v1/device-models","/api/v1/service-issues",
-                        "/api/v1/service-catalog-items","/api/v1/branches","/api/v1/appointment-slots",
-                        "/api/v1/appointments/lookup","/api/v1/service-tickets/lookup","/api/v1/warranties/eligibility").permitAll()
-                    .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                    .anyRequest().authenticated();
-            }).addFilterBefore(jwt,UsernamePasswordAuthenticationFilter.class);
+                .csrf(c->c.disable()).formLogin(f->f.disable()).httpBasic(b->b.disable())
+                .requestCache(c->c.disable()).cors(org.springframework.security.config.Customizer.withDefaults())
+                .exceptionHandling(e->e.authenticationEntryPoint(errors).accessDeniedHandler(errors))
+                .authorizeHttpRequests(a->{
+                    a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();
+                    if(publicDocs) a.requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll();
+                    a.requestMatchers(HttpMethod.POST,
+                                    "/api/v1/auth/login",
+                                    "/api/v1/auth/forgot-password", // <--- Bổ sung dòng này
+                                    "/api/v1/appointments",
+                                    "/api/v1/service-tickets/*/feedback"
+                            ).permitAll()
+                            .requestMatchers(HttpMethod.GET,"/api/v1/device-types","/api/v1/device-models","/api/v1/service-issues",
+                                    "/api/v1/service-catalog-items","/api/v1/branches","/api/v1/appointment-slots",
+                                    "/api/v1/appointments/lookup","/api/v1/service-tickets/lookup","/api/v1/warranties/eligibility").permitAll()
+                            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                            .anyRequest().authenticated();
+                }).addFilterBefore(jwt,UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
     @Bean public CorsConfigurationSource corsConfigurationSource(@Value("${app.security.allowed-origins:}") String origins) {

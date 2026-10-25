@@ -86,7 +86,10 @@ public class ServiceCatalogService {
 
     private void apply(ServiceCatalogItem e, UpdateServiceCatalogItemRequest r) {
 
-        e.setDeviceModel(access.get(DeviceModel.class, r.deviceModelId()));
+        DeviceModel deviceModel = access.get(DeviceModel.class, r.deviceModelId());
+        BusinessRules.require(deviceModel.getStatus() == ActiveStatus.ACTIVE, "Model thiết bị đã ngừng hoạt động, không thể chọn.");
+
+        e.setDeviceModel(deviceModel);
         e.setServiceType(access.get(ServiceType.class, r.serviceTypeId()));
         e.setServiceIssue(access.get(ServiceIssue.class, r.serviceIssueId()));
         e.setPart(r.partId() == null ? null : access.get(Part.class, r.partId()));
@@ -100,7 +103,7 @@ public class ServiceCatalogService {
         // the concrete compatible service when the customer actually creates a warranty claim.
         e.setWarrantyReplacementCatalog(null);
         BusinessRules.require(e.getServiceIssue().getDeviceTypes().stream()
-                .anyMatch(type -> type.getId().equals(e.getDeviceModel().getDeviceType().getId())),
+                        .anyMatch(type -> type.getId().equals(e.getDeviceModel().getDeviceType().getId())),
                 "Vấn đề dịch vụ không áp dụng cho loại thiết bị của model.");
         BusinessRules.require(e.getWarrantyDays() == 0 || e.getWarrantyRemedy() != null,
                 "Dịch vụ có bảo hành phải cấu hình phương án kỹ thuật bảo hành.");

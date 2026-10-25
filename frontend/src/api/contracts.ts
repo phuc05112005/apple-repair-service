@@ -72,9 +72,20 @@ export interface PublicRepairItemResponse {
   warrantyStartDate: string | null; warrantyEndDate: string | null; warrantyDecision: WarrantyDecision; warrantyRemedy: WarrantyRemedy | null; warrantySourceItemId: number | null
 }
 export interface PublicTicketResponse {
-  ticketCode: string; deviceModelName: string; branchName: string; status: ServiceTicketStatus
-  paymentStatus: PaymentStatus; approvedTotal: number; receivedAt: string; actualRepairStartedAt: string | null
-  estimatedCompletionAt: string | null; estimatedDurationMinutes: number | null; handedOverAt: string | null
+  ticketCode: string
+  status: ServiceTicketStatus
+  branchName: string
+  deviceModelName: string
+  receivedAt: string
+  inspectedAt?: string
+  actualRepairStartedAt?: string
+  actualRepairCompletedAt?: string
+  handedOverAt?: string
+  estimatedCompletionAt?: string
+  estimatedDurationMinutes?: number
+  paymentStatus: PaymentStatus
+  approvedTotal: number
+  hasFeedback?: boolean
   repairItems: PublicRepairItemResponse[]
 }
 export interface WarrantyEligibilityResponse {
@@ -125,6 +136,32 @@ export interface ServiceStatusHistoryResponse {
 export interface ServiceTicketDetailResponse {
   ticket: ServiceTicketResponse; repairItems: RepairItemResponse[]; history: ServiceStatusHistoryResponse[]
   context: TicketContextResponse
+}
+export interface TicketTimingInfo {
+  actualRepairStartedAt?: string
+  actualRepairCompletedAt?: string
+  estimatedStartAt?: string
+  estimatedCompletionAt?: string
+  estimatedDurationMinutes?: number
+}
+
+export interface PublicTicketResponse {
+  ticketCode: string
+  status: ServiceTicketStatus
+  branchName: string
+  deviceModelName: string
+  receivedAt: string
+  inspectedAt?: string
+  actualRepairStartedAt?: string
+  actualRepairCompletedAt?: string
+  handedOverAt?: string
+  estimatedCompletionAt?: string
+  estimatedDurationMinutes?: number
+  paymentStatus: PaymentStatus
+  approvedTotal: number
+  hasFeedback?: boolean
+  timing?: TicketTimingInfo
+  repairItems: PublicRepairItemResponse[]
 }
 export interface TicketContextResponse {
   customerId: number; customerFullName: string; customerPhone: string; customerDeviceId: number
@@ -195,13 +232,40 @@ export interface WarrantyHistoryItemResponse {
   eligible: boolean; claimCount: number; lastClaimAt: string | null; claims: WarrantyClaimSummaryResponse[]
 }
 export interface WarrantyHistoryResponse { customerId: number; customerFullName: string; customerPhone: string; items: WarrantyHistoryItemResponse[] }
-export interface PartResponse { id: number; partCode: string; name: string; brand: string | null; variant: string | null; origin: string | null; manufacturer: string | null; supplier: string | null; salePrice: number; status: ActiveStatus; createdAt: string; updatedAt: string }
+export interface PartResponse { 
+  id: number; 
+  partCode: string; 
+  name: string; 
+  deviceModelIds: number[]; 
+  serviceIssueId?: number | null
+  brand: string | null; 
+  variant: string | null; 
+  origin: string | null; 
+  manufacturer: string | null; 
+  supplier: string | null; 
+  salePrice: number; 
+  status: ActiveStatus; 
+  createdAt: string; 
+  updatedAt: string 
+}
 export interface BranchInventoryResponse { id: number; branchId: number; partId: number; quantity: number; createdAt: string; updatedAt: string }
 export interface InventoryTransactionResponse {
-  id: number; transactionCode?: string; partId: number; transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER'
-  sourceBranchId: number | null; destinationBranchId: number | null; quantity: number; partUsageId: number | null
-  inventoryLotId: number | null; lotCode: string | null
-  recordedById: number; recordedByName: string; note: string | null; createdAt: string
+  id: number; 
+  transactionCode?: string; 
+  partId: number; 
+  transactionType: 'STOCK_IN' | 'STOCK_OUT' | 'USAGE_OUT' | 'USAGE_RETURN' | 'TRANSFER';
+  sourceBranchId: number | null; 
+  destinationBranchId: number | null; 
+  quantity: number; 
+  supplierName?: string | null; 
+  costPrice?: number | null; 
+  partUsageId: number | null;
+  inventoryLotId: number | null; 
+  lotCode: string | null;
+  recordedById: number; 
+  recordedByName: string; 
+  note: string | null; 
+  createdAt: string
 }
 export interface InventoryLotResponse {
   id: number; lotCode: string; branchId: number; partId: number; receivedQuantity: number
@@ -227,4 +291,29 @@ export interface DefectivePartReturn {
  id: number; branchId: number; branchName: string; partId: number; partName: string; sourcePartUsageId: number
  repairItemId: number; ticketId: number; ticketCode: string; quantity: number; status: DefectivePartStatus
  reason: string; note: string | null; recordedById: number; receivedAt: string; statusChangedAt: string | null
+}
+// Thêm email vào UserResponse hiện có
+export interface UserResponse {
+  id: number
+  username: string
+  fullName: string
+  phone: string | null
+  email: string | null
+  role: UserRole
+  status: UserStatus
+  createdAt: string
+  updatedAt: string
+}
+
+// DTOs cho Profile
+export interface UpdateUserProfileRequest {
+  fullName: string
+  phone?: string | null
+  email?: string | null
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }

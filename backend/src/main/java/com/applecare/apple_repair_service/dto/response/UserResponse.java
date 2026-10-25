@@ -10,6 +10,7 @@ public record UserResponse(
         String username,
         String fullName,
         String phone,
+        String email,
         UserRole role,
         UserStatus status,
         LocalDateTime createdAt,

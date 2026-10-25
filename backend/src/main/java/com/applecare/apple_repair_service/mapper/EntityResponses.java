@@ -56,6 +56,8 @@ import com.applecare.apple_repair_service.entity.Transfer;
 import com.applecare.apple_repair_service.entity.User;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+
 @Component
 public class EntityResponses {
     public AppointmentResponse map(Appointment e) {
@@ -109,8 +111,26 @@ public class EntityResponses {
         return new DeviceTypeResponse(e.getId(), e.getName(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
     }
 
-    public InventoryTransactionResponse map(InventoryTransaction e) {
-        return new InventoryTransactionResponse(e.getId(), InventoryTransactionResponse.code(e.getId(), e.getTransactionType()), e.getPart() == null ? null : e.getPart().getId(), e.getTransactionType(), e.getSourceBranch() == null ? null : e.getSourceBranch().getId(), e.getDestinationBranch() == null ? null : e.getDestinationBranch().getId(), e.getQuantity(), e.getPartUsage() == null ? null : e.getPartUsage().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getId(), e.getInventoryLot() == null ? null : e.getInventoryLot().getLotCode(), e.getRecordedBy() == null ? null : e.getRecordedBy().getId(), e.getRecordedBy() == null ? null : e.getRecordedBy().getFullName(), e.getNote(), e.getCreatedAt());
+    public InventoryTransactionResponse map(InventoryTransaction entity) {
+        if (entity == null) return null;
+        return new InventoryTransactionResponse(
+                entity.getId(),
+                InventoryTransactionResponse.code(entity.getId(), entity.getTransactionType()),
+                entity.getPart() != null ? entity.getPart().getId() : null,
+                entity.getTransactionType(),
+                entity.getSourceBranch() != null ? entity.getSourceBranch().getId() : null,
+                entity.getDestinationBranch() != null ? entity.getDestinationBranch().getId() : null,
+                entity.getQuantity(),
+                entity.getCostPrice(),       // <--- Map giá
+                entity.getSupplierName(),    // <--- Map NCC
+                entity.getPartUsage() != null ? entity.getPartUsage().getId() : null,
+                entity.getInventoryLot() != null ? entity.getInventoryLot().getId() : null,
+                entity.getInventoryLot() != null ? entity.getInventoryLot().getLotCode() : null,
+                entity.getRecordedBy() != null ? entity.getRecordedBy().getId() : null,
+                entity.getRecordedBy() != null ? (entity.getRecordedBy().getFullName() != null ? entity.getRecordedBy().getFullName() : entity.getRecordedBy().getUsername()) : null,
+                entity.getNote(),
+                entity.getCreatedAt()
+        );
     }
 
     public InventoryLotResponse map(InventoryLot e) {
@@ -126,8 +146,26 @@ public class EntityResponses {
                 e.getModelName(), e.getModelVersion(), e.getPredictedAt());
     }
 
-    public PartResponse map(Part e) {
-        return new PartResponse(e.getId(), e.getPartCode(), e.getName(), e.getBrand(), e.getVariant(), e.getOrigin(), e.getManufacturer(), e.getSupplier(), e.getSalePrice(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+    public PartResponse map(Part part) {
+        if (part == null) {
+            return null;
+        }
+        return new PartResponse(
+                part.getId(),
+                new ArrayList<>(part.getDeviceModelIds()),
+                part.getServiceIssueId(), // Gán serviceIssueId ở vị trí thứ 3
+                part.getPartCode(),
+                part.getName(),
+                part.getBrand(),
+                part.getVariant(),
+                part.getOrigin(),
+                part.getManufacturer(),
+                part.getSupplier(),
+                part.getSalePrice(),
+                part.getStatus(),
+                part.getCreatedAt(),
+                part.getUpdatedAt()
+        );
     }
 
     public PartUsageResponse map(PartUsage e) {
@@ -180,6 +218,16 @@ public class EntityResponses {
     }
 
     public UserResponse map(User e) {
-        return new UserResponse(e.getId(), e.getUsername(), e.getFullName(), e.getPhone(), e.getRole(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt());
+        return new UserResponse(
+                e.getId(),
+                e.getUsername(),
+                e.getFullName(),
+                e.getPhone(),
+                e.getEmail(),
+                e.getRole(),
+                e.getStatus(),
+                e.getCreatedAt(),
+                e.getUpdatedAt()
+        );
     }
 }
