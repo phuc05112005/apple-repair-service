@@ -21,7 +21,7 @@ export function SettingsPage() {
  const client = useQueryClient(); const [drafts, setDrafts] = useState<Record<string, string>>({}); const [saved, setSaved] = useState('')
  const settings = useQuery({ queryKey: ['admin', 'settings'], queryFn: ({ signal }) => adminApi.settings(signal) })
  const update = useMutation({ mutationFn: ({ key, value }: { key: string; value: string }) => adminApi.updateSetting(key, value), onSuccess: async () => { setSaved('Đã lưu cấu hình. Áp dụng cho các lần tính dự kiến tiếp theo; lịch sử cũ được giữ nguyên.'); await client.invalidateQueries({ queryKey: ['admin', 'settings'] }) } })
- return <div className="workspace-page"><header><span className="eyebrow">Quản trị · Vận hành</span><h1>Thời gian & cấu hình</h1><p>Thiết lập hàng đợi kỹ thuật viên và chính sách đặt lịch. Thay đổi chỉ áp dụng cho dữ liệu phát sinh sau khi lưu.</p></header>
+ return <div className="workspace-page"><header><span className="eyebrow">Vận hành</span><h1>Thời gian & cấu hình</h1><p>Thiết lập hàng đợi kỹ thuật viên và chính sách đặt lịch. Thay đổi chỉ áp dụng cho dữ liệu phát sinh sau khi lưu.</p></header>
   {settings.isLoading ? <LoadingState /> : settings.isError ? <ErrorState error={settings.error} retry={() => settings.refetch()} /> : <div className="settings-list">{settingsMetadata.map(meta => {
    const stored = settings.data?.find(s => s.settingKey === meta.key)?.settingValue; const value = drafts[meta.key] ?? stored ?? meta.value; const number = Number(value)
    const max = meta.max ?? 10080

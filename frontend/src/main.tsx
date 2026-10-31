@@ -5,6 +5,10 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import { App } from './app/App'
 import './styles/global.css'
+import "@fontsource-variable/inter";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

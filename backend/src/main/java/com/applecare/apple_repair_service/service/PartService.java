@@ -35,7 +35,7 @@ public class PartService {
     }
 
     public List<PartResponse> list() {
-        return repository.findAll().stream().map(mapper::map).toList();
+        return repository.findAllWithDeviceModels().stream().map(mapper::map).toList();
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)

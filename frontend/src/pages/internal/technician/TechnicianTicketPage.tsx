@@ -32,20 +32,22 @@ export function TechnicianTicketPage() {
   const [requiresApproval, setRequiresApproval] = useState(false)
   const [items, setItems] = useState<InspectionRepairItemRequest[]>()
   const [partNote, setPartNote] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const [targetTechnicianId, setTargetTechnicianId] = useState<number>()
   const [transferNote, setTransferNote] = useState('')
   const [transferWorkDone, setTransferWorkDone] = useState('')
   const [transferCondition, setTransferCondition] = useState('')
   const [approvalMethodByItem, setApprovalMethodByItem] = useState<Record<number, ConfirmationMethod | ''>>({})
   const [approvalNoteByItem, setApprovalNoteByItem] = useState<Record<number, string>>({})
-  const [waitResolvedAt, setWaitResolvedAt] = useState(() => businessDateTimeInput())
+  const [waitResolvedAt, setWaitResolvedAt] = useState('')
   const [waitResolutionNote, setWaitResolutionNote] = useState('')
 
   const proposedItems = items ?? (detail.data?.repairItems.filter(item => item.approvalStatus !== 'REJECTED').map(item => ({ serviceCatalogItemId: item.serviceCatalogItemId, basePrice: item.basePrice, finalPrice: item.finalPrice, warrantySourceItemId: item.warrantySourceItemId })) ?? [])
   const proposedResult = inspectionResult || detail.data?.ticket.inspectionResult || ''
 
   function acceptResult(updated: ServiceTicketDetailResponse) {
-    setItems(undefined); setRequiresApproval(false); setConfirmationMethod(''); setConfirmationNote('')
+    setItems(undefined); setRequiresApproval(false); setConfirmationMethod(''); setConfirmationNote(''); setShowCancelModal(false); setCancelReason(''); setWaitResolvedAt(''); setWaitResolutionNote('')
     queryClient.setQueryData(['internal', 'ticket', id], updated)
     void queryClient.invalidateQueries({ queryKey: ['internal', 'duration', id] })
     void queryClient.invalidateQueries({ queryKey: ['internal', 'time-estimates', id] })
@@ -53,22 +55,25 @@ export function TechnicianTicketPage() {
   }
 
   const transition = useMutation({
-    mutationFn: (kind: 'start' | 'inspect' | 'wait' | 'resume' | 'finish') => {
-      if (kind === 'start') return technicianApi.startInspection(id)
+    mutationFn: (kind: 'start' | 'inspect' | 'wait' | 'resume' | 'finish' | 'cancel') => {
+      if (kind === 'start') return technicianApi.startProcessing(id)
       if (kind === 'inspect') return technicianApi.inspect(id, { inspectionResult: proposedResult, requiresCustomerApproval: requiresApproval, items: proposedItems, confirmationMethod: confirmationMethod || undefined, confirmationNote: confirmationNote.trim() || undefined })
       if (kind === 'wait') return technicianApi.waitForPart(id, partNote || undefined)
       if (kind === 'resume') return technicianApi.resume(id)
+      if (kind === 'cancel') return technicianApi.cancel(id, cancelReason.trim())
       return technicianApi.finish(id)
     }, onSuccess: acceptResult,
   })
 
   const approval = useMutation({
-    mutationFn: ({ itemId, decision }: { itemId: number; decision: 'APPROVED' | 'REJECTED' }) => technicianApi.approval(itemId, decision, approvalMethodByItem[itemId] as ConfirmationMethod, approvalNoteByItem[itemId]?.trim() || undefined, waitResolvedAt || undefined),
+    mutationFn: ({ itemId, decision }: { itemId: number; decision: 'APPROVED' | 'REJECTED' }) => 
+      technicianApi.approval(itemId, decision, approvalMethodByItem[itemId] as ConfirmationMethod, approvalNoteByItem[itemId]?.trim() || undefined, waitResolvedAt || undefined),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['internal', 'ticket', id] }) },
   })
 
   const resolveWait = useMutation({
-    mutationFn: () => technicianApi.resolveWait(id, waitResolvedAt || undefined, waitResolutionNote.trim() || undefined),
+    mutationFn: (overrideTime?: string) => 
+      technicianApi.resolveWait(id, overrideTime !== undefined ? overrideTime : (waitResolvedAt || undefined), waitResolutionNote.trim() || undefined),
     onSuccess: acceptResult,
   })
 
@@ -87,6 +92,7 @@ export function TechnicianTicketPage() {
   const currentEvent = detail.data.history.at(-1)
   const waitResolved = Boolean(currentEvent?.toStatus === ticket.status && currentEvent.resolvedAt)
   const pendingApprovalItems = detail.data.repairItems.filter(item => item.approvalStatus === 'PENDING')
+  const canCancel = !['WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status)
 
   return (
     <div className="workspace-page ticket-workspace">
@@ -96,8 +102,32 @@ export function TechnicianTicketPage() {
           <h1>Xử lý phiếu dịch vụ</h1>
           <p>{context.deviceModelName} · {context.customerFullName} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}</p>
         </div>
-        <StatusBadge label={ticketStatusLabels[ticket.status]} tone="info" />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <StatusBadge label={ticketStatusLabels[ticket.status]} tone="info" />
+          {canCancel && (
+            <button className="button button--quiet" style={{ color: '#e53e3e', borderColor: '#feb2b2' }} onClick={() => setShowCancelModal(true)}>
+              Hủy ca sửa
+            </button>
+          )}
+        </div>
       </header>
+
+      {/* POPUP HỦY PHIẾU */}
+      {showCancelModal && (
+        <div style={{ margin: '15px 0', padding: '15px', border: '1px solid #feb2b2', borderRadius: '8px', background: '#fff5f5' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#c53030' }}>Xác nhận Hủy ca sửa chữa</h3>
+          <label className="field">
+            <span style={{ color: '#c53030', fontWeight: 'bold' }}>Lý do hủy ca sửa *</span>
+            <textarea placeholder="Khách không đồng ý phương án/giá mới hoặc máy không phục hồi được..." value={cancelReason} onChange={e => setCancelReason(e.target.value)} />
+          </label>
+          <div className="button-row" style={{ marginTop: '10px' }}>
+            <button className="button" style={{ background: '#e53e3e', color: '#fff' }} disabled={!cancelReason.trim() || transition.isPending} onClick={() => transition.mutate('cancel')}>
+              {transition.isPending ? 'Đang hủy…' : 'Xác nhận Hủy Phiếu'}
+            </button>
+            <button className="button button--quiet" onClick={() => setShowCancelModal(false)}>Quay lại</button>
+          </div>
+        </div>
+      )}
 
       <div className="tech-focus-bar">
         <div>
@@ -110,7 +140,7 @@ export function TechnicianTicketPage() {
         </div>
       </div>
 
-      {/* THANH TAB KHÔNG ĐÁNH SỐ BƯỚC */}
+      {/* THANH TAB TỐI GIẢN */}
       <nav style={{ display: 'flex', gap: '8px', margin: '20px 0 10px', borderBottom: '2px solid #e2e8f0', paddingBottom: '2px' }}>
         <button 
           type="button"
@@ -126,7 +156,7 @@ export function TechnicianTicketPage() {
         >
           Phương án & Linh kiện
         </button>
-        {!['WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status) && (
+        {canCancel && (
           <button 
             type="button"
             className={`button ${activeTab === 'TRANSFER' ? 'button--primary' : 'button--quiet'}`} 
@@ -161,15 +191,16 @@ export function TechnicianTicketPage() {
             </dl>
             {context.symptomDescription && <div className="detail-note"><span>Mô tả sự cố của khách</span><p>{context.symptomDescription}</p></div>}
             <div className="detail-note"><span>Tình trạng khi tiếp nhận</span><p>{ticket.receivedCondition}</p></div>
-            {ticket.inspectionResult && <div className="detail-note"><span>Kết quả kiểm tra</span><p>{ticket.inspectionResult}</p></div>}
+            {ticket.inspectionResult && <div className="detail-note"><span>Kết quả chẩn đoán</span><p>{ticket.inspectionResult}</p></div>}
           </section>
 
+          {/* TRẠNG THÁI ASSIGNED: BẤM 1 NÚT DUY NHẤT ĐỂ BẮT ĐẦU XỬ LÝ */}
           {ticket.status === 'ASSIGNED' && (
             <section className="next-action-panel">
               <span>{ticketStatusLabels.ASSIGNED}</span>
-              <h2>Bắt đầu kiểm tra thiết bị</h2>
-              <p>Tiến hành kiểm tra chi tiết để xác định phương án sửa chữa.</p>
-              <button className="button button--primary" disabled={transition.isPending} onClick={() => transition.mutate('start')}>Bắt đầu kiểm tra</button>
+              <h2>Bắt đầu xử lý phiếu dịch vụ</h2>
+              <p>Thực hiện kiểm tra, chẩn đoán và tháo lắp máy xử lý kỹ thuật.</p>
+              <button className="button button--primary" disabled={transition.isPending} onClick={() => transition.mutate('start')}>Bắt đầu xử lý</button>
             </section>
           )}
 
@@ -180,7 +211,7 @@ export function TechnicianTicketPage() {
                 <>
                   <h2>Ghi nhận phản hồi từ khách hàng</h2>
                   <label className="field">
-                    <span>Thời gian phản hồi</span>
+                    <span>Thời gian phản hồi (Để trống để lấy giờ hiện tại)</span>
                     <input type="datetime-local" max={businessDateTimeInput()} value={waitResolvedAt} onChange={event => setWaitResolvedAt(event.target.value)} />
                   </label>
                   {pendingApprovalItems.map(item => (
@@ -188,8 +219,8 @@ export function TechnicianTicketPage() {
                       <h3>{item.itemNameSnapshot}</h3>
                       <ConfirmationFields method={approvalMethodByItem[item.id] ?? ''} note={approvalNoteByItem[item.id] ?? ''} scope={ticket.authorizedScope} onMethod={value => setApprovalMethodByItem(current => ({ ...current, [item.id]: value }))} onNote={value => setApprovalNoteByItem(current => ({ ...current, [item.id]: value }))} />
                       <div className="button-row">
-                        <button className="button button--primary" disabled={approval.isPending || !approvalMethodByItem[item.id] || !waitResolvedAt} onClick={() => approval.mutate({ itemId: item.id, decision: 'APPROVED' })}>Khách đồng ý</button>
-                        <button className="button button--quiet" disabled={approval.isPending || !approvalMethodByItem[item.id] || !waitResolvedAt} onClick={() => approval.mutate({ itemId: item.id, decision: 'REJECTED' })}>Khách từ chối</button>
+                        <button className="button button--primary" disabled={approval.isPending || !approvalMethodByItem[item.id]} onClick={() => approval.mutate({ itemId: item.id, decision: 'APPROVED' })}>Khách đồng ý</button>
+                        <button className="button button--quiet" disabled={approval.isPending || !approvalMethodByItem[item.id]} onClick={() => approval.mutate({ itemId: item.id, decision: 'REJECTED' })}>Khách từ chối</button>
                       </div>
                     </article>
                   ))}
@@ -212,13 +243,15 @@ export function TechnicianTicketPage() {
                   <PartUsagePanel key={item.id} item={item} parts={parts.data ?? []} partsLoading={parts.isLoading} ticketId={id} />
                 ))}
               </div>
+              
               <label className="field">
-                <span>Ghi chú chờ linh kiện (Nếu cần)</span>
-                <textarea placeholder="Nhập tên/mã linh kiện cần chờ thêm" value={partNote} onChange={event => setPartNote(event.target.value)} />
+                <span>Ghi chú chờ linh kiện (Nếu phát sinh)</span>
+                <textarea placeholder="Nhập tên/mã linh kiện cần điều chuyển thêm" value={partNote} onChange={event => setPartNote(event.target.value)} />
               </label>
-              <div className="button-row">
-                <button className="button button--secondary" disabled={transition.isPending} onClick={() => transition.mutate('wait')}>Chuyển sang Chờ linh kiện</button>
+
+              <div className="button-row" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button className="button button--primary" disabled={transition.isPending} onClick={() => transition.mutate('finish')}>Hoàn tất sửa chữa</button>
+                <button className="button button--secondary" disabled={transition.isPending} onClick={() => transition.mutate('wait')}>Tạm dừng: Chờ linh kiện</button>
               </div>
             </section>
           )}
@@ -235,14 +268,29 @@ export function TechnicianTicketPage() {
                 <>
                   <h2>Xác nhận linh kiện đã sẵn sàng</h2>
                   <label className="field">
-                    <span>Thời gian linh kiện về</span>
-                    <input type="datetime-local" max={businessDateTimeInput()} value={waitResolvedAt} onChange={event => setWaitResolvedAt(event.target.value)} />
+                    <span>Ghi chú linh kiện</span>
+                    <textarea placeholder="Ghi chú thêm về linh kiện đã về kho..." value={waitResolutionNote} onChange={event => setWaitResolutionNote(event.target.value)} />
                   </label>
-                  <label className="field">
-                    <span>Ghi chú</span>
-                    <textarea placeholder="Ghi chú thêm về linh kiện" value={waitResolutionNote} onChange={event => setWaitResolutionNote(event.target.value)} />
-                  </label>
-                  <button className="button button--primary" disabled={resolveWait.isPending || !waitResolvedAt} onClick={() => resolveWait.mutate()}>Ghi nhận đã sẵn sàng</button>
+
+                  <div className="button-row" style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {/* BẤM NÚT NÀY SẼ TỰ LẤY GIỜ HIỆN TẠI HỆ THỐNG - KHÔNG BAO GIỜ BỊ LỖI THỜI GIAN */}
+                    <button className="button button--primary" disabled={resolveWait.isPending} onClick={() => resolveWait.mutate(undefined)}>
+                      {resolveWait.isPending ? 'Đang lưu…' : 'Xác nhận sẵn sàng ngay bây giờ'}
+                    </button>
+                  </div>
+
+                  <details style={{ marginTop: '15px' }}>
+                    <summary style={{ cursor: 'pointer', color: '#4a5568', fontSize: '0.9rem' }}>Tùy chọn: Chọn thời điểm khác trong quá khứ</summary>
+                    <div style={{ marginTop: '10px' }}>
+                      <label className="field">
+                        <span>Thời gian linh kiện về</span>
+                        <input type="datetime-local" max={businessDateTimeInput()} value={waitResolvedAt} onChange={event => setWaitResolvedAt(event.target.value)} />
+                      </label>
+                      <button className="button button--secondary" disabled={resolveWait.isPending || !waitResolvedAt} onClick={() => resolveWait.mutate()}>
+                        Lưu theo thời gian đã chọn
+                      </button>
+                    </div>
+                  </details>
                 </>
               )}
             </section>
@@ -253,7 +301,7 @@ export function TechnicianTicketPage() {
       {/* TAB 2: PHƯƠNG ÁN & LINH KIỆN */}
       {activeTab === 'PLAN_PARTS' && (
         <>
-          {['INSPECTING', 'REPAIRING', 'WAITING_APPROVAL'].includes(ticket.status) && (
+          {['ASSIGNED', 'INSPECTING', 'REPAIRING', 'WAITING_APPROVAL'].includes(ticket.status) && (
             <InspectionPlanEditor
               modelId={context.deviceModelId} 
               discountPercent={ticket.discountPercent}
@@ -294,14 +342,12 @@ export function TechnicianTicketPage() {
             </div>
           </section>
 
-          {!['WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status) && (
-            <DefectiveInventoryPanel ticketId={id} />
-          )}
+          {canCancel && <DefectiveInventoryPanel ticketId={id} />}
         </>
       )}
 
       {/* TAB 3: CHUYỂN GIAO CA */}
-      {activeTab === 'TRANSFER' && !['WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status) && (
+      {activeTab === 'TRANSFER' && canCancel && (
         <section className="ops-section">
           <div className="ops-section__title"><h2>Yêu cầu chuyển giao công việc</h2></div>
           {candidates.isLoading ? <LoadingState /> : !candidates.data?.length ? <EmptyState title="Không có kỹ thuật viên khác trong ca" /> : (
@@ -340,7 +386,7 @@ export function TechnicianTicketPage() {
       {/* TAB 4: LỊCH SỬ & SLA */}
       {activeTab === 'TIMELINE' && (
         <>
-          <TicketTimingPanel ticket={ticket} canViewHistory={!['WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status)} />
+          <TicketTimingPanel ticket={ticket} canViewHistory={canCancel} />
           <section className="ops-section">
             <div className="ops-section__title"><h2>Lịch sử mốc xử lý</h2></div>
             <ol className="history-list">
@@ -373,7 +419,7 @@ function PartUsagePanel({ item, parts, partsLoading, ticketId }: { item: RepairI
   const usePart = useMutation({ 
     mutationFn: () => technicianApi.usePart(item.id, partId!, quantity, warrantyReplacement || collectDefective ? defectiveNote.trim() : undefined), 
     onSuccess: async () => { 
-      setPartId(undefined); setQuantity(1); 
+      setPartId(undefined); setQuantity(1); setDefectiveNote(''); setCollectDefective(false);
       await Promise.all([
         client.invalidateQueries({ queryKey: ['internal', 'part-usages', item.id] }), 
         client.invalidateQueries({ queryKey: ['internal', 'available-parts', ticketId] }), 
@@ -434,14 +480,14 @@ function PartUsagePanel({ item, parts, partsLoading, ticketId }: { item: RepairI
         {!warrantyReplacement && item.expectedPartId && (
           <label className="check-field">
             <input type="checkbox" checked={collectDefective} onChange={e => setCollectDefective(e.target.checked)} />
-            <span>Có thu hồi linh kiện cũ từ khách</span>
+            <span>Có thu hồi linh kiện cũ từ khách (báo đổi linh kiện lỗi)</span>
           </label>
         )}
 
         {(warrantyReplacement || collectDefective) && (
           <label className="field">
-            <span>Mô tả linh kiện lỗi thu hồi</span>
-            <textarea placeholder="Tên/Mã và mô tả tình trạng linh kiện cũ tháo ra" maxLength={5000} value={defectiveNote} onChange={event => setDefectiveNote(event.target.value)} />
+            <span>Mô tả linh kiện lỗi thu hồi *</span>
+            <textarea placeholder="Tên/Mã và mô tả tình trạng linh kiện lỗi tháo ra từ máy khách..." maxLength={5000} value={defectiveNote} onChange={event => setDefectiveNote(event.target.value)} />
           </label>
         )}
 
@@ -463,8 +509,8 @@ function PartUsagePanel({ item, parts, partsLoading, ticketId }: { item: RepairI
 
 function nextAction(status: ServiceTicketDetailResponse['ticket']['status']) {
   const labels: Partial<Record<ServiceTicketDetailResponse['ticket']['status'], string>> = {
-    ASSIGNED: 'Bắt đầu kiểm tra', 
-    INSPECTING: 'Xác định phương án', 
+    ASSIGNED: 'Bắt đầu xử lý ca', 
+    INSPECTING: 'Xác định phương án kỹ thuật', 
     WAITING_APPROVAL: 'Đang chờ khách hàng phản hồi',
     REPAIRING: 'Đang sửa chữa & Thay thế', 
     WAITING_PART: 'Đang chờ linh kiện về kho', 

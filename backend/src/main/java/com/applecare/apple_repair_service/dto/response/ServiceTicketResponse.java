@@ -17,7 +17,6 @@ public record ServiceTicketResponse(
         ServiceTicketStatus status,
         String receivedCondition,
         String inspectionResult,
-        Long inspectedByUserId,
         BigDecimal discountPercent,
         PaymentStatus paymentStatus,
         PaymentMethod paymentMethod,

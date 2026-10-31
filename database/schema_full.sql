@@ -102,7 +102,7 @@ CREATE TABLE `appointment_slots` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_appointment_slots_branch_date_time` (`branch_id`,`appointment_date`,`start_time`,`end_time`),
   CONSTRAINT `fk_appointment_slots_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5396 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4201 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -178,7 +178,7 @@ CREATE TABLE `assignments` (
   CONSTRAINT `fk_assignments_assigned_by` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_assignments_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`),
   CONSTRAINT `fk_assignments_technician` FOREIGN KEY (`technician_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4333 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -200,7 +200,7 @@ CREATE TABLE `branch_inventories` (
   KEY `fk_branch_inventories_part` (`part_id`),
   CONSTRAINT `fk_branch_inventories_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
   CONSTRAINT `fk_branch_inventories_part` FOREIGN KEY (`part_id`) REFERENCES `parts` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=130 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=644 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -243,7 +243,7 @@ CREATE TABLE `customer_devices` (
   KEY `fk_customer_devices_device_model` (`device_model_id`),
   CONSTRAINT `fk_customer_devices_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`),
   CONSTRAINT `fk_customer_devices_device_model` FOREIGN KEY (`device_model_id`) REFERENCES `device_models` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1517 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5588 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -261,7 +261,7 @@ CREATE TABLE `customers` (
   `updated_at` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_customers_phone` (`phone`)
-) ENGINE=InnoDB AUTO_INCREMENT=1345 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5416 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -398,7 +398,7 @@ CREATE TABLE `inventory_transactions` (
   CONSTRAINT `fk_inventory_transactions_part_usage` FOREIGN KEY (`part_usage_id`) REFERENCES `part_usages` (`id`),
   CONSTRAINT `fk_inventory_transactions_recorded_by` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_inventory_transactions_source_branch` FOREIGN KEY (`source_branch_id`) REFERENCES `branches` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=163 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4791 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -472,7 +472,7 @@ CREATE TABLE `part_usages` (
   CONSTRAINT `fk_part_usages_recorded_by` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_part_usages_repair_item` FOREIGN KEY (`repair_item_id`) REFERENCES `repair_items` (`id`),
   CONSTRAINT `fk_part_usages_reversed_by` FOREIGN KEY (`reversed_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3868 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -543,7 +543,7 @@ CREATE TABLE `repair_items` (
   CONSTRAINT `fk_repair_items_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`),
   CONSTRAINT `fk_repair_items_warranty_replacement_catalog` FOREIGN KEY (`warranty_replacement_catalog_id`) REFERENCES `service_catalog_items` (`id`),
   CONSTRAINT `fk_repair_items_warranty_source_item` FOREIGN KEY (`warranty_source_item_id`) REFERENCES `repair_items` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4425 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -579,7 +579,7 @@ CREATE TABLE `service_catalog_items` (
   CONSTRAINT `fk_service_catalog_items_service_issue` FOREIGN KEY (`service_issue_id`) REFERENCES `service_issues` (`id`),
   CONSTRAINT `fk_service_catalog_items_service_type` FOREIGN KEY (`service_type_id`) REFERENCES `service_types` (`id`),
   CONSTRAINT `fk_service_catalog_warranty_replacement` FOREIGN KEY (`warranty_replacement_catalog_id`) REFERENCES `service_catalog_items` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=384 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=293 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -598,7 +598,7 @@ CREATE TABLE `service_feedbacks` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_service_feedbacks_service_ticket` (`service_ticket_id`),
   CONSTRAINT `fk_service_feedbacks_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2854 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -629,7 +629,7 @@ CREATE TABLE `service_interruptions` (
   CONSTRAINT `fk_service_interruptions_assignment` FOREIGN KEY (`assignment_id`) REFERENCES `assignments` (`id`),
   CONSTRAINT `fk_service_interruptions_recorded_by` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`),
   CONSTRAINT `ck_service_interruptions_time_order` CHECK (((`ended_at` is null) or (`ended_at` >= `started_at`)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -694,7 +694,7 @@ CREATE TABLE `service_status_histories` (
   CONSTRAINT `fk_service_status_histories_changed_by` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_service_status_histories_service_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`),
   CONSTRAINT `fk_status_history_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=26316 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -750,7 +750,7 @@ CREATE TABLE `service_tickets` (
   CONSTRAINT `fk_service_tickets_customer_device` FOREIGN KEY (`customer_device_id`) REFERENCES `customer_devices` (`id`),
   CONSTRAINT `fk_service_tickets_handed_over_by` FOREIGN KEY (`handed_over_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_service_tickets_inspected_by` FOREIGN KEY (`inspected_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4072 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -780,7 +780,7 @@ CREATE TABLE `service_time_estimate_histories` (
   CONSTRAINT `fk_time_estimate_actor` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_time_estimate_technician` FOREIGN KEY (`technician_id`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_time_estimate_ticket` FOREIGN KEY (`service_ticket_id`) REFERENCES `service_tickets` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -843,7 +843,7 @@ CREATE TABLE `technician_schedules` (
   KEY `idx_technician_schedules_branch_date_status` (`branch_id`,`work_date`,`status`),
   CONSTRAINT `fk_technician_schedules_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
   CONSTRAINT `fk_technician_schedules_technician` FOREIGN KEY (`technician_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=256 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=184 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -876,7 +876,7 @@ CREATE TABLE `transfers` (
   CONSTRAINT `fk_transfers_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_transfers_responded_by` FOREIGN KEY (`responded_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_transfers_target_technician` FOREIGN KEY (`target_technician_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=262 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -916,4 +916,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-25 13:51:09
+-- Dump completed on 2026-10-26 23:41:42

@@ -33,7 +33,7 @@ spring:
 
   jackson:
     deserialization:
-      fail-on-unknown-properties: true
+      fail-on-unknown-properties: false
 
 app:
   security:
@@ -50,8 +50,13 @@ app:
   ml:
     enabled: ${ML_ENABLED:true}
     base-url: ${ML_SERVICE_BASE_URL:http://localhost:8001}
-    connect-timeout: ${ML_CONNECT_TIMEOUT:1s}
-    read-timeout: ${ML_READ_TIMEOUT:3s}
+    connect-timeout: ${ML_CONNECT_TIMEOUT:3s}
+    read-timeout: ${ML_READ_TIMEOUT:10s}
+
+  logging:
+    level:
+      com.applecare.apple_repair_service: DEBUG
+      org.springframework.web.client: DEBUG
 
 springdoc:
   api-docs:

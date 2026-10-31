@@ -11,8 +11,8 @@ import com.applecare.apple_repair_service.dto.response.CustomerDeviceResponse;
 import com.applecare.apple_repair_service.dto.response.CustomerResponse;
 import com.applecare.apple_repair_service.dto.response.DeviceModelResponse;
 import com.applecare.apple_repair_service.dto.response.DeviceTypeResponse;
-import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
 import com.applecare.apple_repair_service.dto.response.InventoryLotResponse;
+import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
 import com.applecare.apple_repair_service.dto.response.MlPredictionResponse;
 import com.applecare.apple_repair_service.dto.response.PartResponse;
 import com.applecare.apple_repair_service.dto.response.PartUsageResponse;
@@ -38,8 +38,8 @@ import com.applecare.apple_repair_service.entity.Customer;
 import com.applecare.apple_repair_service.entity.CustomerDevice;
 import com.applecare.apple_repair_service.entity.DeviceModel;
 import com.applecare.apple_repair_service.entity.DeviceType;
-import com.applecare.apple_repair_service.entity.InventoryTransaction;
 import com.applecare.apple_repair_service.entity.InventoryLot;
+import com.applecare.apple_repair_service.entity.InventoryTransaction;
 import com.applecare.apple_repair_service.entity.MlPrediction;
 import com.applecare.apple_repair_service.entity.Part;
 import com.applecare.apple_repair_service.entity.PartUsage;
@@ -60,6 +60,7 @@ import java.util.ArrayList;
 
 @Component
 public class EntityResponses {
+
     public AppointmentResponse map(Appointment e) {
         return new AppointmentResponse(e.getId(), e.getCustomer() == null ? null : e.getCustomer().getId(),
                 e.getCustomer() == null ? null : e.getCustomer().getFullName(),
@@ -121,8 +122,8 @@ public class EntityResponses {
                 entity.getSourceBranch() != null ? entity.getSourceBranch().getId() : null,
                 entity.getDestinationBranch() != null ? entity.getDestinationBranch().getId() : null,
                 entity.getQuantity(),
-                entity.getCostPrice(),       // <--- Map giá
-                entity.getSupplierName(),    // <--- Map NCC
+                entity.getCostPrice(),
+                entity.getSupplierName(),
                 entity.getPartUsage() != null ? entity.getPartUsage().getId() : null,
                 entity.getInventoryLot() != null ? entity.getInventoryLot().getId() : null,
                 entity.getInventoryLot() != null ? entity.getInventoryLot().getLotCode() : null,
@@ -153,7 +154,7 @@ public class EntityResponses {
         return new PartResponse(
                 part.getId(),
                 new ArrayList<>(part.getDeviceModelIds()),
-                part.getServiceIssueId(), // Gán serviceIssueId ở vị trí thứ 3
+                part.getServiceIssueId(),
                 part.getPartCode(),
                 part.getName(),
                 part.getBrand(),
@@ -176,7 +177,7 @@ public class EntityResponses {
         return new RepairItemResponse(e.getId(), e.getServiceTicket() == null ? null : e.getServiceTicket().getId(), e.getServiceCatalogItem() == null ? null : e.getServiceCatalogItem().getId(), e.getItemNameSnapshot(), e.getApprovalStatus(), e.getBasePrice(), e.getFinalPrice(), e.getApprovalRecordedBy() == null ? null : e.getApprovalRecordedBy().getId(), e.getApprovalDecisionAt(), e.getApprovalResolvedAt(), e.getApprovalNote(), e.getWarrantyStartDate(), e.getWarrantyEndDate(), e.getWarrantySourceItem() == null ? null : e.getWarrantySourceItem().getId(), e.getWarrantyDecision(), e.getWarrantyDecisionNote(), e.getCreatedAt(), e.getUpdatedAt(), e.getConfirmationMethod(), e.getWarrantyRemedy(),
                 e.getWarrantyReplacementCatalog() == null ? null : e.getWarrantyReplacementCatalog().getId(),
                 (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart() == null ? null
-                : (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart().getId());
+                        : (e.getWarrantyReplacementCatalog() != null ? e.getWarrantyReplacementCatalog() : e.getServiceCatalogItem()).getPart().getId());
     }
 
     public ServiceCatalogItemResponse map(ServiceCatalogItem e) {
@@ -198,7 +199,28 @@ public class EntityResponses {
     }
 
     public ServiceTicketResponse map(ServiceTicket e) {
-        return new ServiceTicketResponse(e.getId(), e.getTicketCode(), e.getAppointmentDevice() == null ? null : e.getAppointmentDevice().getId(), e.getCustomerDevice() == null ? null : e.getCustomerDevice().getId(), e.getBranch() == null ? null : e.getBranch().getId(), e.getCreatedBy() == null ? null : e.getCreatedBy().getId(), e.getStatus(), e.getReceivedCondition(), e.getInspectionResult(), e.getInspectedBy() == null ? null : e.getInspectedBy().getId(), e.getDiscountPercent(), e.getPaymentStatus(), e.getPaymentMethod(), e.getPaidAt(), e.getHandedOverBy() == null ? null : e.getHandedOverBy().getId(), e.getHandedOverAt(), e.getCancelReason(), e.getReceivedAt(), e.getUpdatedAt(), e.getAuthorizedScope(), com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(e));
+        return new ServiceTicketResponse(
+                e.getId(),
+                e.getTicketCode(),
+                e.getAppointmentDevice() == null ? null : e.getAppointmentDevice().getId(),
+                e.getCustomerDevice() == null ? null : e.getCustomerDevice().getId(),
+                e.getBranch() == null ? null : e.getBranch().getId(),
+                e.getCreatedBy() == null ? null : e.getCreatedBy().getId(),
+                e.getStatus(),
+                e.getReceivedCondition(),
+                e.getInspectionResult(),
+                e.getDiscountPercent(),
+                e.getPaymentStatus(),
+                e.getPaymentMethod(),
+                e.getPaidAt(),
+                e.getHandedOverBy() == null ? null : e.getHandedOverBy().getId(),
+                e.getHandedOverAt(),
+                e.getCancelReason(),
+                e.getReceivedAt(),
+                e.getUpdatedAt(),
+                e.getAuthorizedScope(),
+                com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(e)
+        );
     }
 
     public ServiceTypeResponse map(ServiceType e) {

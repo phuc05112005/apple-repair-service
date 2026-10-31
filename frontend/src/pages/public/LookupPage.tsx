@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useState, useMemo, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { publicApi } from '../../api/publicApi'
 import type { PublicRepairItemResponse, PublicTicketResponse, ServiceTicketStatus } from '../../api/contracts'
@@ -86,7 +86,7 @@ export function LookupPage() {
               <div className="result-heading">
                 <div>
                   <span className="eyebrow">Lịch hẹn</span>
-                  2. Lịch đã đăng ký
+                  Lịch đã đăng ký
                 </div>
                 <span>{appointments.data?.length ?? 0} kết quả</span>
               </div>
@@ -186,13 +186,18 @@ export function LookupPage() {
 
 function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: string }) {
   const [open, setOpen] = useState(true)
+  
+  // Lưu vết trạng thái đánh giá trong localStorage
+  const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(() => {
+    return localStorage.getItem(`feedback_submitted_${ticket.ticketCode}`) === 'true'
+  })
+
   const current = stepIndex(ticket.status)
   const waiting = ticket.status === 'WAITING_APPROVAL' || ticket.status === 'WAITING_PART'
 
   const activeItems = ticket.repairItems.filter(item => item.approvalStatus !== 'REJECTED')
   const cancelledItems = ticket.repairItems.filter(item => item.approvalStatus === 'REJECTED')
 
-  // Bóc tách thời gian hiển thị Timeline linh hoạt
   const getStepTime = (index: number) => {
     switch (index) {
       case 0: return ticket.receivedAt
@@ -204,8 +209,25 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
     }
   }
 
-  const estimatedCompletion = ticket.estimatedCompletionAt || ticket.timing?.estimatedCompletionAt
+  // TÍNH TOÁN DỰ KIẾN HOÀN THÀNH CHUẨN XÁC
+  const displayEstimatedCompletion = useMemo(() => {
+    const rawEst = ticket.estimatedCompletionAt || ticket.timing?.estimatedCompletionAt
+    if (rawEst) return formatDateTime(rawEst)
+
+    const durationMinutes = ticket.estimatedDurationMinutes || ticket.timing?.estimatedDurationMinutes
+    if (ticket.receivedAt && durationMinutes) {
+      const receivedDate = new Date(ticket.receivedAt)
+      if (!isNaN(receivedDate.getTime())) {
+        const completionDate = new Date(receivedDate.getTime() + durationMinutes * 60 * 1000)
+        return formatDateTime(completionDate.toISOString())
+      }
+    }
+
+    return 'Chưa có thời gian dự kiến'
+  }, [ticket])
+
   const estimatedDuration = ticket.estimatedDurationMinutes || ticket.timing?.estimatedDurationMinutes
+  const isFeedbackDone = ticket.hasFeedback || hasSubmittedFeedback
 
   return (
     <article className="ticket-card">
@@ -226,7 +248,7 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
           <div className="ticket-meta">
             <div><span>Thanh toán</span><strong>{paymentStatusLabels[ticket.paymentStatus]}</strong></div>
             <div><span>Tổng đã duyệt</span><strong>{formatMoney(ticket.approvedTotal)}</strong></div>
-            <div><span>Dự kiến hoàn thành</span><strong>{estimatedCompletion ? formatDateTime(estimatedCompletion) : 'Chưa có thời gian dự kiến'}</strong></div>
+            <div><span>Dự kiến hoàn thành</span><strong>{displayEstimatedCompletion}</strong></div>
           </div>
 
           <div className="timeline-public">
@@ -261,7 +283,7 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
 
           {estimatedDuration && <p className="muted">Thời lượng kỹ thuật dự kiến: {estimatedDuration} phút.</p>}
 
-          <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#0f172a' }}>Dịch vụ thực tế thực hiện</h4>
+          <h4 style={{ marginTop: '20px', marginBottom: '10px', color: '#0f172a' }}>Dịch vụ &amp; Linh kiện thực hiện</h4>
           <div className="repair-items">
             {activeItems.length === 0 ? (
               <p className="muted">Chưa có dịch vụ nào được duyệt.</p>
@@ -281,13 +303,21 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
             </div>
           )}
 
+          {/* KHÓA THÔNG BÁO ĐÃ ĐÁNH GIÁ VĨNH VIỄN */}
           {ticket.status === 'HANDED_OVER' && (
-            ticket.hasFeedback ? (
+            isFeedbackDone ? (
               <div className="feedback-success" style={{ marginTop: '20px', padding: '12px 16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#166534', fontWeight: 500 }}>
                 ✓ Bạn đã gửi đánh giá cho dịch vụ này. Cảm ơn phản hồi của bạn!
               </div>
             ) : (
-              <FeedbackForm ticketCode={ticket.ticketCode} phone={phone} />
+              <FeedbackForm 
+                ticketCode={ticket.ticketCode} 
+                phone={phone} 
+                onSuccess={() => {
+                  localStorage.setItem(`feedback_submitted_${ticket.ticketCode}`, 'true')
+                  setHasSubmittedFeedback(true)
+                }} 
+              />
             )
           )}
         </div>
@@ -304,6 +334,7 @@ function RepairItem({ item, phone, isCancelled = false }: { item: PublicRepairIt
   })
 
   const warrantyBooking = `/booking?warrantySourceItem=${item.repairItemId}`
+  const partDetails = [item.partBrand, item.partVariant].filter(Boolean).join(' · ')
 
   return (
     <div style={{ 
@@ -331,13 +362,13 @@ function RepairItem({ item, phone, isCancelled = false }: { item: PublicRepairIt
       </div>
 
       {item.partName && (
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>
-          {item.partName} · {[item.partBrand, item.partVariant].filter(Boolean).join(' · ')}
+        <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: '#475569', backgroundColor: '#f8fafc', padding: '6px 10px', borderRadius: '6px' }}>
+          🔧 <strong>Linh kiện đi kèm:</strong> {item.partName} {partDetails ? `(${partDetails})` : ''}
         </p>
       )}
 
       {!isCancelled && item.warrantyStartDate && (
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#0369a1', fontWeight: 500 }}>
+        <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: '#0369a1', fontWeight: 500 }}>
           {!phone 
             ? 'Tra cứu bằng số điện thoại để kiểm tra bảo hành' 
             : warranty.isLoading 
@@ -357,12 +388,15 @@ function RepairItem({ item, phone, isCancelled = false }: { item: PublicRepairIt
   )
 }
 
-function FeedbackForm({ ticketCode, phone }: { ticketCode: string; phone?: string }) {
+function FeedbackForm({ ticketCode, phone, onSuccess }: { ticketCode: string; phone?: string; onSuccess?: () => void }) {
   const [satisfied, setSatisfied] = useState<boolean>()
   const [comment, setComment] = useState('')
   
   const feedback = useMutation({ 
-    mutationFn: () => publicApi.feedback(ticketCode, { phone: phone!, satisfied: satisfied!, comment: comment.trim() || undefined }) 
+    mutationFn: () => publicApi.feedback(ticketCode, { phone: phone!, satisfied: satisfied!, comment: comment.trim() || undefined }),
+    onSuccess: () => {
+      if (onSuccess) onSuccess()
+    }
   })
 
   if (!phone) return <p style={{ marginTop: '15px' }}>Tra cứu bằng số điện thoại để gửi phản hồi.</p>

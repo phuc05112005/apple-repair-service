@@ -28,46 +28,63 @@ public class TechnicianOperationsService {
         return repairItems.recordApprovalDecision(itemId, new ApprovalDecisionRequest(request.decision(), actor.id(), request.note(), request.confirmationMethod(), request.resolvedAt()));
     }
 
-    public ServiceTicketDetailResponse startInspection(Long id) {
+    public ServiceTicketDetailResponse startProcessing(Long id) {
         policy.requireActiveTechnician(id);
-        return tickets.startInspection(id,actor.id());
+        return tickets.startProcessing(id, actor.id());
     }
+
     public ServiceTicketDetailResponse inspect(Long id, InspectionCommand request) {
         policy.requireActiveTechnician(id);
-        return tickets.recordInspection(id,new RecordInspectionRequest(request.inspectionResult(),actor.id(),
-                request.requiresCustomerApproval(),request.items(),request.confirmationMethod(),request.confirmationNote()));
+        return tickets.recordInspection(id, actor.id(), new RecordInspectionRequest(
+                request.inspectionResult(),
+                request.requiresCustomerApproval(),
+                request.items(),
+                request.confirmationMethod(),
+                request.confirmationNote()
+        ));
     }
+
     public ServiceTicketDetailResponse waitForPart(Long id, NoteCommand request) {
         policy.requireActiveTechnician(id);
-        return tickets.waitForPart(id,actor.id(),request.note());
+        return tickets.waitForPart(id, actor.id(), request.note());
     }
+
     public ServiceTicketDetailResponse resumeRepair(Long id) {
         policy.requireActiveTechnician(id);
-        return tickets.resumeRepair(id,actor.id());
+        return tickets.resumeRepair(id, actor.id());
     }
+
     public ServiceTicketDetailResponse resolveWait(Long id, WaitResolutionCommand request) {
         policy.requireActiveTechnician(id);
         return tickets.resolveWait(id, actor.id(), request.resolvedAt(), request.note());
     }
+
     public ServiceTicketDetailResponse finishRepair(Long id) {
         policy.requireActiveTechnician(id);
-        return tickets.finishRepair(id,actor.id());
+        return tickets.finishRepair(id, actor.id());
     }
+
     public RepairDurationResponse duration(Long id) {
         policy.requireActiveTechnician(id);
-        return new RepairDurationResponse(id,durations.calculateCompletedRepairMinutes(id),durations.calculateCurrentRepairMinutes(id));
+        return new RepairDurationResponse(id, durations.calculateCompletedRepairMinutes(id), durations.calculateCurrentRepairMinutes(id));
     }
+
     public PartUsageResponse usePart(Long itemId, PartUsageCommand request) {
         policy.requireItem(itemId);
-        return inventory.usePart(new UsePartRequest(itemId,request.partId(),request.quantity(),actor.id(),request.defectiveReturnNote(),request.defectivePartId()));
+        return inventory.usePart(new UsePartRequest(itemId, request.partId(), request.quantity(), actor.id(), request.defectiveReturnNote(), request.defectivePartId()));
     }
+
     public PartUsageResponse reverseUsage(Long usageId, NoteCommand request) {
         policy.requireUsage(usageId);
-        return inventory.reversePartUsage(new ReversePartUsageRequest(usageId,actor.id(),request.note()));
+        return inventory.reversePartUsage(new ReversePartUsageRequest(usageId, actor.id(), request.note()));
     }
+
     public RepairItemResponse warranty(Long itemId, WarrantyDecisionRequest request) {
         policy.requireItem(itemId);
-        return warranties.recordWarrantyDecision(itemId,request);
+        return warranties.recordWarrantyDecision(itemId, request);
+    }
+    public ServiceTicketDetailResponse cancel(Long id, NoteCommand request) {
+        policy.requireActiveTechnician(id);
+        return tickets.cancelTicket(id, actor.id(), request.note());
     }
 }
-

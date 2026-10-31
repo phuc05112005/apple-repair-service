@@ -91,11 +91,6 @@ public class ServiceTicket {
     @Column(name = "inspection_result", columnDefinition = "TEXT")
     private String inspectionResult;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "inspected_by", nullable = true,
-            foreignKey = @ForeignKey(name = "fk_service_tickets_inspected_by"))
-    private User inspectedBy;
-
     @NotNull
     @DecimalMin("0.00")
     @DecimalMax("100.00")
@@ -149,8 +144,13 @@ public class ServiceTicket {
 
     @Column(name="actual_repair_completed_at")
     private LocalDateTime actualRepairCompletedAt;
-    @Column(name="estimated_duration_minutes") private Long estimatedDurationMinutes;
-    @Enumerated(EnumType.STRING) @Column(name="estimate_source") private com.applecare.apple_repair_service.enums.EstimateSource estimateSource;
+
+    @Column(name="estimated_duration_minutes")
+    private Long estimatedDurationMinutes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name="estimate_source")
+    private com.applecare.apple_repair_service.enums.EstimateSource estimateSource;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)

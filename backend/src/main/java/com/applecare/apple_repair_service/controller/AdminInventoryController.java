@@ -6,6 +6,10 @@ import com.applecare.apple_repair_service.service.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -34,26 +38,31 @@ public class AdminInventoryController {
     public BranchInventoryResponse inventory(@RequestParam @Positive Long branchId, @RequestParam @Positive Long partId) {
         return inventory.getInventory(branchId, partId);
     }
+
     @GetMapping("/admin/inventory")
     public List<BranchInventoryResponse> inventories(
             @RequestParam(required = false) @Positive Long branchId,
             @RequestParam(required = false) @Positive Long partId) {
         return inventory.listInventories(branchId, partId);
     }
+
     @GetMapping("/admin/parts/{partId}/inventory-transactions")
     public List<InventoryTransactionResponse> transactionHistory(@PathVariable @Positive Long partId) {
         return inventory.getTransactionHistory(partId);
     }
+
     @GetMapping("/admin/inventory/transactions")
-    public List<InventoryTransactionResponse> transactions(
-            @RequestParam(required=false) @Positive Long branchId,
-            @RequestParam(required=false) @Positive Long partId,
-            @RequestParam(required=false) InventoryTransactionType transactionType,
-            @RequestParam(required=false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required=false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required=false) String code) {
-        return inventory.searchTransactions(branchId, partId, transactionType, from, to, code);
+    public Page<InventoryTransactionResponse> transactions(
+            @RequestParam(required = false) @Positive Long branchId,
+            @RequestParam(required = false) @Positive Long partId,
+            @RequestParam(required = false) InventoryTransactionType transactionType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String code,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return inventory.searchTransactions(branchId, partId, transactionType, from, to, code, pageable);
     }
+
     @GetMapping("/admin/inventory/import-template")
     public ResponseEntity<byte[]> importTemplate() {
         return ResponseEntity.ok()
@@ -61,15 +70,18 @@ public class AdminInventoryController {
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(inventoryExcel.createTemplate());
     }
+
     @PostMapping(value = "/admin/inventory/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public InventoryImportResultResponse importInventory(@RequestPart("file") MultipartFile file) {
         return inventoryExcel.importWorkbook(file, actor.id());
     }
+
     @GetMapping("/admin/inventory/lots")
-    public List<InventoryLotResponse> lots(@RequestParam(required=false) @Positive Long branchId,
-                                           @RequestParam(required=false) @Positive Long partId) {
+    public List<InventoryLotResponse> lots(@RequestParam(required = false) @Positive Long branchId,
+                                           @RequestParam(required = false) @Positive Long partId) {
         return inventory.listLots(branchId, partId);
     }
+
     @PostMapping("/admin/inventory/stock-in")
     public StockInResponse stockIn(@Valid @RequestBody StockInCommand request) {
         return inventory.stockIn(new StockInRequest(
@@ -84,13 +96,15 @@ public class AdminInventoryController {
                 request.sourceNote()
         ));
     }
+
     @PostMapping("/admin/inventory/stock-out")
     public BranchInventoryResponse stockOut(@Valid @RequestBody StockAdjustmentCommand request) {
-        return inventory.stockOut(new StockAdjustmentRequest(request.branchId(),request.partId(),request.quantity(),actor.id(),request.note()));
+        return inventory.stockOut(new StockAdjustmentRequest(request.branchId(), request.partId(), request.quantity(), actor.id(), request.note()));
     }
+
     @PostMapping("/admin/inventory/transfer")
     public InventoryTransactionResponse transfer(@Valid @RequestBody StockTransferCommand request) {
-        return inventory.transferStock(new TransferStockRequest(request.partId(),request.sourceBranchId(),
-                request.destinationBranchId(),request.quantity(),actor.id(),request.note()));
+        return inventory.transferStock(new TransferStockRequest(request.partId(), request.sourceBranchId(),
+                request.destinationBranchId(), request.quantity(), actor.id(), request.note()));
     }
 }

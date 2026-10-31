@@ -87,6 +87,7 @@ export interface PublicTicketResponse {
   approvedTotal: number
   hasFeedback?: boolean
   repairItems: PublicRepairItemResponse[]
+  timing?: TicketTimingResponse
 }
 export interface WarrantyEligibilityResponse {
   repairItemId: number; warrantyStartDate: string | null; warrantyEndDate: string | null
@@ -116,7 +117,7 @@ export interface AppointmentDetailResponse {
 export interface ServiceTicketResponse {
   id: number; ticketCode: string; appointmentDeviceId: number | null; customerDeviceId: number; branchId: number
   createdById: number; status: ServiceTicketStatus; receivedCondition: string | null; inspectionResult: string | null
-  inspectedById: number | null; discountPercent: number; paymentStatus: PaymentStatus; paymentMethod: PaymentMethod | null
+  discountPercent: number; paymentStatus: PaymentStatus; paymentMethod: PaymentMethod | null
   paidAt: string | null; handedOverById: number | null; handedOverAt: string | null; cancelReason: string | null
   receivedAt: string; updatedAt: string; authorizedScope: string | null; timing: TicketTiming
 }
@@ -144,25 +145,6 @@ export interface TicketTimingInfo {
   estimatedCompletionAt?: string
   estimatedDurationMinutes?: number
 }
-
-export interface PublicTicketResponse {
-  ticketCode: string
-  status: ServiceTicketStatus
-  branchName: string
-  deviceModelName: string
-  receivedAt: string
-  inspectedAt?: string
-  actualRepairStartedAt?: string
-  actualRepairCompletedAt?: string
-  handedOverAt?: string
-  estimatedCompletionAt?: string
-  estimatedDurationMinutes?: number
-  paymentStatus: PaymentStatus
-  approvedTotal: number
-  hasFeedback?: boolean
-  timing?: TicketTimingInfo
-  repairItems: PublicRepairItemResponse[]
-}
 export interface TicketContextResponse {
   customerId: number; customerFullName: string; customerPhone: string; customerDeviceId: number
   deviceModelId: number; deviceModelName: string; deviceTypeName: string | null; serialNumber: string | null; storage: string | null
@@ -181,6 +163,12 @@ export interface TechnicianRecommendationResponse {
   predictionSource: 'ML' | 'STANDARD_DURATION_FALLBACK'; predictionWarnings: string[]
   estimatedStartAt: string | null; estimatedCompletionAt: string | null; modelStatus: string | null
   syntheticData: boolean; productionValidated: boolean
+}
+export interface TicketTimingResponse {
+  actualRepairStartedAt?: string
+  actualRepairCompletedAt?: string
+  estimatedCompletionAt?: string
+  estimatedDurationMinutes?: number
 }
 export interface AssignmentResponse {
   id: number; serviceTicketId: number; technicianId: number; technicianName: string; assignedById: number
@@ -213,7 +201,7 @@ export interface StatisticsOverviewResponse {
   currentStatusCounts: { status: ServiceTicketStatus; count: number }[]; paidRevenue: number; warrantyReturnTickets: number
 }
 export interface SystemSettingResponse { id: number; settingKey: string; settingValue: string; createdAt: string; updatedAt: string }
-export interface UserResponse { id: number; username: string; fullName: string; phone: string | null; role: UserRole; status: UserStatus; createdAt: string; updatedAt: string }
+export interface UserResponse { id: number; username: string; fullName: string; phone: string | null; email: string | null; role: UserRole; status: UserStatus; createdAt: string; updatedAt: string }
 export interface BranchResponse { id: number; name: string; address: string; phone: string | null; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface DeviceTypeResponse { id: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
 export interface DeviceModelResponse { id: number; deviceTypeId: number; name: string; status: ActiveStatus; createdAt: string; updatedAt: string }
@@ -292,20 +280,7 @@ export interface DefectivePartReturn {
  repairItemId: number; ticketId: number; ticketCode: string; quantity: number; status: DefectivePartStatus
  reason: string; note: string | null; recordedById: number; receivedAt: string; statusChangedAt: string | null
 }
-// Thêm email vào UserResponse hiện có
-export interface UserResponse {
-  id: number
-  username: string
-  fullName: string
-  phone: string | null
-  email: string | null
-  role: UserRole
-  status: UserStatus
-  createdAt: string
-  updatedAt: string
-}
 
-// DTOs cho Profile
 export interface UpdateUserProfileRequest {
   fullName: string
   phone?: string | null
