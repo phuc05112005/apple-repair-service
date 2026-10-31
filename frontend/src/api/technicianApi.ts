@@ -13,13 +13,18 @@ export const technicianApi = {
   partUsages: (itemId: number, signal?: AbortSignal) => apiRequest<PartUsageResponse[]>(`/api/v1/internal/repair-items/${itemId}/part-usages`, { auth: true, signal }),
   usePart: (itemId: number, partId: number, quantity: number, defectiveReturnNote?: string) => apiRequest<PartUsageResponse>(`/api/v1/internal/repair-items/${itemId}/part-usages`, { auth: true, method: 'POST', body: { partId, quantity, defectiveReturnNote } }),
   reversePartUsage: (usageId: number, note?: string) => apiRequest<PartUsageResponse>(`/api/v1/internal/part-usages/${usageId}/reverse`, { auth: true, method: 'POST', body: { note } }),
-  startInspection: (id: number) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/inspection/start`, { auth: true, method: 'POST' }),
+  
+  startProcessing: (id: number) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/start-processing`, { auth: true, method: 'POST' }),
   inspect: (id: number, request: { inspectionResult: string; requiresCustomerApproval: boolean; confirmationMethod?: ConfirmationMethod; confirmationNote?: string; items: InspectionRepairItemRequest[] }) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/inspection`, { auth: true, method: 'POST', body: request }),
   waitForPart: (id: number, note?: string) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/wait-for-part`, { auth: true, method: 'POST', body: { note } }),
   resolveWait: (id: number, resolvedAt?: string, note?: string) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/wait/resolve`, { auth: true, method: 'POST', body: { resolvedAt, note } }),
   resume: (id: number) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/resume-repair`, { auth: true, method: 'POST' }),
   approval: (itemId: number, decision: 'APPROVED' | 'REJECTED', confirmationMethod: ConfirmationMethod, note?: string, resolvedAt?: string) => apiRequest<RepairItemResponse>(`/api/v1/internal/technician/repair-items/${itemId}/approval`, { auth: true, method: 'POST', body: { decision, confirmationMethod, note, resolvedAt } }),
   finish: (id: number) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/service-tickets/${id}/finish-repair`, { auth: true, method: 'POST' }),
+  
+  /* Đã cập nhật URL khớp với TechnicianController */
+  cancel: (id: number, reason: string) => apiRequest<ServiceTicketDetailResponse>(`/api/v1/internal/technician/service-tickets/${id}/cancel`, { auth: true, method: 'POST', body: { note: reason } }),
+  
   duration: (id: number, signal?: AbortSignal) => apiRequest<RepairDurationResponse>(`/api/v1/internal/service-tickets/${id}/repair-duration`, { auth: true, signal }),
   warrantyDecision: (itemId: number, decision: Exclude<WarrantyDecision, null>, note?: string, remedy?: WarrantyRemedy, replacementCatalogItemId?: number) => apiRequest<RepairItemResponse>(`/api/v1/internal/repair-items/${itemId}/warranty-decision`, { auth: true, method: 'POST', body: { decision, note, remedy, replacementCatalogItemId } }),
 }

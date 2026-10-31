@@ -49,6 +49,19 @@ async function inventoryTransactionHistory(filters: InventoryHistoryFilters = {}
   }
 }
 
+export interface RepairItemApiDetail {
+  repairItemId?: number
+  serviceTicketId?: number
+  serviceType?: string
+  serviceName?: string | null
+  finalPrice?: number
+  partName?: string | null
+  partCode?: string | null
+  partBrand?: string | null
+  partVariant?: string | null
+  approvalStatus?: string
+}
+
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
     apiRequest<StatisticsOverviewResponse>('/api/v1/admin/statistics/overview', { auth: true, query: filters, signal }),
@@ -86,7 +99,8 @@ export const adminApi = {
       costPrice?: number; 
       receivedAt: string; 
       sourceNote?: string 
-    }) => apiRequest<StockInResponse>('/api/v1/admin/inventory/stock-in', { auth: true, method: 'POST', body }),  stockOut: (body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>('/api/v1/admin/inventory/stock-out', { auth: true, method: 'POST', body }),
+    }) => apiRequest<StockInResponse>('/api/v1/admin/inventory/stock-in', { auth: true, method: 'POST', body }),
+  stockOut: (body: { branchId: number; partId: number; quantity: number; note?: string }) => apiRequest<BranchInventoryResponse>('/api/v1/admin/inventory/stock-out', { auth: true, method: 'POST', body }),
   transferStock: (body: { partId: number; sourceBranchId: number; destinationBranchId: number; quantity: number; note?: string }) => apiRequest('/api/v1/admin/inventory/transfer', { auth: true, method: 'POST', body }),
   slots: (branchId: number, date: string, signal?: AbortSignal) => apiRequest<SlotAvailabilityResponse[]>('/api/v1/admin/appointment-slots', { auth: true, query: { branchId, date }, signal }),
   weeklySchedules: (branchId: number, signal?: AbortSignal) => apiRequest<WeeklyScheduleResponse[]>('/api/v1/admin/appointment-weekly-schedules', { auth: true, query: { branchId }, signal }),
@@ -100,4 +114,10 @@ export const adminApi = {
   schedules: (technicianId: number, date: string, signal?: AbortSignal) => apiRequest<TechnicianScheduleResponse[]>('/api/v1/admin/technician-schedules', { auth: true, query: { technicianId, date }, signal }),
   saveSchedule: (id: number | undefined, body: { technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: string }) => apiRequest<TechnicianScheduleResponse>(id ? `/api/v1/admin/technician-schedules/${id}` : '/api/v1/admin/technician-schedules', { auth: true, method: id ? 'PUT' : 'POST', body }),
   deleteSchedule: (id: number) => apiRequest<void>(`/api/v1/admin/technician-schedules/${id}`, { auth: true, method: 'DELETE' }),
+  serviceTickets: (params?: { branchId?: number }, signal?: AbortSignal) =>
+    apiRequest<unknown[]>('/api/v1/admin/tickets', { auth: true, query: params, signal }),
+  ticketDetail: (id: number, signal?: AbortSignal) =>
+    apiRequest<unknown>(`/api/v1/admin/tickets/${id}`, { auth: true, signal }),
+  ticketItems: (id: number, signal?: AbortSignal) =>
+    apiRequest<RepairItemApiDetail[]>(`/api/v1/admin/tickets/${id}/items`, { auth: true, signal }),
 }

@@ -48,6 +48,7 @@ export function AdminDataTable<T>({
   const [sort, setSort] = useState(sortOptions[0]?.value ?? '')
   const [page, setPage] = useState(1)
   const normalizedQuery = query.trim().toLocaleLowerCase('vi')
+
   const filtered = useMemo(() => {
     const result = rows.filter(row => {
       if (normalizedQuery && !searchableText(row).toLocaleLowerCase('vi').includes(normalizedQuery)) return false
@@ -62,6 +63,28 @@ export function AdminDataTable<T>({
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const hasFilters = Boolean(query || filters.some(filter => filter.value))
 
+  // Giới hạn hiển thị tối đa 5 nút số trang
+  const pageNumbers = useMemo(() => {
+    const maxVisible = 5
+    if (pageCount <= maxVisible) {
+      return Array.from({ length: pageCount }, (_, index) => index + 1)
+    }
+
+    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2))
+    let end = start + maxVisible - 1
+
+    if (end > pageCount) {
+      end = pageCount
+      start = Math.max(1, end - maxVisible + 1)
+    }
+
+    const pages: number[] = []
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+    return pages
+  }, [currentPage, pageCount])
+
   function clearFilters() {
     setQuery('')
     setPage(1)
@@ -70,36 +93,199 @@ export function AdminDataTable<T>({
 
   const isInitialEmpty = rows.length === 0
 
-  return <section className="data-panel" aria-label="Danh sách dữ liệu">
-    <div className="table-toolbar">
-      <label className="search-control">
-        <span className="visually-hidden">Tìm kiếm</span>
-        <span aria-hidden="true">⌕</span>
-        <input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} placeholder={searchPlaceholder} />
-      </label>
-      {filters.map(filter => <label className="filter-control" key={filter.key}><span>{filter.label}</span><select value={filter.value} onChange={event => { filter.onChange(event.target.value); setPage(1) }}><option value="">Tất cả</option>{filter.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>)}
-      {sortOptions.length > 0 && <label className="filter-control"><span>Sắp xếp</span><select value={sort} onChange={event => { setSort(event.target.value); setPage(1) }}>{sortOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>}
-      {hasFilters && <button className="button button--quiet table-clear" onClick={clearFilters}>Xóa bộ lọc</button>}
-    </div>
-    <div className="table-meta" aria-live="polite"><span>{filtered.length} kết quả</span><span>Trang {currentPage}/{pageCount}</span></div>
-    {visible.length === 0 ? (
-      <div className="table-empty">
-        <span aria-hidden="true">○</span>
-        <strong>{isInitialEmpty ? 'Chưa có dữ liệu nào.' : emptyText}</strong>
-        {!isInitialEmpty && hasFilters && <button className="text-action" onClick={clearFilters}>Xóa bộ lọc</button>}
+  return (
+    <section className="data-panel" aria-label="Danh sách dữ liệu">
+      <div className="table-toolbar">
+        <label className="search-control">
+          <span className="visually-hidden">Tìm kiếm</span>
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            value={query}
+            onChange={event => {
+              setQuery(event.target.value)
+              setPage(1)
+            }}
+            placeholder={searchPlaceholder}
+          />
+        </label>
+        {filters.map(filter => (
+          <label className="filter-control" key={filter.key}>
+            <span>{filter.label}</span>
+            <select
+              value={filter.value}
+              onChange={event => {
+                filter.onChange(event.target.value)
+                setPage(1)
+              }}
+            >
+              <option value="">Tất cả</option>
+              {filter.options.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+        {sortOptions.length > 0 && (
+          <label className="filter-control">
+            <span>Sắp xếp</span>
+            <select
+              value={sort}
+              onChange={event => {
+                setSort(event.target.value)
+                setPage(1)
+              }}
+            >
+              {sortOptions.map(option => (
+                <option value={option.value} key={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {hasFilters && (
+          <button className="button button--quiet table-clear" onClick={clearFilters}>
+            Xóa bộ lọc
+          </button>
+        )}
       </div>
-    ) : (
-      <div className="data-table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>{columns.map(column => <th key={column.key} className={column.className} scope="col">{column.label}</th>)}</tr>
-          </thead>
-          <tbody>
-            {visible.map(row => <tr key={rowKey(row)}>{columns.map(column => <td key={column.key} className={column.className}>{column.render(row)}</td>)}</tr>)}
-          </tbody>
-        </table>
+
+      <div className="table-meta" aria-live="polite">
+        <span>{filtered.length} kết quả</span>
+        <span>
+          Trang {currentPage}/{pageCount}
+        </span>
       </div>
-    )}
-    {pageCount > 1 && <nav className="pagination" aria-label="Phân trang"><button className="button button--quiet" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Trước</button><div>{Array.from({ length: pageCount }, (_, index) => index + 1).map(value => <button key={value} aria-current={value === currentPage ? 'page' : undefined} onClick={() => setPage(value)}>{value}</button>)}</div><button className="button button--quiet" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Sau</button></nav>}
-  </section>
+
+      {visible.length === 0 ? (
+        <div className="table-empty">
+          <span aria-hidden="true">○</span>
+          <strong>{isInitialEmpty ? 'Chưa có dữ liệu nào.' : emptyText}</strong>
+          {!isInitialEmpty && hasFilters && (
+            <button className="text-action" onClick={clearFilters}>
+              Xóa bộ lọc
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {columns.map(column => (
+                  <th key={column.key} className={column.className} scope="col">
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(row => (
+                <tr key={rowKey(row)}>
+                  {columns.map(column => (
+                    <td key={column.key} className={column.className}>
+                      {column.render(row)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {pageCount > 1 && (
+        <nav
+          className="pagination"
+          aria-label="Phân trang"
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '16px',
+          }}
+        >
+          <button
+            className="button button--quiet"
+            disabled={currentPage === 1}
+            onClick={() => setPage(currentPage - 1)}
+            aria-label="Trang trước"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              minWidth: '36px',
+              borderRadius: '50%',
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: 'block' }}
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+            {pageNumbers.map(value => (
+              <button
+                key={value}
+                aria-current={value === currentPage ? 'page' : undefined}
+                onClick={() => setPage(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+
+          <button
+            className="button button--quiet"
+            disabled={currentPage === pageCount}
+            onClick={() => setPage(currentPage + 1)}
+            aria-label="Trang sau"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              minWidth: '36px',
+              borderRadius: '50%',
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: 'block' }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </nav>
+      )}
+    </section>
+  )
 }

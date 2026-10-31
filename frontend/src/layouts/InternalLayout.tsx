@@ -7,8 +7,21 @@ import { UserProfileModal } from '../components/UserProfileModal'
 interface NavGroup { label: string; links: [string, string, string][] }
 const roleConfig: Record<UserRole, { title: string; groups: NavGroup[] }> = {
   ADMIN: { title: 'Quản trị hệ thống', groups: [
-    { label: 'Tổng quan', links: [['', 'Tổng quan', '⌂'], ['statistics', 'Thống kê & phản hồi', '⌁'], ['ml', 'Giám sát ML', '◇']] },
-    { label: 'Vận hành', links: [['settings', 'Thời gian & cấu hình', '◷']] },
+    { 
+      label: 'Tổng quan', 
+      links: [
+        ['', 'Tổng quan', '⌂'], 
+        ['statistics', 'Thống kê & Báo cáo', '⌁']
+        // Đã xóa tab Giám sát ML tại đây
+      ] 
+    },
+    { 
+      label: 'Vận hành', 
+      links: [
+        ['settings', 'Thời gian & cấu hình', '◷'],
+        ['footer-settings', 'Thông tin hệ thống', '☎'] // Bổ sung tab cấu hình Footer & Hotline
+      ] 
+    },
     { label: 'Nhân sự', links: [['users', 'Tài khoản', '◎'], ['schedules', 'Lịch làm việc', '◷']] },
     { label: 'Danh mục', links: [['catalog', 'Dịch vụ', '◇'], ['parts', 'Linh kiện', '▣'], ['inventory', 'Tồn kho linh kiện', '▤'], ['branches', 'Chi nhánh', '⌖'], ['slots', 'Khung giờ & lịch hẹn', '◫']] },
   ] },
@@ -70,7 +83,7 @@ export function InternalLayout({ role }: { role: UserRole }) {
           ))}
         </nav>
 
-        {/* Khối User góc dưới Sidebar có hiệu ứng hover & bấm xem Hồ sơ */}
+        {/* Khối User góc dưới Sidebar */}
         <button
           type="button"
           className="sidebar-user"
@@ -112,7 +125,6 @@ export function InternalLayout({ role }: { role: UserRole }) {
             <strong>{config.title}</strong>
           </div>
 
-          {/* Cụm nút bấm chuẩn Design System */}
           <div className="page-action-group">
             <button
               type="button"

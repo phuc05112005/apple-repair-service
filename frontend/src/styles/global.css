@@ -1242,3 +1242,1381 @@ h1, h2, h3, h4 { font-family: var(--font-display); }
 .defective-panel th, .defective-panel td { text-align: left; padding: 1rem; border-bottom: 1px solid #dce2dd; vertical-align: top; }
 .defective-panel summary { cursor: pointer; }
 @media (max-width: 600px) { .ticket-timing-summary { grid-template-columns: 1fr; } .timing-manual-form { padding: .8rem; } }
+/* =============================================================================
+   CẤU HÌNH HEADER & FOOTER MỚI (TO RÕ & ĐẦY ĐỦ THÔNG TIN)
+   ============================================================================= */
+
+/* Header Styling */
+.public-header {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 86px;
+  padding: 0 clamp(1.25rem, 5vw, 5rem);
+  border-bottom: 1px solid rgba(30, 30, 28, .1);
+  background: rgba(247, 247, 245, .92);
+  backdrop-filter: blur(16px);
+  transition: all .3s ease;
+}
+
+.public-header--scrolled {
+  min-height: 72px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, .96);
+}
+
+.public-header .brand {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  text-decoration: none;
+}
+
+.public-header .brand-mark {
+  width: 42px;
+  height: 42px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  border-radius: 12px;
+}
+
+.brand-text strong {
+  display: block;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.brand-text small {
+  display: block;
+  font-size: .58rem;
+  font-weight: 750;
+  letter-spacing: .14em;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.public-header nav {
+  display: flex;
+  gap: clamp(1.5rem, 3vw, 3rem);
+  font-size: .95rem;
+  font-weight: 650;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.header-hotline {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.hotline-icon {
+  font-size: 1.2rem;
+}
+
+.header-hotline small {
+  display: block;
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.header-hotline strong {
+  display: block;
+  font-size: .95rem;
+  color: var(--blue);
+}
+
+/* Footer Styling */
+.public-footer {
+  display: block;
+  padding: 5rem clamp(1.25rem, 5vw, 5rem) 2.5rem;
+  background: #0d110f;
+  color: #b0b8b2;
+}
+
+.public-footer__grid {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1.2fr 1.8fr;
+  gap: clamp(2rem, 4vw, 4rem);
+  padding-bottom: 3.5rem;
+  border-bottom: 1px solid #232a26;
+}
+
+.footer-col h3 {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  letter-spacing: -.01em;
+}
+
+.footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: .75rem;
+}
+
+.footer-col a {
+  color: #a0aaa2;
+  font-size: .88rem;
+  transition: color .2s ease;
+}
+
+.footer-col a:hover {
+  color: #ffffff;
+}
+
+.footer-desc {
+  margin-top: 1rem;
+  font-size: .88rem;
+  line-height: 1.6;
+  color: #8f9891;
+  max-width: 380px;
+}
+
+.footer-hotline-card {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #171f1b;
+  border: 1px solid #26322b;
+  border-radius: 10px;
+}
+
+.footer-hotline-card span {
+  display: block;
+  font-size: .75rem;
+  color: #808c83;
+  margin-bottom: .25rem;
+}
+
+.footer-hotline-card strong {
+  font-size: 1.05rem;
+  color: #4da2ff;
+}
+
+.footer-contact-list li {
+  font-size: .85rem;
+  line-height: 1.5;
+  color: #9ea8a1;
+}
+
+.footer-contact-list strong {
+  color: #e0e5e1;
+}
+
+.public-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 2rem;
+  font-size: .78rem;
+  color: #6e7871;
+}
+
+.public-footer__note {
+  color: #828c84;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .public-footer__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .header-hotline {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .public-footer__grid {
+    grid-template-columns: 1fr;
+  }
+  .public-footer__bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+/* =============================================================================
+   CỤM NÚT NỔI FLOATING WIDGET & PHONECALL ANIMATION
+   ============================================================================= */
+
+.floating-widget-container {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.floating-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: #fff;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.floating-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Nút Gọi Điện thoại & Hiệu ứng sóng Sóng Pulse */
+.floating-btn--call {
+  background: #237a4a;
+}
+
+.btn-pulse-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(35, 122, 74, 0.6);
+  animation: pulse-ring 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+  z-index: 1;
+}
+
+.floating-btn--call .btn-icon {
+  position: relative;
+  z-index: 2;
+  font-size: 1.35rem;
+  animation: phone-shake 2.2s infinite ease-in-out;
+}
+
+.btn-tooltip {
+  position: absolute;
+  right: 65px;
+  background: #121211;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateX(10px);
+  pointer-events: none;
+}
+
+.floating-btn--call:hover .btn-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+/* Nút Zalo */
+.floating-btn--zalo {
+  background: #0068ff;
+}
+
+.btn-icon-zalo {
+  font-weight: 900;
+  font-size: 0.85rem;
+  letter-spacing: -0.5px;
+}
+
+/* Nút Back to Top */
+.floating-btn--top {
+  background: #121211;
+  width: 44px;
+  height: 44px;
+  font-size: 0.9rem;
+}
+
+/* Keyframes Animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes phone-shake {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50%, 70% { transform: rotate(-12deg); }
+  20%, 40%, 60%, 80% { transform: rotate(12deg); }
+}
+
+@media (max-width: 640px) {
+  .floating-widget-container {
+    bottom: 18px;
+    right: 18px;
+    gap: 10px;
+  }
+  .floating-btn {
+    width: 46px;
+    height: 46px;
+  }
+}
+.system-widget-container {
+  position: fixed;
+  right: clamp(1rem, 2.5vw, 2.5rem);
+  bottom: clamp(1rem, 2.5vw, 2.5rem);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.widget-btn {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(23, 26, 24, 0.82);
+  color: #f4f5f2;
+  text-decoration: none;
+  box-shadow: 0 16px 38px rgba(12, 17, 14, 0.28);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.25, 1);
+  overflow: hidden;
+}
+
+.widget-btn__icon {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.widget-btn__label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 0;
+  opacity: 0;
+  padding-right: 0;
+  white-space: nowrap;
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.25, 1);
+  pointer-events: none;
+}
+
+.widget-btn__label small {
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #a2a8a4;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.widget-btn__label strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+/* Hover effect: Mở rộng nhãn chữ thanh lịch */
+.widget-btn:hover {
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(28, 33, 30, 0.94);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 45px rgba(12, 17, 14, 0.38);
+}
+
+.widget-btn:hover .widget-btn__label {
+  max-width: 160px;
+  opacity: 1;
+  padding-left: 0.6rem;
+  padding-right: 1.1rem;
+}
+
+/* Tinh chỉnh riêng nút Hotline */
+.widget-btn--call {
+  border-color: rgba(35, 122, 74, 0.4);
+}
+
+.widget-btn--call .widget-btn__icon {
+  background: #1e6b41;
+  color: #ffffff;
+}
+
+.widget-btn--call:hover {
+  border-color: #237a4a;
+}
+
+/* Hiệu ứng Sóng Radar mờ mịn nhã nhặn cho Hotline */
+.radar-pulse {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(42, 158, 96, 0.8);
+  pointer-events: none;
+  animation: studioRadar 2.6s infinite cubic-bezier(0.1, 0.7, 0.1, 1);
+}
+
+.radar-pulse.delay {
+  animation-delay: 1.3s;
+}
+
+/* Tinh chỉnh riêng nút Zalo */
+.widget-btn--zalo {
+  border-color: rgba(0, 104, 255, 0.35);
+}
+
+.widget-btn--zalo .widget-btn__icon {
+  background: #0052cc;
+  color: #ffffff;
+}
+
+.widget-btn--zalo:hover {
+  border-color: #0068ff;
+}
+
+/* Nút Back to Top */
+.widget-btn--top {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px) scale(0.9);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+.widget-btn--top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.widget-btn--top .widget-btn__icon {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.widget-btn--top:hover .widget-btn__icon {
+  transform: translateY(-2px);
+  color: #69a9f8;
+}
+
+/* Keyframe Sóng Radar Studio */
+@keyframes studioRadar {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Responsive trên thiết bị di động */
+@media (max-width: 640px) {
+  .system-widget-container {
+    right: 1rem;
+    bottom: 1.25rem;
+  }
+  
+  /* Trên mobile luôn mở nhẹ nhãn Hotline để khách bấm trực tiếp */
+  .widget-btn--call .widget-btn__label {
+    max-width: 150px;
+    opacity: 1;
+    padding-left: 0.5rem;
+    padding-right: 0.9rem;
+  }
+}
+.branches-editor-section {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.branches-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.branches-editor-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.branch-editor-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.25rem;
+  background: #fcfdfe;
+}
+
+.branch-editor-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: .75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.branch-editor-card__head strong {
+  font-size: .92rem;
+  color: var(--ink);
+}
+
+/* Public Footer Branch List Styling */
+.footer-col--branches {
+  grid-column: span 2;
+}
+
+.footer-branch-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem 2rem;
+}
+
+.footer-branch-item {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.footer-branch-item strong {
+  color: #ffffff;
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.footer-branch-item p {
+  margin: 0;
+  color: #929b94;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.branch-phone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .2rem;
+  color: #68a9ff !important;
+  font-size: .8rem;
+  font-weight: 650;
+  transition: opacity .2s ease;
+}
+
+.branch-phone-link:hover {
+  opacity: .85;
+  text-decoration: underline;
+}
+
+.hotline-icon-svg {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eaf2fd;
+  color: var(--blue);
+}
+
+.footer-hotline-card small {
+  display: block;
+  margin-top: .3rem;
+  color: #7b857e;
+  font-size: .72rem;
+}
+
+@media (max-width: 900px) {
+  .footer-col--branches {
+    grid-column: span 1;
+  }
+  .footer-branch-list {
+    grid-template-columns: 1fr;
+  }
+}
+.widget-btn--zalo {
+  border-color: #0068ff !important;
+  background: #0068ff !important;
+  box-shadow: 0 8px 22px rgba(0, 104, 255, 0.4) !important;
+}
+
+/* Loại bỏ lớp nền tối bị lồng bên trong icon Zalo */
+.widget-btn--zalo .widget-btn__icon,
+.widget-btn__icon--zalo {
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+/* Style cho Icon Zalo Vector */
+.zalo-official-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+}
+
+/* Hiệu ứng phóng to thu nhỏ nhịp nhàng */
+.widget-btn--zalo-pulse {
+  animation: zaloBreathing 2.4s infinite ease-in-out;
+}
+
+@keyframes zaloBreathing {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 8px 22px rgba(0, 104, 255, 0.35);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 14px 30px rgba(0, 104, 255, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 22px rgba(0, 104, 255, 0.35);
+  }
+}
+.brand-logo-img,
+.public-header .brand img,
+.public-footer .brand img {
+  height: 38px !important;
+  max-height: 38px !important;
+  width: auto !important;
+  max-width: 180px !important;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
+  border-radius: 8px;
+  display: block;
+}
+
+.public-footer .brand-logo-img,
+.public-footer .brand img {
+  height: 34px !important;
+  max-height: 34px !important;
+}
+
+.public-header nav a::after,
+.public-header nav a.active::after {
+  display: none !important;
+  content: none !important;
+}
+
+.public-header nav a {
+  border-bottom: none !important;
+}
+
+.public-header nav a.active {
+  border-bottom: 2px solid #0f172a !important; /* Chỉ giữ 1 đường gạch chân duy nhất */
+}
+
+/* 2. SỬA LỖI CHỮ THƯƠNG HIỆU BỊ TUỘT XUỐNG DƯỚI LOGO */
+.public-header .brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.65rem !important;
+  position: relative !important;
+}
+
+.public-header .brand small,
+.public-header .brand-text small {
+  position: static !important; /* Ép về luồng Flexbox tự nhiên, bỏ vị trí absolute cũ */
+  top: auto !important;
+  left: auto !important;
+  display: block !important;
+  margin-top: 2px !important;
+  line-height: 1 !important;
+}
+
+.public-header .brand-text {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.public-header .brand-text strong {
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+
+/* 3. XÓA SẠCH ĐƯỜNG GẠCH NGANG DƯ THỪA Ở FOOTER */
+.public-footer__grid {
+  border-bottom: none !important;
+  padding-bottom: 2rem !important;
+}
+
+.public-footer small,
+.public-footer p,
+.public-footer__brand,
+.footer-hotline-card {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+.public-footer__bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  margin-top: 2rem !important;
+  padding-top: 1.25rem !important;
+}
+.public-footer__brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+.public-footer__brand .brand-title-wrap,
+.public-footer__brand .brand-text {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+.public-footer__brand strong {
+  margin: 0 !important;
+  line-height: 1.1 !important;
+}
+
+.public-footer__brand small {
+  grid-column: auto !important;
+  padding-top: 0 !important;
+  border-top: none !important;
+  margin-top: 2px !important;
+  display: block !important;
+  line-height: 1.2 !important;
+}
+.public-header .brand-text small,
+.public-header .brand small {
+  font-size: 0.72rem !important;            
+  font-weight: 600 !important;             
+  color: #475569 !important;                
+  letter-spacing: 0.08em !important;       
+  margin-top: 2px !important;
+  display: block !important;
+}
+.studio-hero {
+  --pointer-x: 0;
+  --pointer-y: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(500px, 1.08fr);
+  gap: clamp(2rem, 4vw, 5rem);
+  align-items: center;
+  min-height: auto !important; /* Bỏ ép chiều cao 900px để không bị tụt nội dung */
+  padding-top: clamp(1.25rem, 2.5vw, 2.25rem) !important; /* Đã thu gọn đệm trên sát Header */
+  padding-bottom: clamp(3.5rem, 6vw, 6rem);
+  background: radial-gradient(circle at 72% 42%, rgba(255,255,255,.95), transparent 29%), linear-gradient(112deg, #f5f3ee 0 47%, #e9ebe8 100%);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Quầng sáng & Nền hạt di chuyển theo con trỏ chuột */
+.studio-hero::before {
+  display: block !important;
+  position: absolute;
+  z-index: -1;
+  top: 10%;
+  right: 1%;
+  width: min(50vw, 760px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(39,48,43,.11);
+  border-radius: 50%;
+  content: "";
+  transform: translate(calc(var(--pointer-x) * -5px), calc(var(--pointer-y) * -5px));
+  transition: transform .3s ease-out;
+}
+
+.studio-hero::after {
+  display: block !important;
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  opacity: .055;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  content: "";
+  pointer-events: none;
+}
+
+.studio-hero__grid {
+  display: block !important;
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: .26;
+  background-image: linear-gradient(rgba(36,45,40,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(36,45,40,.08) 1px, transparent 1px);
+  background-size: 86px 86px;
+  mask-image: radial-gradient(circle at 75% 45%, #000, transparent 48%);
+}
+
+.studio-hero__copy {
+  position: relative;
+  z-index: 4;
+  max-width: 710px;
+  animation: studioHeroCopy .9s cubic-bezier(.2,.75,.25,1) both !important;
+}
+
+.studio-hero__copy h1 {
+  margin: 1rem 0 1.4rem;
+  font-size: clamp(3.2rem, 5.5vw, 6.2rem);
+  font-weight: 600;
+  line-height: .93;
+  letter-spacing: -.068em;
+  text-wrap: balance;
+}
+
+.studio-hero__copy h1 em {
+  display: block;
+  margin-top: .08em;
+  color: #6f7771;
+  font-style: normal;
+  font-weight: 390;
+}
+
+.studio-hero__copy > p {
+  max-width: 590px;
+  margin-bottom: 2.1rem;
+  color: #656b66;
+  font-size: clamp(1rem, 1.2vw, 1.12rem);
+  line-height: 1.72;
+}
+
+.studio-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+}
+
+.studio-hero__note {
+  display: flex;
+  gap: .8rem;
+  align-items: center;
+  margin-top: 2.3rem;
+  color: #777d78;
+  font-size: .75rem;
+}
+
+.studio-hero__note span {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #65726a;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(83,99,90,.09);
+}
+
+.studio-hero__note p {
+  margin: 0;
+}
+
+/* Khối thiết bị 3D & Khôi phục hiệu ứng xuất hiện */
+.studio-device-scene {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 760px);
+  aspect-ratio: 1 / .96;
+  justify-self: end;
+  transform-style: preserve-3d;
+  animation: studioSceneIn 1.1s cubic-bezier(.2,.75,.25,1) .08s both !important;
+}
+
+.studio-device-scene__halo {
+  display: block !important;
+  position: absolute;
+  inset: 13% 6% 5%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.96), rgba(205,215,210,.38) 46%, transparent 70%);
+  filter: blur(7px);
+  transform: translate(calc(var(--pointer-x) * -8px), calc(var(--pointer-y) * -6px));
+}
+
+.studio-device-scene__orbit {
+  display: block !important;
+  position: absolute;
+  border: 1px solid rgba(46,57,51,.14);
+  border-radius: 50%;
+  transform: rotate(-13deg);
+}
+
+.studio-device-scene__orbit--one {
+  inset: 9% 1% 8%;
+}
+
+.studio-device-scene__orbit--two {
+  inset: 19% 11% 18%;
+  border-style: dashed;
+  opacity: .55;
+}
+
+/* Ảnh thiết bị: Tự động dập dềnh (floating) & xoay nghiêng 3D theo con trỏ chuột */
+.studio-device-scene img {
+  position: relative;
+  z-index: 3;
+  display: block;
+  width: 105%;
+  height: 105%;
+  margin: -2% 0 0 -2%;
+  object-fit: contain;
+  filter: drop-shadow(0 35px 30px rgba(27,35,30,.16));
+  transform: translate(calc(var(--pointer-x) * 9px), calc(var(--pointer-y) * 7px));
+  transition: transform .35s ease-out;
+  animation: studioFloat 8s ease-in-out 1.2s infinite !important;
+}
+
+/* Nhãn thông tin kính mờ di chuyển theo chuột */
+.studio-scene-label {
+  display: block !important;
+  position: absolute;
+  z-index: 5;
+  min-width: 155px;
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 4px;
+  padding: .8rem .9rem;
+  background: rgba(250,250,247,.72);
+  box-shadow: 0 18px 40px rgba(25,32,28,.1);
+  backdrop-filter: blur(16px);
+}
+
+.studio-scene-label span {
+  float: right;
+  color: #8c928e;
+  font-size: .55rem;
+}
+
+.studio-scene-label p {
+  margin: 0 0 .3rem;
+  color: #7b827d;
+  font-size: .55rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.studio-scene-label strong {
+  font-size: .7rem;
+}
+
+.studio-scene-label--top {
+  top: 16%;
+  right: 1%;
+  transform: translate(calc(var(--pointer-x) * 16px), calc(var(--pointer-y) * 12px));
+}
+
+.studio-scene-label--bottom {
+  bottom: 10%;
+  left: 1%;
+  transform: translate(calc(var(--pointer-x) * -14px), calc(var(--pointer-y) * -10px));
+}
+
+.studio-hero__scroll {
+  display: flex !important;
+  position: absolute;
+  bottom: 1.4rem;
+  left: clamp(1.25rem, 5vw, 5rem);
+  gap: .8rem;
+  align-items: center;
+  color: #777d78;
+  font-size: .56rem;
+  font-weight: 720;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.studio-hero__scroll i {
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 1px;
+  background: #777d78;
+}
+
+.studio-hero__scroll i::after {
+  position: absolute;
+  right: 0;
+  bottom: -2px;
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid #777d78;
+  border-bottom: 1px solid #777d78;
+  transform: rotate(-45deg);
+  content: "";
+}
+
+/* Keyframes hiệu ứng */
+@keyframes studioHeroCopy {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes studioSceneIn {
+  from { transform: translateY(32px) scale(.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes studioFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -7px; }
+}
+:root {
+  --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-main);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body, button, input, select, textarea {
+  font-family: var(--font-main);
+}
+
+h1, h2, h3, h4, h5, h6, .studio-home h1, .studio-home h2, .studio-home h3 {
+  font-family: var(--font-display);
+}
+
+/* =============================================================================
+   2. RÀ SOÁT & CĂN TÂM TUYỆT ĐỐI CHO TẤT CẢ NÚT (DEAD-CENTER BUTTON ALIGNMENT)
+   ============================================================================= */
+
+/* Khai báo chuẩn Flexbox căn tâm cho mọi nút bấm */
+button,
+.button,
+.studio-button,
+.header-cta,
+.widget-btn,
+.floating-btn,
+.segmented button,
+.choice-card,
+.choice-fieldset button,
+.intake-choice-row button,
+.brand-choice button,
+.slot-grid button,
+.text-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important; /* Khóa line-height = 1 để triệt tiêu độ lệch baseline */
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+  white-space: nowrap;
+}
+
+/* Căn tâm phần chữ và icon bên trong nút */
+button > *,
+.button > *,
+.studio-button > *,
+.widget-btn > *,
+.floating-btn > * {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Căn chỉnh riêng từng dòng nút phổ biến */
+
+/* Nút chuẩn hệ thống (.button) */
+.button {
+  min-height: 44px;
+  padding: 0 1.35rem !important; /* Chuyển về padding ngang, để Flexbox tự căn dọc */
+}
+
+.button--large {
+  min-height: 52px;
+  padding: 0 1.65rem !important;
+}
+
+/* Nút Studio Landing Page */
+.studio-button {
+  min-height: 50px;
+  padding: 0 1.5rem !important;
+  gap: .65rem !important;
+}
+
+/* Nút CTA trên Header */
+.header-cta, .public-header .header-cta {
+  min-height: 40px;
+  padding: 0 1.15rem !important;
+}
+
+/* Nút dạng Segmented / Tab chọn */
+.segmented button {
+  min-height: 38px;
+  padding: 0 1rem !important;
+}
+
+/* Nút Floating Widget & Hotline / Zalo góc màn hình */
+.floating-btn,
+.widget-btn__icon,
+.hotline-icon-svg {
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+}
+
+.widget-btn {
+  padding: 4px 12px 4px 4px !important;
+}
+
+.widget-btn__label {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+
+/* Nút icon dạng tròn (close, expand, back to top) */
+.expand-icon,
+.dialog-icon,
+.icon-button,
+.widget-btn--top {
+  display: grid !important;
+  place-items: center !important;
+  line-height: 1 !important;
+}
+
+/* Căn lề icon SVG / Font Icon đi kèm trong nút bấm */
+button svg,
+.button svg,
+.studio-button svg,
+button i,
+.button i,
+.studio-button i {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+/* 1. Khung chứa nút nổi: Cấu hình dạng nhộng thu gọn / mở rộng mượt mà */
+.system-widget-container .widget-btn {
+  position: relative !important;
+  pointer-events: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  max-height: 48px !important;
+  padding: 4px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  transition: width 0.35s cubic-bezier(0.2, 0.8, 0.25, 1),
+              max-width 0.35s cubic-bezier(0.2, 0.8, 0.25, 1),
+              background 0.3s ease,
+              transform 0.25s ease,
+              box-shadow 0.25s ease !important;
+}
+
+/* 2. Căn chính giữa icon tròn 40px ở cạnh trái */
+.system-widget-container .widget-btn__icon {
+  position: relative !important;
+  z-index: 2 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  flex-shrink: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  font-size: 1.2rem !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 3. Nhãn chữ: Mặc định ẩn (thu gọn), rê chuột rê vào xổ ra mượt mà */
+.system-widget-container .widget-btn__label {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  transition: max-width 0.35s cubic-bezier(0.2, 0.8, 0.25, 1),
+              opacity 0.25s ease,
+              padding 0.35s cubic-bezier(0.2, 0.8, 0.25, 1) !important;
+}
+
+.system-widget-container .widget-btn__label small {
+  display: block !important;
+  font-size: 0.58rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.12em !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  line-height: 1.1 !important;
+  text-transform: uppercase !important;
+}
+
+.system-widget-container .widget-btn__label strong {
+  display: block !important;
+  font-size: 0.88rem !important;
+  font-weight: 750 !important;
+  color: #ffffff !important;
+  line-height: 1.1 !important;
+}
+
+/* Khi rê chuột vào: Nút xổ rộng sang bên trái hiển thị đầy đủ thông tin */
+.system-widget-container .widget-btn:hover {
+  transform: translateY(-2px) !important;
+}
+
+.system-widget-container .widget-btn:hover .widget-btn__label {
+  max-width: 180px !important;
+  opacity: 1 !important;
+  padding-left: 0.65rem !important;
+  padding-right: 1.1rem !important;
+}
+
+/* 4. Đổ màu nền đặc đồng nhất (Xóa sạch lớp xám đen lòi ra ngoài) */
+
+/* Nút Hotline (Gọi Điện) - Xanh lá cây tươi chuẩn thương hiệu */
+.system-widget-container .widget-btn--call {
+  background: #16a34a !important;
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.4) !important;
+}
+
+.system-widget-container .widget-btn--call:hover {
+  background: #15803d !important;
+  box-shadow: 0 12px 30px rgba(22, 163, 74, 0.55) !important;
+}
+
+/* Hiệu ứng sóng Radar xung quanh nút Gọi Điện */
+.system-widget-container .radar-pulse {
+  position: absolute !important;
+  top: 4px !important;
+  left: 4px !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(255, 255, 255, 0.75) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  animation: studioRadar 3s infinite cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.system-widget-container .radar-pulse.delay {
+  animation-delay: 1.2s !important;
+}
+
+/* Nút Zalo - Xanh dương đặc trưng */
+.system-widget-container .widget-btn--zalo {
+  background: #0068ff !important;
+  box-shadow: 0 8px 24px rgba(0, 104, 255, 0.4) !important;
+}
+
+.system-widget-container .widget-btn--zalo:hover {
+  background: #0056d6 !important;
+  box-shadow: 0 12px 30px rgba(0, 104, 255, 0.55) !important;
+}
+
+/* Nút Cuộn lên đầu trang (Back to Top) */
+.system-widget-container .widget-btn--top {
+  width: 48px !important;
+  height: 48px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  background: #27272a !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(12px) scale(0.9) !important;
+}
+
+.system-widget-container .widget-btn--top.is-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+.system-widget-container .widget-btn--top:hover {
+  background: #18181b !important;
+  transform: translateY(-2px) scale(1.05) !important;
+}
+
+.system-widget-container .widget-btn--top .widget-btn__icon {
+  background: transparent !important;
+}
+
+/* Animation sóng Radar */
+@keyframes studioRadar {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Tự động hiển thị sẵn nhãn Call trên thiết bị di động để khách bấm trực tiếp */
+@media (max-width: 640px) {
+  .system-widget-container .widget-btn--call .widget-btn__label {
+    max-width: 150px !important;
+    opacity: 1 !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.9rem !important;
+  }
+}

@@ -40,6 +40,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,7 +84,6 @@ public class InventoryService {
         return new StockInResponse(mapper.map(lot), mapper.map(stock), mapper.map(movement));
     }
 
-    /** Compatibility helper for isolated fixtures; HTTP stock-in always requires explicit lot data. */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public BranchInventoryResponse stockIn(StockAdjustmentRequest r) {
         var result = stockIn(new StockInRequest("TEST-" + java.util.UUID.randomUUID(), r.branchId(), r.partId(),
@@ -211,8 +212,9 @@ public class InventoryService {
         return transactions.findAllByPart_IdOrderByCreatedAtDesc(partId).stream().map(mapper::map).toList();
     }
 
-    public List<InventoryTransactionResponse> searchTransactions(Long branchId, Long partId,
-                                                                 InventoryTransactionType type, LocalDate from, LocalDate to, String code) {
+    public Page<InventoryTransactionResponse> searchTransactions(Long branchId, Long partId,
+                                                                 InventoryTransactionType type, LocalDate from, LocalDate to, String code,
+                                                                 Pageable pageable) {
         if (branchId != null) access.get(Branch.class, branchId);
         if (partId != null) access.get(Part.class, partId);
         BusinessRules.require(from == null || to == null || !from.isAfter(to),
@@ -220,23 +222,9 @@ public class InventoryService {
         LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
         LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
         String query = BusinessRules.text(code);
-        return transactions.search(branchId, partId, type, fromTime, toTime).stream()
-                .filter(transaction -> matchesTransactionCode(transaction, query))
-                .map(mapper::map)
-                .toList();
-    }
 
-    private boolean matchesTransactionCode(InventoryTransaction transaction, String query) {
-        if (query == null) return true;
-        String normalized = query.toLowerCase(java.util.Locale.ROOT).trim();
-        String id = transaction.getId().toString();
-        String displayId = String.format("%06d", transaction.getId());
-        String transactionCode = InventoryTransactionResponse.code(transaction.getId(), transaction.getTransactionType())
-                .toLowerCase(java.util.Locale.ROOT);
-        String reference = transaction.getInventoryLot() == null ? "" : transaction.getInventoryLot().getLotCode();
-        return transactionCode.contains(normalized) || id.contains(normalized.replaceAll("^(nhap|xuat|chuyen)_?", ""))
-                || displayId.contains(normalized.replaceAll("^(nhap|xuat|chuyen)_?", ""))
-                || reference.toLowerCase(java.util.Locale.ROOT).contains(query.toLowerCase(java.util.Locale.ROOT));
+        return transactions.search(branchId, partId, type, fromTime, toTime, query, pageable)
+                .map(mapper::map);
     }
 
     public List<InventoryLotResponse> listLots(Long branchId, Long partId) {

@@ -41,18 +41,17 @@ public class ServiceStatusService {
         var old = ticket.getStatus();
         boolean allowed = switch (old) {
             case WAITING_ASSIGNMENT -> next == ServiceTicketStatus.ASSIGNED || next == ServiceTicketStatus.CANCELLED;
-            case ASSIGNED -> next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.CANCELLED;
-            case INSPECTING ->
-                    Set.of(ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.CANCELLED).contains(next);
-            case WAITING_APPROVAL ->
-                    next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.WAITING_HANDOVER;
-            case REPAIRING -> next == ServiceTicketStatus.WAITING_PART || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.WAITING_APPROVAL;
-            case WAITING_PART -> next == ServiceTicketStatus.REPAIRING;
+            case ASSIGNED -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.CANCELLED;
+            case INSPECTING -> Set.of(ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.CANCELLED).contains(next);
+            case WAITING_APPROVAL -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED;
+            case REPAIRING -> next == ServiceTicketStatus.WAITING_PART || next == ServiceTicketStatus.WAITING_APPROVAL || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED;
+            case WAITING_PART -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.CANCELLED;
             case WAITING_HANDOVER -> next == ServiceTicketStatus.HANDED_OVER;
             default -> false;
         };
         if (!allowed) throw new InvalidStateTransitionException(old + " -> " + next);
-        if (next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.REPAIRING) {
+
+        if (next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.INSPECTING) {
             if (old == ServiceTicketStatus.WAITING_PART || old == ServiceTicketStatus.WAITING_APPROVAL) {
                 var wait = currentWait(ticket);
                 BusinessRules.require(wait.getResolvedAt() != null,
@@ -66,10 +65,16 @@ public class ServiceStatusService {
             BusinessRules.require(!assignments.hasOtherActiveTechnicalWork(assignment.getTechnician().getId(), ticket.getId()),
                     "Kỹ thuật viên đang xử lý kỹ thuật một phiếu khác. Hãy hoàn tất hoặc đưa phiếu đó về trạng thái chờ trước khi bắt đầu phiếu này.");
         }
+
         ticket.setStatus(next);
         var eventAt = history(ticket, old, next, actor, note);
-        if (next == ServiceTicketStatus.REPAIRING && ticket.getActualRepairStartedAt() == null) ticket.setActualRepairStartedAt(eventAt);
-        if (next == ServiceTicketStatus.WAITING_HANDOVER && ticket.getActualRepairCompletedAt() == null) ticket.setActualRepairCompletedAt(eventAt);
+
+        if (next == ServiceTicketStatus.REPAIRING && ticket.getActualRepairStartedAt() == null) {
+            ticket.setActualRepairStartedAt(eventAt);
+        }
+        if (next == ServiceTicketStatus.WAITING_HANDOVER && ticket.getActualRepairCompletedAt() == null) {
+            ticket.setActualRepairCompletedAt(eventAt);
+        }
         if (next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED) {
             assignments.findFirstByServiceTicket_IdAndStatus(ticket.getId(), AssignmentStatus.ACTIVE).ifPresent(a -> {
                 a.setStatus(AssignmentStatus.ENDED);

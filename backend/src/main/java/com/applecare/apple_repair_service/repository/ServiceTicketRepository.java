@@ -38,6 +38,7 @@ public interface ServiceTicketRepository extends JpaRepository<ServiceTicket, Lo
 
     List<ServiceTicket> findAllByCustomerDevice_Customer_PhoneOrderByReceivedAtDesc(String phone);
 
+
     @org.springframework.data.jpa.repository.Query("""
             select t from ServiceTicket t
             where (:branchId is null or t.branch.id = :branchId)

@@ -194,8 +194,8 @@ public class ServiceTicketService {
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public ServiceTicketDetailResponse startInspection(Long id, Long userId) {
-        return move(id, userId, ServiceTicketStatus.INSPECTING, null);
+    public ServiceTicketDetailResponse startProcessing(Long id, Long userId) {
+        return move(id, userId, ServiceTicketStatus.REPAIRING, "KTV bấm bắt đầu xử lý ca sửa chữa");
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
@@ -267,13 +267,14 @@ public class ServiceTicketService {
     }
 
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-    public ServiceTicketDetailResponse recordInspection(Long id, RecordInspectionRequest r) {
+    public ServiceTicketDetailResponse recordInspection(Long id, Long userId, RecordInspectionRequest r) {
         rules.validate(r);
         var t = access.lock(ServiceTicket.class, id);
         BusinessRules.require(t.getPaymentStatus() != PaymentStatus.PAID &&
-                (t.getStatus() == ServiceTicketStatus.INSPECTING || t.getStatus() == ServiceTicketStatus.REPAIRING
-                        || t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL), "Chỉ cập nhật phương án khi đang kiểm tra, sửa chữa hoặc chờ liên hệ khách.");
-        var actor = access.get(User.class, r.inspectedByUserId());
+                (t.getStatus() == ServiceTicketStatus.ASSIGNED || t.getStatus() == ServiceTicketStatus.REPAIRING
+                        || t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL), "Chỉ cập nhật phương án khi phiếu đang xử lý hoặc chờ khách.");
+
+        var actor = access.get(User.class, userId);
         var current = new ArrayList<>(repairItems.findAllByServiceTicket_Id(id));
         boolean changedScope = current.stream().anyMatch(old -> old.getApprovalStatus() == ApprovalStatus.APPROVED
                 && r.items().stream().noneMatch(request -> old.getServiceCatalogItem().getId().equals(request.serviceCatalogItemId())))
@@ -282,11 +283,13 @@ public class ServiceTicketService {
                         && old.getServiceCatalogItem().getId().equals(request.serviceCatalogItemId())
                         && Objects.equals(old.getWarrantySourceItem() == null ? null : old.getWarrantySourceItem().getId(), request.warrantySourceItemId())
                         && sameAmount(old.getFinalPrice(), request.finalPrice())));
+
         boolean requiresApproval = r.requiresCustomerApproval();
         if (!requiresApproval && (changedScope || t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL))
             BusinessRules.require(r.confirmationMethod() != null, "Vui lòng ghi nhận khách đã đồng ý trực tiếp, qua điện thoại hoặc trong phạm vi cho phép trước.");
         if (r.confirmationMethod() == com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED)
             BusinessRules.required(t.getAuthorizedScope(), "Phiếu chưa có phạm vi khách cho phép trước");
+
         var retained = new HashSet<RepairItem>();
         var selected = new HashSet<Long>();
         for (var request : r.items()) {
@@ -341,7 +344,7 @@ public class ServiceTicketService {
                 old.setApprovalNote("Superseded by inspection plan");
             }
         t.setInspectionResult(r.inspectionResult().trim());
-        t.setInspectedBy(actor);
+
         var next = requiresApproval ? ServiceTicketStatus.WAITING_APPROVAL : ServiceTicketStatus.REPAIRING;
         if (t.getStatus() != next) statuses.changeStatus(t, next, actor, requiresApproval ? "Chờ liên hệ khách hàng" : "Đã ghi nhận phương án và xác nhận nội bộ");
         statuses.planChanged(t, actor);
