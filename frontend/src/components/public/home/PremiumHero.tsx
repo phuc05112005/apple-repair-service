@@ -14,7 +14,7 @@ export function PremiumHero() {
   return <section className="studio-hero section-pad" onPointerMove={moveScene}>
     <div className="studio-hero__grid" aria-hidden="true" />
     <div className="studio-hero__copy">
-      <span className="studio-kicker"><i /> Dịch vụ kỹ thuật độc lập</span>
+      <span className="studio-kicker"><i /> Dịch vụ sửa chữa các thiết bị nhà táo<i /></span>
       <h1>Dịch vụ sửa chữa thiết bị Apple, <em>chuyên nghiệp trong từng bước xử lý.</em></h1>
       <p>Chọn đúng thiết bị, xem phương án đang có và theo dõi toàn bộ hành trình sửa chữa trong một trải nghiệm liền mạch.</p>
       <div className="studio-hero__actions">

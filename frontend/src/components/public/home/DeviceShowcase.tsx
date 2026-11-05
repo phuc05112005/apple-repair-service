@@ -8,7 +8,6 @@ export function DeviceShowcase({ query }: { query: DeviceQuery }) {
   return <section className="studio-devices section-pad studio-reveal" id="supported-devices">
     <header className="studio-section-heading studio-section-heading--split">
       <div><span className="studio-kicker">Thiết bị được hỗ trợ</span><h2>Những thiết bị quen thuộc.<br />Một chuẩn chăm sóc thống nhất.</h2></div>
-      <p>Tên thiết bị và đường dẫn được lấy trực tiếp từ danh mục đang hoạt động.</p>
     </header>
     {query.isLoading ? <div className="studio-loading">Đang tải thiết bị…</div> : query.isError ? <div className="studio-error">Không thể tải danh sách thiết bị.</div> : <div className="studio-device-grid">{query.data?.map((device, index) => {
       const kind = deviceKind(device.name)
