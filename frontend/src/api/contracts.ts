@@ -71,6 +71,13 @@ export interface PublicRepairItemResponse {
   name: string; approvalStatus: ApprovalStatus; finalPrice: number | null
   warrantyStartDate: string | null; warrantyEndDate: string | null; warrantyDecision: WarrantyDecision; warrantyRemedy: WarrantyRemedy | null; warrantySourceItemId: number | null
 }
+export interface PublicTechnicianResponse {
+  technicianId?: number
+  name: string
+  phone?: string
+  role?: string
+}
+
 export interface PublicTicketResponse {
   ticketCode: string
   status: ServiceTicketStatus
@@ -88,6 +95,11 @@ export interface PublicTicketResponse {
   hasFeedback?: boolean
   repairItems: PublicRepairItemResponse[]
   timing?: TicketTimingResponse
+  
+  // Bổ sung các trường KTV:
+  technicianName?: string
+  technicianPhone?: string
+  technicians?: PublicTechnicianResponse[] // Chứa toàn bộ danh sách KTV nếu ca đó có chuyển giao/phối hợp
 }
 export interface WarrantyEligibilityResponse {
   repairItemId: number; warrantyStartDate: string | null; warrantyEndDate: string | null

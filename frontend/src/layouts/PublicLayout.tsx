@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useSystemSettings } from '../hooks/useSystemSettings'
 import { FloatingContactWidget } from '../components/FloatingContactWidget'
 
@@ -11,8 +11,14 @@ const navLinks = [
 
 export function PublicLayout() {
   const { settings } = useSystemSettings()
+  const { pathname } = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({})
+
+  // Tự động cuộn lên đầu trang khi chuyển Route
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   useEffect(() => {
     const update = () => setScrolled(window.scrollY > 18)

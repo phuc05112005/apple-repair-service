@@ -1,6 +1,8 @@
 package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.dto.publicapi.*;
+import com.applecare.apple_repair_service.dto.response.PublicTechnicianResponse;
+import com.applecare.apple_repair_service.dto.response.PublicTicketResponse;
 import com.applecare.apple_repair_service.dto.response.WarrantyEligibilityResponse;
 import com.applecare.apple_repair_service.entity.*;
 import com.applecare.apple_repair_service.enums.*;
@@ -9,6 +11,7 @@ import com.applecare.apple_repair_service.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -26,10 +29,10 @@ public class PublicQueryService {
     private final AppointmentServiceItemRepository bookedItems;
     private final ServiceTicketRepository tickets;
     private final RepairItemRepository repairItems;
+    private final AssignmentRepository assignmentRepository;
     private final DomainAccess access;
     private final SystemSettingService settings;
     private final WarrantyService warranties;
-    private final WarrantyPolicy warrantyPolicy;
 
     public List<PublicNamedResponse> deviceTypes() {
         return types.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE).stream()
@@ -98,22 +101,33 @@ public class PublicQueryService {
         var total = items.stream().filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
                 .map(RepairItem::getFinalPrice).filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        var technicians = assignmentRepository.findAllByServiceTicket_IdOrderByAssignedAtAsc(ticket.getId()).stream()
+                .map(a -> new PublicTechnicianResponse(
+                        a.getTechnician().getId(),
+                        a.getTechnician().getFullName(),
+                        a.getTechnician().getPhone(),
+                        a.getStatus().name()
+                )).toList();
+
         return new PublicTicketResponse(ticket.getTicketCode(), ticket.getCustomerDevice().getDeviceModel().getName(),
                 ticket.getBranch().getName(), ticket.getStatus(), ticket.getPaymentStatus(), total,
                 ticket.getReceivedAt(), ticket.getActualRepairStartedAt(), ticket.getEstimatedCompletionAt(),
                 ticket.getEstimatedDurationMinutes(), ticket.getHandedOverAt(), items.stream().map(i -> {
-                    var catalogItem = i.getServiceCatalogItem();
-                    var part = catalogItem.getPart();
-                    return new PublicRepairItemResponse(i.getId(), catalogItem.getDeviceModel().getDeviceType().getId(), catalogItem.getDeviceModel().getId(),
-                            catalogItem.getServiceIssue().getId(), catalogItem.getId(), catalogItem.getServiceType().getCode(),
-                            catalogItem.getServiceType().getName(), part == null ? null : part.getId(),
-                            part == null ? null : part.getName(), part == null ? null : part.getBrand(),
-                            part == null ? null : part.getVariant(), i.getItemNameSnapshot(), i.getApprovalStatus(),
-                            i.getFinalPrice(), i.getWarrantyStartDate(), i.getWarrantyEndDate(), i.getWarrantyDecision(),
-                            i.getWarrantyRemedy() != null ? i.getWarrantyRemedy() : catalogItem.getWarrantyRemedy(),
-                            i.getWarrantySourceItem() == null ? null : i.getWarrantySourceItem().getId());
-                }).toList());
+            var catalogItem = i.getServiceCatalogItem();
+            var part = catalogItem.getPart();
+            return new PublicRepairItemResponse(i.getId(), catalogItem.getDeviceModel().getDeviceType().getId(), catalogItem.getDeviceModel().getId(),
+                    catalogItem.getServiceIssue().getId(), catalogItem.getId(), catalogItem.getServiceType().getCode(),
+                    catalogItem.getServiceType().getName(), part == null ? null : part.getId(),
+                    part == null ? null : part.getName(), part == null ? null : part.getBrand(),
+                    part == null ? null : part.getVariant(), i.getItemNameSnapshot(), i.getApprovalStatus(),
+                    i.getFinalPrice(), i.getWarrantyStartDate(), i.getWarrantyEndDate(), i.getWarrantyDecision(),
+                    i.getWarrantyRemedy() != null ? i.getWarrantyRemedy() : catalogItem.getWarrantyRemedy(),
+                    i.getWarrantySourceItem() == null ? null : i.getWarrantySourceItem().getId());
+        }).toList(),
+                technicians);
     }
+
     public WarrantyEligibilityResponse eligibility(Long itemId, String phone) {
         var item = access.get(RepairItem.class, itemId);
         requireOwner(item.getServiceTicket(), phone);

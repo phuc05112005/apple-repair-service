@@ -29,8 +29,7 @@ const MasterDataPage = safeLazy<{ initial?: string; grouped?: boolean }>(() => i
 const UsersPage = safeLazy(() => import('../pages/internal/admin/UsersPage'), 'UsersPage')
 const InventoryPage = safeLazy(() => import('../pages/internal/admin/OperationsPages'), 'InventoryPage')
 const SlotsPage = safeLazy(() => import('../pages/internal/admin/OperationsPages'), 'SlotsPage')
-const SchedulesPage = safeLazy(() => import('../pages/internal/admin/OperationsPages'), 'SchedulesPage')
-
+const SchedulesPage = safeLazy(() => import('../pages/internal/admin/SchedulesPage'), 'SchedulesPage')
 export function App() {
   return (
     <Suspense fallback={<div className="route-loading"><LoadingState label="Đang mở màn hình…" /></div>}>

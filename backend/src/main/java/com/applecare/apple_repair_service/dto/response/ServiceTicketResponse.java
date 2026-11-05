@@ -6,6 +6,7 @@ import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ServiceTicketResponse(
         Long id,
@@ -27,5 +28,6 @@ public record ServiceTicketResponse(
         LocalDateTime receivedAt,
         LocalDateTime updatedAt,
         String authorizedScope,
-        TicketTimingResponse timing
+        TicketTimingResponse timing,
+        List<PublicTechnicianResponse> technicians
 ) {}
