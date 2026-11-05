@@ -52,9 +52,37 @@ public class ServiceTicketService {
         if (total.signum() > 0)
             BusinessRules.require(t.getPaymentStatus() == PaymentStatus.PAID, "Positive total must be paid before handover");
         else if (t.getPaymentStatus() != PaymentStatus.PAID) payments.settleZero(t);
+
         var actor = access.get(User.class, r.handedOverByUserId());
+        var now = LocalDateTime.now(clock);
         t.setHandedOverBy(actor);
-        t.setHandedOverAt(LocalDateTime.now(clock));
+        t.setHandedOverAt(now);
+
+        // --- CẬP NHẬT: Tự động tính & lưu hạn bảo hành khi bàn giao máy cho khách ---
+        var handoverDate = now.toLocalDate();
+        var items = repairItems.findAllByServiceTicket_Id(id);
+        for (var item : items) {
+            if (item.getApprovalStatus() != ApprovalStatus.APPROVED) continue;
+
+            // Trường hợp 1: Hạng mục đi bảo hành -> Giữ nguyên hạn bảo hành của phiếu gốc
+            if (item.getWarrantySourceItem() != null && item.getWarrantyDecision() == WarrantyDecision.APPROVED) {
+                item.setWarrantyStartDate(item.getWarrantySourceItem().getWarrantyStartDate());
+                item.setWarrantyEndDate(item.getWarrantySourceItem().getWarrantyEndDate());
+                repairItems.save(item);
+                continue;
+            }
+
+            // Trường hợp 2: Dịch vụ/linh kiện mới -> Ngày bắt đầu = Ngày bàn giao, Ngày kết thúc = Ngày bàn giao + warrantyDays
+            if (item.getServiceCatalogItem() != null
+                    && item.getServiceCatalogItem().getWarrantyDays() != null
+                    && item.getServiceCatalogItem().getWarrantyDays() > 0) {
+                int days = item.getServiceCatalogItem().getWarrantyDays();
+                item.setWarrantyStartDate(handoverDate);
+                item.setWarrantyEndDate(handoverDate.plusDays(days));
+                repairItems.save(item);
+            }
+        }
+
         statuses.changeStatus(t, ServiceTicketStatus.HANDED_OVER, actor, "Handed over");
         return detail(t);
     }
@@ -381,12 +409,14 @@ public class ServiceTicketService {
                 if (item.getWarrantyDecision() == WarrantyDecision.APPROVED) {
                     item.setWarrantyStartDate(item.getWarrantySourceItem().getWarrantyStartDate());
                     item.setWarrantyEndDate(item.getWarrantySourceItem().getWarrantyEndDate());
+                    repairItems.save(item); // Thêm save
                     continue;
                 }
             }
             if (item.getServiceCatalogItem().getWarrantyDays() > 0) {
                 item.setWarrantyStartDate(today);
                 item.setWarrantyEndDate(today.plusDays(item.getServiceCatalogItem().getWarrantyDays()));
+                repairItems.save(item); // Thêm save
             }
         }
         statuses.changeStatus(t, ServiceTicketStatus.WAITING_HANDOVER, access.get(User.class, userId), "Repair finished");

@@ -3,6 +3,7 @@ package com.applecare.apple_repair_service.controller;
 import com.applecare.apple_repair_service.dto.publicapi.*;
 import com.applecare.apple_repair_service.dto.request.CreateAppointmentRequest;
 import com.applecare.apple_repair_service.dto.response.*;
+import com.applecare.apple_repair_service.dto.response.PublicTicketResponse; // Import đích danh để sửa lỗi trùng lặp
 import com.applecare.apple_repair_service.service.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -31,8 +32,8 @@ public class PublicController {
     public List<PublicNamedResponse> serviceIssues(@RequestParam(required = false) @Positive Long deviceTypeId) { return queries.serviceIssues(deviceTypeId); }
     @GetMapping("/service-catalog-items")
     public List<PublicCatalogResponse> catalog(@RequestParam(required = false) @Positive Long deviceModelId,
-            @RequestParam(required = false) @Positive Long serviceIssueId,
-            @RequestParam(required = false) @Positive Long serviceTypeId) {
+                                               @RequestParam(required = false) @Positive Long serviceIssueId,
+                                               @RequestParam(required = false) @Positive Long serviceTypeId) {
         return queries.catalog(deviceModelId, serviceIssueId, serviceTypeId);
     }
     @GetMapping("/branches")
@@ -53,7 +54,7 @@ public class PublicController {
     }
     @GetMapping("/service-tickets/lookup")
     public List<PublicTicketResponse> tickets(@RequestParam(required=false) @Size(max = 255) String phone,
-                                               @RequestParam(required=false) @Size(max = 255) String ticketCode) {
+                                              @RequestParam(required=false) @Size(max = 255) String ticketCode) {
         return queries.tickets(phone, ticketCode);
     }
     @GetMapping("/warranties/eligibility")

@@ -2322,120 +2322,6 @@ h1, h2, h3, h4, h5, h6, .studio-home h1, .studio-home h2, .studio-home h3 {
   font-family: var(--font-display);
 }
 
-/* =============================================================================
-   2. RÀ SOÁT & CĂN TÂM TUYỆT ĐỐI CHO TẤT CẢ NÚT (DEAD-CENTER BUTTON ALIGNMENT)
-   ============================================================================= */
-
-/* Khai báo chuẩn Flexbox căn tâm cho mọi nút bấm */
-button,
-.button,
-.studio-button,
-.header-cta,
-.widget-btn,
-.floating-btn,
-.segmented button,
-.choice-card,
-.choice-fieldset button,
-.intake-choice-row button,
-.brand-choice button,
-.slot-grid button,
-.text-action {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-  line-height: 1 !important; /* Khóa line-height = 1 để triệt tiêu độ lệch baseline */
-  vertical-align: middle !important;
-  box-sizing: border-box !important;
-  white-space: nowrap;
-}
-
-/* Căn tâm phần chữ và icon bên trong nút */
-button > *,
-.button > *,
-.studio-button > *,
-.widget-btn > *,
-.floating-btn > * {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  line-height: 1 !important;
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-/* Căn chỉnh riêng từng dòng nút phổ biến */
-
-/* Nút chuẩn hệ thống (.button) */
-.button {
-  min-height: 44px;
-  padding: 0 1.35rem !important; /* Chuyển về padding ngang, để Flexbox tự căn dọc */
-}
-
-.button--large {
-  min-height: 52px;
-  padding: 0 1.65rem !important;
-}
-
-/* Nút Studio Landing Page */
-.studio-button {
-  min-height: 50px;
-  padding: 0 1.5rem !important;
-  gap: .65rem !important;
-}
-
-/* Nút CTA trên Header */
-.header-cta, .public-header .header-cta {
-  min-height: 40px;
-  padding: 0 1.15rem !important;
-}
-
-/* Nút dạng Segmented / Tab chọn */
-.segmented button {
-  min-height: 38px;
-  padding: 0 1rem !important;
-}
-
-/* Nút Floating Widget & Hotline / Zalo góc màn hình */
-.floating-btn,
-.widget-btn__icon,
-.hotline-icon-svg {
-  display: grid !important;
-  place-items: center !important;
-  padding: 0 !important;
-}
-
-.widget-btn {
-  padding: 4px 12px 4px 4px !important;
-}
-
-.widget-btn__label {
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  align-items: flex-start !important;
-}
-
-/* Nút icon dạng tròn (close, expand, back to top) */
-.expand-icon,
-.dialog-icon,
-.icon-button,
-.widget-btn--top {
-  display: grid !important;
-  place-items: center !important;
-  line-height: 1 !important;
-}
-
-/* Căn lề icon SVG / Font Icon đi kèm trong nút bấm */
-button svg,
-.button svg,
-.studio-button svg,
-button i,
-.button i,
-.studio-button i {
-  flex-shrink: 0;
-  vertical-align: middle;
-}
 /* 1. Khung chứa nút nổi: Cấu hình dạng nhộng thu gọn / mở rộng mượt mà */
 .system-widget-container .widget-btn {
   position: relative !important;
@@ -2619,4 +2505,78 @@ button i,
     padding-left: 0.5rem !important;
     padding-right: 0.9rem !important;
   }
+}
+
+/* =============================================================================
+   SỬA LỖI KHỐI USER SIDEBAR (ÉP HIỂN THỊ THÀNH 2 DÒNG DỌC)
+   ============================================================================= */
+
+/* Cấu trúc Grid cho Nút User (Avatar + Khối thông tin) */
+.sidebar-user {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) !important;
+  gap: 0.75rem !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin-top: auto !important;
+  padding: 0.85rem 0.65rem !important;
+  border: none !important;
+  border-top: 1px solid #29302c !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease !important;
+}
+
+.sidebar-user:hover {
+  background: #25302a !important;
+}
+
+/* Đè quy tắc button > * : Ép khối chứa Tên & Vai trò xếp theo hàng dọc (Column) */
+.sidebar-user > div {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  gap: 3px !important;
+}
+
+/* Avatar dạng hình tròn */
+.sidebar-user > span {
+  display: grid !important;
+  width: 36px !important;
+  height: 36px !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+  color: #0e1411 !important;
+  background: #dfe6e1 !important;
+  font-weight: 800 !important;
+  font-size: 0.88rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Định dạng Tên & Vai trò riêng biệt trên 2 dòng */
+.sidebar-user strong,
+.sidebar-user small {
+  display: block !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.25 !important;
+  margin: 0 !important;
+}
+
+.sidebar-user strong {
+  color: #eef1ef !important;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-user small {
+  color: #7f8b84 !important;
+  font-size: 0.72rem !important;
+  font-weight: 400 !important;
 }

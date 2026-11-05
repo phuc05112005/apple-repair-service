@@ -1,32 +1,6 @@
 package com.applecare.apple_repair_service.mapper;
 
-import com.applecare.apple_repair_service.dto.response.AppointmentDeviceResponse;
-import com.applecare.apple_repair_service.dto.response.AppointmentResponse;
-import com.applecare.apple_repair_service.dto.response.AppointmentServiceItemResponse;
-import com.applecare.apple_repair_service.dto.response.AppointmentSlotResponse;
-import com.applecare.apple_repair_service.dto.response.AssignmentResponse;
-import com.applecare.apple_repair_service.dto.response.BranchInventoryResponse;
-import com.applecare.apple_repair_service.dto.response.BranchResponse;
-import com.applecare.apple_repair_service.dto.response.CustomerDeviceResponse;
-import com.applecare.apple_repair_service.dto.response.CustomerResponse;
-import com.applecare.apple_repair_service.dto.response.DeviceModelResponse;
-import com.applecare.apple_repair_service.dto.response.DeviceTypeResponse;
-import com.applecare.apple_repair_service.dto.response.InventoryLotResponse;
-import com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse;
-import com.applecare.apple_repair_service.dto.response.MlPredictionResponse;
-import com.applecare.apple_repair_service.dto.response.PartResponse;
-import com.applecare.apple_repair_service.dto.response.PartUsageResponse;
-import com.applecare.apple_repair_service.dto.response.RepairItemResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceCatalogItemResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceFeedbackResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceIssueResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceStatusHistoryResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceTicketResponse;
-import com.applecare.apple_repair_service.dto.response.ServiceTypeResponse;
-import com.applecare.apple_repair_service.dto.response.SystemSettingResponse;
-import com.applecare.apple_repair_service.dto.response.TechnicianScheduleResponse;
-import com.applecare.apple_repair_service.dto.response.TransferResponse;
-import com.applecare.apple_repair_service.dto.response.UserResponse;
+import com.applecare.apple_repair_service.dto.response.*;
 import com.applecare.apple_repair_service.entity.Appointment;
 import com.applecare.apple_repair_service.entity.AppointmentDevice;
 import com.applecare.apple_repair_service.entity.AppointmentServiceItem;
@@ -54,12 +28,18 @@ import com.applecare.apple_repair_service.entity.SystemSetting;
 import com.applecare.apple_repair_service.entity.TechnicianSchedule;
 import com.applecare.apple_repair_service.entity.Transfer;
 import com.applecare.apple_repair_service.entity.User;
+import com.applecare.apple_repair_service.repository.AssignmentRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class EntityResponses {
+
+    private final AssignmentRepository assignmentRepository;
 
     public AppointmentResponse map(Appointment e) {
         return new AppointmentResponse(e.getId(), e.getCustomer() == null ? null : e.getCustomer().getId(),
@@ -199,6 +179,17 @@ public class EntityResponses {
     }
 
     public ServiceTicketResponse map(ServiceTicket e) {
+        List<PublicTechnicianResponse> technicians = assignmentRepository
+                .findAllByServiceTicket_IdOrderByAssignedAtAsc(e.getId())
+                .stream()
+                .map(a -> new PublicTechnicianResponse(
+                        a.getTechnician().getId(),
+                        a.getTechnician().getFullName(),
+                        a.getTechnician().getPhone(),
+                        a.getStatus().name()
+                ))
+                .toList();
+
         return new ServiceTicketResponse(
                 e.getId(),
                 e.getTicketCode(),
@@ -219,7 +210,8 @@ public class EntityResponses {
                 e.getReceivedAt(),
                 e.getUpdatedAt(),
                 e.getAuthorizedScope(),
-                com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(e)
+                com.applecare.apple_repair_service.dto.response.TicketTimingResponse.from(e),
+                technicians
         );
     }
 

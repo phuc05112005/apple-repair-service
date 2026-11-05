@@ -38,22 +38,8 @@ export function InternalLayout({ role }: { role: UserRole }) {
 
   return (
     <div className="internal-shell">
-      <button
-        className="mobile-menu-button"
-        aria-label="Mở menu quản trị"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen(value => !value)}
-      >
-        ☰ <span>Menu</span>
-      </button>
+          
       
-      {menuOpen && (
-        <button
-          className="sidebar-scrim"
-          aria-label="Đóng menu"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
 
       {/* Sidebar bên trái */}
       <aside className={`internal-sidebar ${menuOpen ? 'is-open' : ''}`}>

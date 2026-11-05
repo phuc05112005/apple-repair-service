@@ -712,7 +712,7 @@ export function StatisticsPage() {
                               fontSize: '0.75rem', 
                               color: '#64748b'
                             }}>
-                              Mã / Thông số: {item.partDetail}
+                              Loại linh kiện: {item.partDetail}
                             </div>
                           )}
                         </td>
