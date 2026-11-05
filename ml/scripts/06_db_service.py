@@ -1,7 +1,8 @@
 import importlib
+import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-import sys
 
 import joblib
 import pandas as pd
@@ -22,8 +23,14 @@ import __main__
 
 setattr(__main__, "RepairDataPreprocessor", RepairDataPreprocessor)
 
-# 2. Cấu hình kết nối MySQL (Cổng 3307 từ host)
-DB_URL = "mysql+pymysql://root:123456@127.0.0.1:3307/apple_repair_service"
+# 2. Cấu hình kết nối MySQL động (Đọc trực tiếp từ Docker Compose hoặc local fallback)
+DB_HOST = os.getenv("DB_HOST") or os.getenv("MYSQL_HOST") or "127.0.0.1"
+DB_PORT = os.getenv("DB_PORT") or os.getenv("MYSQL_PORT") or "3306"
+DB_NAME = os.getenv("DB_NAME") or os.getenv("MYSQL_DATABASE") or "apple_repair_service"
+DB_USER = os.getenv("DB_USER") or os.getenv("MYSQL_USER") or "root"
+DB_PASSWORD = os.getenv("DB_PASSWORD") or os.getenv("MYSQL_PASSWORD") or "123456"
+
+DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600)
 
 
@@ -71,6 +78,8 @@ def fetch_ticket_features(ticket_id: int) -> pd.DataFrame:
     """)
     with engine.connect() as conn:
         return pd.read_sql(query, conn, params={"ticket_id": ticket_id})
+
+
 def predict_for_technician(ticket_id: int, technician_id: int) -> float:
     """Dự đoán thời lượng sửa chữa CatBoost riêng cho từng KTV, tự động xử lý ID KTV mới."""
     df_features = fetch_ticket_features(ticket_id)
@@ -130,6 +139,7 @@ def predict_for_technician(ticket_id: int, technician_id: int) -> float:
     final_duration = round(max(10.0, base_predicted * tech_factor), 1)
 
     return final_duration
+
 
 def calculate_eta(technician_id: int, predicted_minutes: float):
     """Tính toán thời điểm bắt đầu và hoàn thành dựa trên hàng chờ của KTV."""
