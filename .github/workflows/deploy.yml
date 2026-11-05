@@ -1,0 +1,54 @@
+name: CI/CD Pipeline - Apple Repair Service
+
+on:
+  push:
+    branches: ["dev", "main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  ci-check:
+    name: Test Build (CI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Test Docker Images
+        run: |
+          docker compose build
+
+  cd-deploy:
+    name: Build Push & Deploy EC2 (CD)
+    needs: ci-check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Images to Docker Hub
+        run: |
+          docker compose build
+          docker compose push
+
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/apple-repair-service
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
