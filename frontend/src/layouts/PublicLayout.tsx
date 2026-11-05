@@ -46,23 +46,8 @@ export function PublicLayout() {
     <div className="site-shell">
       <a className="skip-link" href="#main-content">Đi tới nội dung chính</a>
       
-      {/* HEADER */}
-      <header 
-        className={`public-header ${scrolled ? 'public-header--scrolled' : ''}`}
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.75rem 2.5rem',
-          backgroundColor: scrolled ? 'rgba(255, 255, 255, 0.96)' : '#f8fafc',
-          backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
-          transition: 'all 0.2s ease',
-        }}
-      >
+      {/* HEADER PROPERLY STYLED WITHOUT HARCODED INLINE POSITIONS */}
+      <header className={`public-header ${scrolled ? 'public-header--scrolled' : ''}`}>
         {/* LOGO & BRAND TITLE */}
         <NavLink 
           className="brand" 
@@ -75,35 +60,10 @@ export function PublicLayout() {
               src={logoSrc}
               alt="TáoCare"
               className="brand-logo-img"
-              style={{ 
-                height: '38px', 
-                width: '38px', 
-                objectFit: 'contain', 
-                borderRadius: '9px',
-                flexShrink: 0,
-                display: 'block'
-              }}
               onError={() => handleLogoError(logoSrc)}
             />
           ) : (
-            <span 
-              className="brand-mark" 
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '9px',
-                backgroundColor: '#0f172a',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '1.1rem',
-                flexShrink: 0
-              }}
-            >
-              T
-            </span>
+            <span className="brand-mark">T</span>
           )}
           
           <div className="brand-text">
@@ -112,18 +72,8 @@ export function PublicLayout() {
           </div>
         </NavLink>
 
-        {/* 3 ĐIỀU HƯỚNG CĂN GIỮA TRANG */}
-        <nav 
-          aria-label="Điều hướng chính"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2.25rem',
-          }}
-        >
+        {/* 3 ĐIỀU HƯỚNG CHÍNH */}
+        <nav aria-label="Điều hướng chính" className="public-header-nav">
           {navLinks.map(([to, label]) => (
             <NavLink 
               key={to} 
@@ -137,50 +87,20 @@ export function PublicLayout() {
         </nav>
 
         {/* CỤM HOTLINE & NÚT ĐẶT LỊCH */}
-        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', zIndex: 2 }}>
-          <a 
-            href={`tel:${cleanPhone}`} 
-            className="header-hotline"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none' }}
-          >
-            <span 
-              className="hotline-icon-svg"
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                backgroundColor: '#e0f2fe',
-                color: '#0284c7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
+        <div className="header-actions">
+          <a href={`tel:${cleanPhone}`} className="header-hotline">
+            <span className="hotline-icon-svg">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
                 <path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
               </svg>
             </span>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <small style={{ fontSize: '0.625rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Hotline hỗ trợ</small>
-              <strong style={{ fontSize: '0.925rem', color: '#0284c7', fontWeight: 700 }}>{settings.hotline}</strong>
+            <div className="hotline-text-wrap">
+              <small>Hotline hỗ trợ</small>
+              <strong>{settings.hotline}</strong>
             </div>
           </a>
 
-          <NavLink 
-            className="button button--dark header-cta" 
-            to="/booking"
-            style={{
-              backgroundColor: '#0f172a',
-              color: '#ffffff',
-              padding: '0.5rem 1.25rem',
-              borderRadius: '9999px',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              textDecoration: 'none',
-              transition: 'all 0.2s ease',
-            }}
-          >
+          <NavLink className="button button--dark header-cta" to="/booking">
             Đặt lịch ngay
           </NavLink>
         </div>
