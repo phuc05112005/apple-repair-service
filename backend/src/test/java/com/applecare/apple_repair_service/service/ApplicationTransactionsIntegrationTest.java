@@ -90,42 +90,24 @@ class ApplicationTransactionsIntegrationTest {
         }
     }
 
-    @Autowired
-    EntityManager em;
-    @Autowired
-    PlatformTransactionManager manager;
-    @Autowired
-    AppointmentService appointments;
-    @Autowired
-    ServiceTicketService tickets;
-    @Autowired
-    AssignmentService assignments;
-    @Autowired
-    InventoryService inventory;
-    @Autowired
-    CustomerService customers;
-    @Autowired
-    PaymentService payments;
-    @Autowired
-    FeedbackService feedback;
-    @Autowired
-    RepairItemService repairItemService;
-    @Autowired
-    MlPredictionService predictions;
-    @Autowired
-    com.applecare.apple_repair_service.repository.MlPredictionRepository mlPredictionRepository;
-    @Autowired
-    com.applecare.apple_repair_service.repository.UserRepository userRepository;
-    @Autowired
-    com.applecare.apple_repair_service.repository.ServiceInterruptionRepository serviceInterruptions;
-    @Autowired
-    TransferService transfers;
-    @MockitoSpyBean
-    TicketCodeGenerator codeGenerator;
-    @MockitoSpyBean
-    com.applecare.apple_repair_service.repository.DefectivePartReturnRepository defectiveReturns;
+    @Autowired EntityManager em;
+    @Autowired PlatformTransactionManager manager;
+    @Autowired AppointmentService appointments;
+    @Autowired ServiceTicketService tickets;
+    @Autowired AssignmentService assignments;
+    @Autowired InventoryService inventory;
+    @Autowired CustomerService customers;
+    @Autowired PaymentService payments;
+    @Autowired FeedbackService feedback;
+    @Autowired MlPredictionService predictions;
+    @Autowired com.applecare.apple_repair_service.repository.MlPredictionRepository mlPredictionRepository;
+    @Autowired com.applecare.apple_repair_service.repository.UserRepository userRepository;
+    @Autowired TransferService transfers;
+    @MockitoSpyBean TicketCodeGenerator codeGenerator;
+    @MockitoSpyBean com.applecare.apple_repair_service.repository.DefectivePartReturnRepository defectiveReturns;
+
     private String prefix;
-    private Long branchId, otherBranchId, partId, modelId, catalogId, secondCatalogId, customerId, userId, techId, otherTechId, ticketId, itemId, slotId;
+    private Long branchId, otherBranchId, partId, modelId, catalogId, secondCatalogId, userId, techId, otherTechId, ticketId, itemId, slotId;
 
     <T> T tx(Supplier<T> action) {
         var template = new TransactionTemplate(manager);
@@ -293,7 +275,6 @@ class ApplicationTransactionsIntegrationTest {
             customer.setFullName(prefix);
             customer.setPhone(prefix);
             persist(customer);
-            customerId = customer.getId();
             var physical = new CustomerDevice();
             physical.setCustomer(customer);
             physical.setDeviceModel(model);
@@ -354,10 +335,9 @@ class ApplicationTransactionsIntegrationTest {
                     new String[]{"ServiceTimeEstimateHistory", "e.technician.id"},
                     new String[]{"ServiceFeedback", "e.serviceTicket.branch.id"},
                     new String[]{"MlPrediction", "e.serviceTicket.branch.id"},
-                    new String[]{"ServiceInterruption", "e.assignment.serviceTicket.branch.id"},
-                     new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
-                     new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
-                     new String[]{"InventoryLot", "e.branch.id"},
+                    new String[]{"Transfer", "e.fromAssignment.serviceTicket.branch.id"},
+                    new String[]{"InventoryTransaction", "coalesce(e.sourceBranch.id,e.destinationBranch.id)"},
+                    new String[]{"InventoryLot", "e.branch.id"},
                     new String[]{"PartUsage", "e.repairItem.serviceTicket.branch.id"},
                     new String[]{"RepairItem", "e.warrantySourceItem.serviceTicket.branch.id"},
                     new String[]{"ServiceStatusHistory", "e.serviceTicket.branch.id"},
@@ -420,10 +400,9 @@ class ApplicationTransactionsIntegrationTest {
         assertEquals(ServiceTicketStatus.WAITING_ASSIGNMENT, received.history().getFirst().toStatus());
         var id = received.ticket().id();
         assignments.assignTechnician(id, new AssignTechnicianRequest(techId, userId, AssignmentSource.MANUAL_OVERRIDE));
-        tickets.startInspection(id, userId);
-        var revised = tickets.recordInspection(id, new RecordInspectionRequest("Confirmed plan", userId, false,
-                List.of(new InspectionRepairItemRequest(catalogId, new BigDecimal("100"), new BigDecimal("90"), null)),
-                com.applecare.apple_repair_service.enums.ConfirmationMethod.DIRECT, "Khách đồng ý phạm vi mới tại cửa hàng"));
+
+        var revised = tickets.recordInspection(id, new RecordInspectionRequest("Confirmed plan", userId,
+                List.of(new InspectionRepairItemRequest(catalogId, new BigDecimal("100"), new BigDecimal("90"), null))));
         assertEquals(ServiceTicketStatus.REPAIRING, revised.ticket().status());
         inventory.usePart(new UsePartRequest(tickets.getById(id).repairItems().stream().filter(i -> i.approvalStatus() == ApprovalStatus.APPROVED).findFirst().orElseThrow().id(), partId, 1, userId));
         assertEquals(new BigDecimal("90.00"), payments.calculateTicketTotal(id));
@@ -487,53 +466,6 @@ class ApplicationTransactionsIntegrationTest {
         }));
         assertTrue(tx(() -> userRepository.existsById(candidateId)));
         assertTrue(tx(() -> mlPredictionRepository.existsById(prediction.id())));
-    }
-
-    @Test
-    void serviceInterruptionPersistsAssignmentAuditAndRejectsInvalidTimeRange() {
-        var assignment = assignments.assignTechnician(ticketId,
-                new AssignTechnicianRequest(techId, userId, AssignmentSource.MANUAL_OVERRIDE));
-        var startedAt = LocalDateTime.now(TestData.CLOCK).plusMinutes(10);
-        Long interruptionId = tx(() -> {
-            var interruption = new ServiceInterruption();
-            interruption.setAssignment(em.getReference(com.applecare.apple_repair_service.entity.Assignment.class,
-                    assignment.id()));
-            interruption.setStartedAt(startedAt);
-            interruption.setReason(InterruptionReason.EQUIPMENT_FAILURE);
-            interruption.setResponsibilityScope(InterruptionResponsibility.BRANCH);
-            interruption.setSource(InterruptionSource.TECHNICIAN);
-            interruption.setIncidentGroupCode(prefix + "incident");
-            interruption.setNote("Thiết bị kiểm tra tạm ngừng hoạt động");
-            interruption.setRecordedBy(em.getReference(com.applecare.apple_repair_service.entity.User.class,
-                    userId));
-            return serviceInterruptions.saveAndFlush(interruption).getId();
-        });
-
-        tx(() -> {
-            var stored = serviceInterruptions.findById(interruptionId).orElseThrow();
-            assertEquals(assignment.id(), stored.getAssignment().getId());
-            assertEquals(userId, stored.getRecordedBy().getId());
-            assertNull(stored.getEndedAt());
-            assertFalse(stored.isVerified());
-            assertNotNull(stored.getCreatedAt());
-            return null;
-        });
-
-        assertThrows(DataIntegrityViolationException.class, () -> tx(() -> {
-            var invalid = new ServiceInterruption();
-            invalid.setAssignment(em.getReference(com.applecare.apple_repair_service.entity.Assignment.class,
-                    assignment.id()));
-            invalid.setStartedAt(startedAt);
-            invalid.setEndedAt(startedAt.minusMinutes(1));
-            invalid.setReason(InterruptionReason.OTHER);
-            invalid.setResponsibilityScope(InterruptionResponsibility.OTHER);
-            invalid.setSource(InterruptionSource.ADMIN);
-            invalid.setNote("Invalid range test");
-            invalid.setRecordedBy(em.getReference(com.applecare.apple_repair_service.entity.User.class,
-                    userId));
-            serviceInterruptions.saveAndFlush(invalid);
-            return null;
-        }));
     }
 
     @Test
