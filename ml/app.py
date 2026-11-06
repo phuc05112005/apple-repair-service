@@ -1,107 +1,96 @@
+"""API FastAPI cho Spring Boot. GIỮ NGUYÊN endpoint và tên trường JSON; chỉ sửa nội dung cho đúng sự thật."""
 import importlib
 import sys
 import traceback
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
 import uvicorn
+from fastapi import FastAPI, HTTPException
 
-# 1. Định tuyến sys.path
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.append(str(SCRIPT_DIR))
 
-# 2. Import module DB Service
-db_service_module = importlib.import_module("scripts.06_db_service")
+from config.config import FEATURE_CONTRACT_VERSION
+from src.inference import load_bundle
 
-app = FastAPI(title="Apple Repair ML Engine", version="1.0.0")
+db_service = importlib.import_module("scripts.06_db_service")
+app = FastAPI(title="Apple Repair ML Engine", version="2.0.0")
+
+
+def _first(payload: Dict[str, Any], *keys, default=None):
+    for k in keys:
+        if payload.get(k) not in (None, "", []):
+            return payload[k]
+    return default
 
 
 @app.get("/health")
 @app.get("/health/ready")
 def health_check():
-    return {"status": "UP", "service": "Apple Repair ML Service"}
+    try:
+        md = load_bundle().metadata
+        return {"status": "UP", "service": "Apple Repair ML Service", "modelVersion": md["model_version"]}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.get("/api/v1/model-info")
+def model_info():
+    """Thông tin minh bạch về model đang chạy (dùng cho trang quản trị/báo cáo)."""
+    return load_bundle().metadata
 
 
 @app.post("/api/v1/repair-duration/predict-candidates")
 def predict_candidates(payload: Dict[str, Any]):
-    """API dự đoán ML chuẩn 100% với DTO MlCandidateEstimateService của Spring Boot."""
     try:
-        ticket_id = (
-            payload.get("ticketId")
-            or payload.get("serviceTicketId")
-            or payload.get("service_ticket_id")
-        )
-        candidates = (
-            payload.get("candidateTechnicianIds")
-            or payload.get("technicianIds")
-            or payload.get("candidates")
-            or []
-        )
-
+        ticket_id = _first(payload, "ticketId", "serviceTicketId", "service_ticket_id")
+        candidates = _first(payload, "candidateTechnicianIds", "technicianIds", "candidates", default=[])
         if not ticket_id:
-            raise HTTPException(
-                status_code=400, detail="Thiếu ticketId trong request body"
-            )
+            raise HTTPException(status_code=400, detail="Thiếu ticketId trong request body")
+        if not candidates:
+            raise HTTPException(status_code=400, detail="Thiếu danh sách KTV ứng viên")
 
-        candidate_predictions = []
-        for tech_id in candidates:
-            # 1. CatBoost dự đoán thời lượng sửa kỹ thuật riêng cho KTV này (dạng float/double)
-            predicted_minutes = float(
-                db_service_module.predict_for_technician(
-                    ticket_id=int(ticket_id), technician_id=int(tech_id)
-                )
-            )
-
-            # 2. Ghép dữ liệu đúng DTO CandidatePrediction của Java
-            candidate_predictions.append(
-                {
-                    "technicianId": int(tech_id),
-                    "technician_id": int(tech_id),
-                    "predictedTechnicalMinutes": predicted_minutes,
-                    "predicted_technical_minutes": predicted_minutes,
-                    "predictedDurationMinutes": int(round(predicted_minutes)),
-                    "warnings": [],
-                }
-            )
-
-        print(
-            f"✅ [SUCCESS] Trả về dự đoán ML cho {len(candidate_predictions)} KTV ứng viên của Phiếu #{ticket_id}"
-        )
-
-        # 3. Cấu trúc Response khớp hoàn toàn với MlCandidateEstimateService
+        preds = []
+        for p in db_service.predict_candidates(int(ticket_id), [int(t) for t in candidates]):
+            m = float(p["predicted_minutes"])
+            preds.append({
+                "technicianId": p["technician_id"], "technician_id": p["technician_id"],
+                "predictedTechnicalMinutes": m, "predicted_technical_minutes": m,
+                "predictedDurationMinutes": int(round(m)),
+                "predictedLowerMinutes": p["lower_minutes"], "predictedUpperMinutes": p["upper_minutes"],
+                "warnings": p["warnings"],
+            })
+        md = load_bundle().metadata
         return {
-            "ticketId": int(ticket_id),
-            "status": "SUCCESS",
-            "predictions": candidate_predictions,
-            "candidates": candidate_predictions,
+            "ticketId": int(ticket_id), "status": "SUCCESS", "predictions": preds, "candidates": preds,
             "model": {
-                "name": "CatBoostRepairDurationModel",
-                "version": "1.0.0",
-                "status": "ACTIVE",
-                "featureContractVersion": "v1",
-                "syntheticData": False,
-                "productionValidated": True,
+                "name": md["model_name"], "version": md["model_version"], "status": "ACTIVE",
+                "featureContractVersion": FEATURE_CONTRACT_VERSION,
+                "syntheticData": md["synthetic_data"],        # nói thật: dữ liệu hiện là mô phỏng
+                "productionValidated": False,                 # chưa đối chiếu với dữ liệu vận hành thật
+                "testMaeMinutes": round(md["test_metrics"]["MAE"], 2),
+                "intervalHalfWidthMinutes": round(md["interval_halfwidth_minutes"], 1),
             },
         }
+    except HTTPException:
+        raise
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print("\n❌ LỖI TRONG PROCESS PREDICT CANDIDATES:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/v1/predict-and-update")
 def predict_and_update(payload: Dict[str, Any]):
-    ticket_id = (
-        payload.get("ticketId")
-        or payload.get("service_ticket_id")
-        or payload.get("serviceTicketId")
-    )
-    user_id = payload.get("userId") or payload.get("user_id") or 1
-    db_service_module.process_and_update_ticket(
-        ticket_id=int(ticket_id), user_id=int(user_id)
-    )
+    ticket_id = _first(payload, "ticketId", "service_ticket_id", "serviceTicketId")
+    if not ticket_id:
+        raise HTTPException(status_code=400, detail="Thiếu ticketId")
+    user_id = _first(payload, "userId", "user_id", default=1)
+    if not db_service.process_and_update_ticket(int(ticket_id), int(user_id)):
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy phiếu #{ticket_id}")
     return {"status": "success", "serviceTicketId": ticket_id}
 
 
