@@ -9,3 +9,8 @@ mysql-connector-python
 sqlalchemy
 pymysql
 catboost
+xgboost
+lightgbm
+scipy
+matplotlib
+seaborn

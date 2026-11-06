@@ -1,283 +1,173 @@
-import importlib
+"""Bước 6: dịch vụ tích hợp DB. Lấy đặc trưng (CÙNG định nghĩa với lúc train) -> dự đoán -> ETA -> ghi DB.
+Giữ nguyên tên hàm cũ (predict_for_technician, process_and_update_ticket) để app.py/Spring Boot không vỡ."""
 import os
 import sys
 from datetime import datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 
-import joblib
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-# 1. Định tuyến sys.path
-SCRIPT_DIR = Path(__file__).resolve().parent
-ML_DIR = SCRIPT_DIR.parent
+ML_DIR = Path(__file__).resolve().parent.parent
 if str(ML_DIR) not in sys.path:
     sys.path.append(str(ML_DIR))
 
-from config.config import BEST_MODEL_PATH, PREPROCESSOR_PATH
-
-# Import preprocessor module
-preprocessing_module = importlib.import_module("scripts.03_preprocessing")
-RepairDataPreprocessor = preprocessing_module.RepairDataPreprocessor
-import __main__
-
-setattr(__main__, "RepairDataPreprocessor", RepairDataPreprocessor)
-
-# 2. Cấu hình kết nối MySQL động (Đọc trực tiếp từ Docker Compose hoặc local fallback)
-DB_HOST = os.getenv("DB_HOST") or os.getenv("MYSQL_HOST") or "127.0.0.1"
-DB_PORT = os.getenv("DB_PORT") or os.getenv("MYSQL_PORT") or "3306"
-DB_NAME = os.getenv("DB_NAME") or os.getenv("MYSQL_DATABASE") or "apple_repair_service"
-DB_USER = os.getenv("DB_USER") or os.getenv("MYSQL_USER") or "root"
-DB_PASSWORD = os.getenv("DB_PASSWORD") or os.getenv("MYSQL_PASSWORD") or "123456"
-
-DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600)
+from config.config import DEFAULT_ESTIMATE_MINUTES
+from src.inference import (load_bundle, predict_for_technician_ids, predict_mean_over_technicians,
+                           predict_minutes)
+from src.sql_features import services_subquery
 
 
-def get_valid_user_id(conn, target_user_id: int) -> int:
-    """Xác minh user_id có tồn tại trong bảng users không. Nếu không, tự động lấy user_id hợp lệ đầu tiên."""
-    if target_user_id is not None:
-        row = conn.execute(
-            text("SELECT id FROM users WHERE id = :uid"),
-            {"uid": target_user_id},
-        ).fetchone()
-        if row:
-            return row[0]
+@lru_cache(maxsize=1)
+def get_engine():
+    from sqlalchemy import create_engine
+    host = os.getenv("DB_HOST") or os.getenv("MYSQL_HOST") or "127.0.0.1"
+    port = os.getenv("DB_PORT") or os.getenv("MYSQL_PORT") or "3307"
+    name = os.getenv("DB_NAME") or os.getenv("MYSQL_DATABASE") or "apple_repair_service"
+    user = os.getenv("DB_USER") or os.getenv("MYSQL_USER") or "root"
+    pwd = os.getenv("DB_PASSWORD") or os.getenv("MYSQL_PASSWORD") or "123456"
+    return create_engine(f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{name}", pool_pre_ping=True, pool_recycle=3600)
 
-    # Nếu không tìm thấy user_id truyền vào, lấy ID của người dùng đầu tiên trong CSDL
-    first_user = conn.execute(
-        text("SELECT id FROM users ORDER BY id ASC LIMIT 1")
-    ).fetchone()
-    return first_user[0] if first_user else 1
+
+FEATURE_QUERY = text(f"""
+    SELECT
+        st.id AS ticket_id,
+        st.branch_id,
+        cd.device_model_id,
+        COALESCE(a.technician_id, 0) AS technician_id,
+        COALESCE(sv.total_services_count, 0) AS total_services_count,
+        sv.service_issue_ids_list,
+        COALESCE(sv.total_catalog_standard_duration_minutes, 0) AS total_catalog_standard_duration_minutes
+    FROM service_tickets st
+    JOIN customer_devices cd ON st.customer_device_id = cd.id
+    LEFT JOIN assignments a ON st.id = a.service_ticket_id AND a.status = 'ACTIVE'
+    LEFT JOIN ({services_subquery("AND ri.service_ticket_id = :ticket_id")}) sv ON st.id = sv.service_ticket_id
+    WHERE st.id = :ticket_id
+""")
 
 
 def fetch_ticket_features(ticket_id: int) -> pd.DataFrame:
-    """Trích xuất 7 đặc trưng ML từ CSDL MySQL cho phiếu cụ thể."""
-    query = text("""
-        SELECT 
-            st.id AS ticket_id,
-            cd.device_model_id,
-            COALESCE(a.technician_id, 0) AS technician_id,
-            st.branch_id,
-            GROUP_CONCAT(DISTINCT sci.service_issue_id ORDER BY sci.service_issue_id SEPARATOR ', ') AS service_issue_ids_list,
-            COALESCE(SUM(sci.standard_duration_minutes), 0) AS total_catalog_standard_duration_minutes,
-            COUNT(DISTINCT ri.id) AS total_services_count,
-            COALESCE(
-                NULLIF(SUM(pu.quantity), 0),
-                COUNT(DISTINCT sci.part_id),
-                1
-            ) AS total_parts_quantity_used
-        FROM service_tickets st
-        JOIN customer_devices cd ON st.customer_device_id = cd.id
-        LEFT JOIN assignments a ON st.id = a.service_ticket_id AND a.status = 'ACTIVE'
-        LEFT JOIN repair_items ri ON st.id = ri.service_ticket_id AND ri.approval_status != 'REJECTED'
-        LEFT JOIN service_catalog_items sci ON ri.service_catalog_item_id = sci.id
-        LEFT JOIN part_usages pu ON ri.id = pu.repair_item_id AND pu.status = 'ACTIVE'
-        WHERE st.id = :ticket_id
-        GROUP BY st.id, cd.device_model_id, a.technician_id, st.branch_id;
-    """)
-    with engine.connect() as conn:
-        return pd.read_sql(query, conn, params={"ticket_id": ticket_id})
+    with get_engine().connect() as conn:
+        return pd.read_sql(FEATURE_QUERY, conn, params={"ticket_id": ticket_id})
+
+
+def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list[str]:
+    w = []
+    if int(features["total_services_count"].iloc[0]) == 0:
+        w.append("NO_REPAIR_ITEMS")
+    unk = bundle.builder.unknown_values(features.assign(technician_id=technician_id if technician_id is not None
+                                                        else features["technician_id"]))
+    if "technician_id" in unk:
+        w.append("UNKNOWN_TECHNICIAN")
+    if "device_model_id" in unk:
+        w.append("UNKNOWN_DEVICE_MODEL")
+    if "issue_ids" in unk:
+        w.append("UNKNOWN_SERVICE_ISSUE")
+    return w
+
+
+def predict_candidates(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
+    """Dự đoán cho nhiều KTV ứng viên: lấy đặc trưng 1 lần, nạp model 1 lần (bản cũ làm lại cho từng KTV)."""
+    features = fetch_ticket_features(ticket_id)
+    if features.empty:
+        raise LookupError(f"Không tìm thấy phiếu #{ticket_id}")
+    bundle = load_bundle()
+    if int(features["total_services_count"].iloc[0]) == 0:
+        return [{"technician_id": int(t), "predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None,
+                 "upper_minutes": None, "warnings": ["NO_REPAIR_ITEMS"]} for t in candidate_ids]
+    res = predict_for_technician_ids(features, [int(t) for t in candidate_ids], bundle)
+    out = []
+    for _, r in res.iterrows():
+        out.append({"technician_id": int(r["technician_id"]), "predicted_minutes": float(r["predicted_minutes"]),
+                    "lower_minutes": float(r["lower_minutes"]), "upper_minutes": float(r["upper_minutes"]),
+                    "warnings": _warnings(features, bundle, int(r["technician_id"]))})
+    return out
 
 
 def predict_for_technician(ticket_id: int, technician_id: int) -> float:
-    """Dự đoán thời lượng sửa chữa CatBoost riêng cho từng KTV, tự động xử lý ID KTV mới."""
-    df_features = fetch_ticket_features(ticket_id)
-    if df_features.empty:
-        return 45.0
-
-    preprocessor = joblib.load(PREPROCESSOR_PATH)
-    model = joblib.load(BEST_MODEL_PATH)
-
-    # 1. Trích xuất ID KTV đã học trong encoder để tránh lỗi unknown category (mã hóa về 0)
-    try:
-        # Lấy danh sách ID KTV hợp lệ mà Preprocessor đã fit lúc train
-        tech_encoder_categories = preprocessor.encoders[
-            "technician_id"
-        ].categories_[0]
-        if technician_id in tech_encoder_categories:
-            target_tech_id = technician_id
-        else:
-            # Map ID KTV mới vào danh sách ID hợp lệ đã học
-            idx = int(technician_id) % len(tech_encoder_categories)
-            target_tech_id = tech_encoder_categories[idx]
-    except Exception:
-        target_tech_id = technician_id
-
-    df_features["technician_id"] = target_tech_id
-
-    # 2. Làm sạch kiểu dữ liệu
-    df_features["service_issue_ids_list"] = (
-        df_features["service_issue_ids_list"].fillna("0").astype(str)
-    )
-    df_features["device_model_id"] = (
-        df_features["device_model_id"].fillna(0).astype(int)
-    )
-    df_features["branch_id"] = (
-        df_features["branch_id"].fillna(0).astype(int)
-    )
-    df_features["total_catalog_standard_duration_minutes"] = (
-        df_features["total_catalog_standard_duration_minutes"]
-        .fillna(0.0)
-        .astype(float)
-    )
-    df_features["total_services_count"] = (
-        df_features["total_services_count"].fillna(1).astype(int)
-    )
-    df_features["total_parts_quantity_used"] = (
-        df_features["total_parts_quantity_used"].fillna(1).astype(int)
-    )
-
-    # 3. Dự đoán qua CatBoost
-    df_eng = preprocessor.add_domain_ratios(df_features)
-    X_processed = preprocessor.transform(df_eng)
-    base_predicted = float(model.predict(X_processed)[0])
-
-    # 4. Tính toán hệ số biến thiên tốc độ tay nghề KTV (dựa trên ID KTV)
-    # Giúp các KTV thực tế luôn có sự chênh lệch thời gian sửa hợp lý (±5 đến ±15%)
-    tech_factor = 1.0 + (((int(technician_id) * 3) % 7) - 3) * 0.04
-    final_duration = round(max(10.0, base_predicted * tech_factor), 1)
-
-    return final_duration
+    """Tương thích bản cũ: trả về số phút. KHÔNG còn nhân hệ số 'tech_factor' tự bịa:
+    khác biệt giữa các KTV nếu có phải do mô hình học được từ dữ liệu."""
+    return predict_candidates(ticket_id, [technician_id])[0]["predicted_minutes"]
 
 
 def calculate_eta(technician_id: int, predicted_minutes: float):
-    """Tính toán thời điểm bắt đầu và hoàn thành dựa trên hàng chờ của KTV."""
+    """Bắt đầu = max(giờ KTV hoàn thành phiếu cuối trong hàng chờ, bây giờ)."""
     now = datetime.now()
-    if technician_id == 0:
-        estimated_start = now
-    else:
+    start = now
+    if technician_id != 0:
         query = text("""
             SELECT MAX(st.estimated_completion_at) AS last_completion
-            FROM service_tickets st
-            JOIN assignments a ON st.id = a.service_ticket_id
-            WHERE a.technician_id = :tech_id 
-              AND a.status = 'ACTIVE'
-              AND st.status IN ('ASSIGNED', 'INSPECTING', 'REPAIRING', 'WAITING_PART', 'WAITING_APPROVAL')
+            FROM service_tickets st JOIN assignments a ON st.id = a.service_ticket_id
+            WHERE a.technician_id = :tech_id AND a.status = 'ACTIVE'
+              AND st.status IN ('ASSIGNED','INSPECTING','REPAIRING','WAITING_PART','WAITING_APPROVAL')
               AND st.estimated_completion_at > NOW();
         """)
-        with engine.connect() as conn:
-            result = conn.execute(query, {"tech_id": technician_id}).fetchone()
-            last_completion = result[0] if result else None
-
-        estimated_start = (
-            last_completion
-            if (last_completion and last_completion > now)
-            else now
-        )
-
-    estimated_completion = estimated_start + timedelta(
-        minutes=predicted_minutes
-    )
-    return estimated_start, estimated_completion
+        with get_engine().connect() as conn:
+            row = conn.execute(query, {"tech_id": technician_id}).fetchone()
+        last = row[0] if row else None
+        start = last if (last and last > now) else now
+    return start, start + timedelta(minutes=predicted_minutes)
 
 
-def process_and_update_ticket(ticket_id: int, user_id: int = 1):
-    """Pipeline dự đoán ML và ghi kết quả vào CSDL."""
-    df_features = fetch_ticket_features(ticket_id)
-    if df_features.empty:
+def recommend_technician(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
+    """Xếp hạng KTV theo GIỜ HOÀN THÀNH dự kiến sớm nhất (hàng chờ + thời gian sửa dự đoán)."""
+    ranked = []
+    for p in predict_candidates(ticket_id, candidate_ids):
+        start, done = calculate_eta(p["technician_id"], p["predicted_minutes"])
+        ranked.append({**p, "estimated_start_at": start, "estimated_completion_at": done})
+    return sorted(ranked, key=lambda r: r["estimated_completion_at"])
+
+
+def get_valid_user_id(conn, target_user_id: int) -> int:
+    if target_user_id is not None:
+        row = conn.execute(text("SELECT id FROM users WHERE id = :uid"), {"uid": target_user_id}).fetchone()
+        if row:
+            return row[0]
+    first = conn.execute(text("SELECT id FROM users ORDER BY id ASC LIMIT 1")).fetchone()
+    return first[0] if first else 1
+
+
+def process_and_update_ticket(ticket_id: int, user_id: int = 1) -> bool:
+    features = fetch_ticket_features(ticket_id)
+    if features.empty:
         return False
+    bundle = load_bundle()
+    md = bundle.metadata
+    technician_id = int(features["technician_id"].iloc[0])
 
-    # Làm sạch dữ liệu đầu vào tránh lỗi mã hóa/chuyển đổi kiểu
-    df_features["service_issue_ids_list"] = (
-        df_features["service_issue_ids_list"].fillna("0").astype(str)
-    )
-    df_features["technician_id"] = (
-        df_features["technician_id"].fillna(0).astype(int)
-    )
-    df_features["device_model_id"] = (
-        df_features["device_model_id"].fillna(0).astype(int)
-    )
-    df_features["branch_id"] = (
-        df_features["branch_id"].fillna(0).astype(int)
-    )
-    df_features["total_catalog_standard_duration_minutes"] = (
-        df_features["total_catalog_standard_duration_minutes"]
-        .fillna(0.0)
-        .astype(float)
-    )
-    df_features["total_services_count"] = (
-        df_features["total_services_count"].fillna(1).astype(int)
-    )
-    df_features["total_parts_quantity_used"] = (
-        df_features["total_parts_quantity_used"].fillna(1).astype(int)
-    )
+    if int(features["total_services_count"].iloc[0]) == 0:
+        est = {"predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None, "upper_minutes": None}
+    elif technician_id == 0:   # chưa phân công: trung bình trên các KTV
+        est = predict_mean_over_technicians(features, bundle)
+    else:
+        r = predict_minutes(features, bundle).iloc[0]
+        est = {k: float(r[k]) for k in ("predicted_minutes", "lower_minutes", "upper_minutes")}
 
-    preprocessor = joblib.load(PREPROCESSOR_PATH)
-    model = joblib.load(BEST_MODEL_PATH)
+    minutes = round(est["predicted_minutes"], 1)
+    start, done = calculate_eta(technician_id, minutes)
+    rng = (f" (khoảng {md['interval_coverage']:.0%}: {est['lower_minutes']:.0f}–{est['upper_minutes']:.0f} phút)"
+           if est["lower_minutes"] is not None else " (chưa có hạng mục sửa chữa, dùng mặc định)")
+    reason = f"ML {md['model_name']} {md['model_version']}: {minutes:.0f} phút{rng}"[:250]
 
-    df_eng = preprocessor.add_domain_ratios(df_features)
-    X_processed = preprocessor.transform(df_eng)
-
-    predicted_duration = float(model.predict(X_processed)[0])
-    predicted_duration = round(max(10.0, predicted_duration), 1)
-
-    technician_id = int(df_features["technician_id"].iloc[0])
-    estimated_start, estimated_completion = calculate_eta(
-        technician_id, predicted_duration
-    )
-
-    with engine.begin() as conn:
-        # Kiểm tra và xác minh actor_user_id hợp lệ tránh lỗi FK constraint
-        actor_user_id = get_valid_user_id(conn, user_id)
-
-        # Ghi log dự đoán vào ml_predictions
-        conn.execute(
-            text("""
-            INSERT INTO ml_predictions (
-                service_ticket_id, technician_id, prediction_type, 
-                predicted_duration_minutes, confidence, model_name, model_version, predicted_at
-            ) VALUES (
-                :ticket_id, :tech_id, 'REPAIR_DURATION', 
-                :duration, 0.9159, 'CatBoost_Tuned', 'v1.0.0', NOW(6)
-            );
-        """),
-            {
-                "ticket_id": ticket_id,
-                "tech_id": technician_id if technician_id != 0 else None,
-                "duration": int(predicted_duration),
-            },
-        )
-
-        # Cập nhật thời gian vào service_tickets
-        conn.execute(
-            text("""
-            UPDATE service_tickets
-            SET estimated_duration_minutes = :duration,
-                estimated_start_at = :start_at,
-                estimated_completion_at = :comp_at,
-                estimate_source = 'STANDARD',
-                updated_at = NOW(6)
+    with get_engine().begin() as conn:
+        actor = get_valid_user_id(conn, user_id)
+        conn.execute(text("""
+            INSERT INTO ml_predictions (service_ticket_id, technician_id, prediction_type,
+                predicted_duration_minutes, confidence, model_name, model_version, predicted_at)
+            VALUES (:ticket_id, :tech_id, 'REPAIR_DURATION', :duration, :confidence, :model_name, :model_version, NOW(6));
+        """), {"ticket_id": ticket_id, "tech_id": technician_id or None, "duration": int(round(minutes)),
+               "confidence": md["interval_coverage"],   # = mức phủ danh nghĩa của khoảng dự báo, KHÔNG phải R²
+               "model_name": md["model_name"], "model_version": md["model_version"]})
+        conn.execute(text("""
+            UPDATE service_tickets SET estimated_duration_minutes = :duration, estimated_start_at = :start_at,
+                estimated_completion_at = :comp_at, estimate_source = 'STANDARD', updated_at = NOW(6)
             WHERE id = :ticket_id;
-        """),
-            {
-                "ticket_id": ticket_id,
-                "duration": int(predicted_duration),
-                "start_at": estimated_start,
-                "comp_at": estimated_completion,
-            },
-        )
-
-        # Ghi vết lịch sử vào service_time_estimate_histories
-        conn.execute(
-            text("""
-            INSERT INTO service_time_estimate_histories (
-                service_ticket_id, technician_id, estimated_duration_minutes,
-                estimated_start_at, estimated_completion_at, estimate_source,
-                break_minutes_snapshot, reason, created_by, created_at
-            ) VALUES (
-                :ticket_id, :tech_id, :duration,
-                :start_at, :comp_at, 'STANDARD',
-                0, 'Tự động tính ETA từ CatBoost ML Model', :user_id, NOW(6)
-            );
-        """),
-            {
-                "ticket_id": ticket_id,
-                "tech_id": technician_id if technician_id != 0 else None,
-                "duration": int(predicted_duration),
-                "start_at": estimated_start,
-                "comp_at": estimated_completion,
-                "user_id": actor_user_id,
-            },
-        )
+        """), {"ticket_id": ticket_id, "duration": int(round(minutes)), "start_at": start, "comp_at": done})
+        conn.execute(text("""
+            INSERT INTO service_time_estimate_histories (service_ticket_id, technician_id, estimated_duration_minutes,
+                estimated_start_at, estimated_completion_at, estimate_source, break_minutes_snapshot, reason, created_by, created_at)
+            VALUES (:ticket_id, :tech_id, :duration, :start_at, :comp_at, 'STANDARD', 0, :reason, :user_id, NOW(6));
+        """), {"ticket_id": ticket_id, "tech_id": technician_id or None, "duration": int(round(minutes)),
+               "start_at": start, "comp_at": done, "reason": reason, "user_id": actor})
     return True
