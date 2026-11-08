@@ -1,68 +1,76 @@
 {
-  "model_name": "XGBoost",
-  "model_version": "v2-20261106",
-  "trained_at": "2026-11-06T18:35:48",
+  "model_name": "Ridge (log-nhân)",
+  "model_version": "v3-20261108",
+  "trained_at": "2026-11-08T11:48:01",
   "synthetic_data": true,
   "use_augmentation": false,
   "best_params": {
-    "learning_rate": 0.03,
-    "max_depth": 3,
-    "n_estimators": 200
+    "regressor__ridge__alpha": 10.0
   },
-  "feature_mode": "ohe",
-  "n_train_rows_final": 832,
-  "n_test_rows_eval": 167,
+  "n_train_rows_final": 944,
+  "n_test_rows_eval": 189,
   "test_metrics": {
-    "MAE": 2.1109468037496786,
-    "RMSE": 2.9386512766208255,
-    "R2": 0.9607074611701468,
-    "P90_abs_err": 3.9376121520996095,
-    "within_5min_pct": 95.80838323353294,
-    "bias": 0.23697179234670307
+    "MAE": 7.007028476832764,
+    "RMSE": 9.894523843999552,
+    "R2": 0.7835948779371991,
+    "P90_abs_err": 14.062398105471415,
+    "within_5min_pct": 48.148148148148145,
+    "bias": 0.11646741705343104
   },
   "test_mae_ci95": [
-    1.8368029543025766,
-    2.4517331705835765
+    6.067995667704507,
+    8.04757700057847
   ],
-  "baseline_B3_test_metrics": {
-    "MAE": 8.111605055135222,
-    "RMSE": 13.885419364077451,
-    "R2": 0.12273260625165672,
-    "P90_abs_err": 17.379591836734697,
-    "within_5min_pct": 61.67664670658682,
-    "bias": -1.5993599255418054
+  "baseline_primary_name": "B2 Tuyến tính theo catalog",
+  "baseline_primary_test_metrics": {
+    "MAE": 8.910603866810854,
+    "RMSE": 12.075923667120549,
+    "R2": 0.6776568428146997,
+    "P90_abs_err": 19.010770842893983,
+    "within_5min_pct": 38.62433862433862,
+    "bias": 1.2372650039355226
   },
   "selection": {
-    "rule": "CV-MAE nhỏ nhất (GroupKFold)",
-    "cv_mae": 2.484577018336246,
-    "cv_se": 0.08301385178242346,
+    "rule": "CV-MAE nhỏ nhất theo nested CV",
+    "cv_mae": 7.789813429870189,
+    "cv_se": 0.2213977019458153,
     "statistical_tie_set": [
-      "XGBoost",
-      "XGBoost",
+      "Ridge (log-nhân)",
       "CatBoost (native cat)",
-      "Random Forest",
-      "Random Forest",
-      "CatBoost (one-hot)",
-      "CatBoost (one-hot)",
-      "LightGBM",
-      "LightGBM"
-    ]
+      "XGBoost"
+    ],
+    "primary_baseline_cv_mae": 8.944874105295423,
+    "outer_folds": 5,
+    "inner_folds": 3
+  },
+  "noise_floor": {
+    "noise_rmse_floor": 9.149669720405727,
+    "noise_mae_floor": 7.101711081226475,
+    "rows_covered": 537.0,
+    "share_covered": 0.7112582781456953,
+    "n_groups_total": 399.0
   },
   "interval_coverage": 0.9,
-  "interval_halfwidth_minutes": 4.057243347167969,
-  "interval_test_coverage": 0.9041916167664671,
+  "interval_method": "relative",
+  "interval_q_abs": 16.047643820595923,
+  "interval_q_rel": 0.28844073259198566,
+  "interval_halfwidth_minutes": 13.600055002226178,
+  "interval_test_coverage": 0.9153439153439153,
   "split_mode": "group",
   "cleaning": {
-    "rows_raw": 832,
-    "dropped_reassigned": 0,
-    "dropped_invalid_target_or_no_service": 0,
+    "rows_raw": 1029,
+    "dropped_reassigned": 84,
+    "dropped_invalid_target_or_no_service": 1,
+    "dropped_missing_technician": 0,
+    "dropped_implausible_duration": 0,
     "dropped_duplicate_tickets": 0,
-    "rows_clean": 832
+    "rows_clean": 944
   },
   "features": [
     "total_services_count",
     "total_catalog_standard_duration_minutes",
     "duration_per_service",
+    "log_catalog",
     "issue_1",
     "issue_2",
     "issue_3",
@@ -104,6 +112,7 @@
     "python": "3.13.5",
     "sklearn": "1.6.1",
     "pandas": "2.2.3",
+    "numpy": "2.1.3",
     "xgboost": "3.4.1",
     "lightgbm": "4.7.0",
     "catboost": "1.2.10"

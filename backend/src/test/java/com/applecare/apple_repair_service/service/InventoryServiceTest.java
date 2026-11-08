@@ -18,6 +18,7 @@ import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.exception.InsufficientStockException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
+import com.applecare.apple_repair_service.repository.AssignmentRepository;
 import com.applecare.apple_repair_service.repository.BranchInventoryRepository;
 import com.applecare.apple_repair_service.repository.InventoryTransactionRepository;
 import com.applecare.apple_repair_service.repository.InventoryLotRepository;
@@ -38,7 +39,7 @@ class InventoryServiceTest {
     final InventoryTransactionRepository transactions = mock(InventoryTransactionRepository.class);
     final InventoryLotRepository lots = mock(InventoryLotRepository.class);
     final DomainAccess access = mock(DomainAccess.class);
-    final InventoryService service = new InventoryService(inventory, usages, transactions, lots, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK, mock(DefectiveInventoryService.class));
+    final InventoryService service = new InventoryService(inventory, usages, transactions, lots, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(DefectiveInventoryService.class));
     final Part part = new Part();
     final BranchInventory stock = new BranchInventory();
     final Branch branch = TestData.branch(1);

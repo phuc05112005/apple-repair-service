@@ -19,6 +19,7 @@ import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.entity.User;
 import com.applecare.apple_repair_service.enums.AppointmentStatus;
 import com.applecare.apple_repair_service.enums.ApprovalStatus;
+import com.applecare.apple_repair_service.enums.AssignmentStatus;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.exception.ConflictException;
@@ -27,6 +28,7 @@ import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AppointmentServiceItemRepository;
 import com.applecare.apple_repair_service.repository.AssignmentRepository;
 import com.applecare.apple_repair_service.repository.RepairItemRepository;
+import com.applecare.apple_repair_service.repository.ServiceFeedbackRepository;
 import com.applecare.apple_repair_service.repository.ServiceStatusHistoryRepository;
 import com.applecare.apple_repair_service.repository.ServiceTicketRepository;
 import jakarta.validation.Validation;
@@ -43,6 +45,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class TicketCoreServiceTest {
@@ -57,11 +62,37 @@ class TicketCoreServiceTest {
     final List<ServiceStatusHistory> history = new ArrayList<>();
     final List<RepairItem> items = new ArrayList<>();
     final ServiceStatusService status = new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class), access);
-    final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
-    final ServiceTicketService service = new ServiceTicketService(tickets, repairs, booking, histories, customers, access, rules, new EntityResponses(), status, codes, new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), new PaymentService(repairs, access, rules, TestData.CLOCK), mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
+    final BusinessRules rules = createBusinessRules();
+
+    private static BusinessRules createBusinessRules() {
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            return new BusinessRules(factory.getValidator());
+        }
+    }
+
+    final ServiceTicketService service = new ServiceTicketService(
+            tickets,
+            repairs,
+            booking,
+            histories,
+            mock(ServiceFeedbackRepository.class),
+            customers,
+            access,
+            rules,
+            new EntityResponses(mock(AssignmentRepository.class)),
+            status,
+            codes,
+            new WarrantyPolicy(),
+            TestData.CLOCK,
+            new RetryingWrites(new WriteTransaction()),
+            new PaymentService(repairs, access, rules, TestData.CLOCK),
+            mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class)
+    );
 
     @BeforeEach
     void setup() {
+        history.clear();
+        items.clear();
         when(histories.save(any())).thenAnswer(i -> {
             ServiceStatusHistory h = i.getArgument(0);
             h.setId((long) history.size() + 1);
@@ -76,26 +107,34 @@ class TicketCoreServiceTest {
             if (!items.contains(r)) items.add(r);
             return r;
         });
-        when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
-        when(access.lock(User.class, 1L)).thenReturn(TestData.user(1));
+        when(access.get(eq(User.class), anyLong())).thenAnswer(i -> TestData.user(i.getArgument(1)));
+        when(access.lock(eq(User.class), anyLong())).thenAnswer(i -> TestData.user(i.getArgument(1)));
         when(assignments.findFirstByServiceTicket_IdAndStatus(any(), any())).thenReturn(Optional.empty());
         when(tickets.saveAndFlush(any())).thenAnswer(i -> {
             ServiceTicket t = i.getArgument(0);
-            t.setId(1L);
+            if (t.getId() == null) t.setId(1L);
             return t;
         });
         when(codes.next()).thenReturn("ST-test");
     }
 
     ServiceTicket ticket(ServiceTicketStatus state) {
-        var t = TestData.ticket(state);
-        when(access.lock(ServiceTicket.class, 1L)).thenReturn(t);
+        var currentTicket = TestData.ticket(state);
+        currentTicket.setId(1L);
+        currentTicket.setStatus(state);
+
+        when(access.lock(eq(ServiceTicket.class), anyLong())).thenReturn(currentTicket);
+        when(access.get(eq(ServiceTicket.class), anyLong())).thenReturn(currentTicket);
+        when(tickets.findById(anyLong())).thenReturn(Optional.of(currentTicket));
+
         var assignment = new Assignment();
         assignment.setId(1L);
-        assignment.setServiceTicket(t);
+        assignment.setServiceTicket(currentTicket);
         assignment.setTechnician(TestData.user(1));
-        when(assignments.findFirstByServiceTicket_IdAndStatus(1L, com.applecare.apple_repair_service.enums.AssignmentStatus.ACTIVE)).thenReturn(Optional.of(assignment));
-        return t;
+        assignment.setStatus(AssignmentStatus.ACTIVE);
+
+        when(assignments.findFirstByServiceTicket_IdAndStatus(anyLong(), eq(AssignmentStatus.ACTIVE))).thenReturn(Optional.of(assignment));
+        return currentTicket;
     }
 
     @Test
@@ -103,7 +142,7 @@ class TicketCoreServiceTest {
         var t = ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
         status.initialize(t, TestData.user(1));
         status.changeStatus(t, ServiceTicketStatus.ASSIGNED, TestData.user(1), null);
-        service.startInspection(1L, 1L);
+        status.changeStatus(t, ServiceTicketStatus.INSPECTING, TestData.user(1), null);
         assertEquals(ServiceTicketStatus.INSPECTING, t.getStatus());
         assertEquals(3, history.size());
         assertNull(history.getFirst().getFromStatus());
@@ -136,8 +175,9 @@ class TicketCoreServiceTest {
         items.add(old);
         var catalog = old.getServiceCatalogItem();
         when(access.get(ServiceCatalogItem.class, catalog.getId())).thenReturn(catalog);
-        service.recordInspection(1L, new RecordInspectionRequest("Revised quote", 1L, true,
-                List.of(new InspectionRepairItemRequest(catalog.getId(), new BigDecimal("200.00"), new BigDecimal("180.00"), null))));
+
+        service.recordInspection(1L, 1L, new RecordInspectionRequest("Revised quote", true,
+                List.of(new InspectionRepairItemRequest(catalog.getId(), new BigDecimal("200.00"), new BigDecimal("180.00"), null)), null, null));
 
         assertEquals(2, items.size());
         assertEquals(ApprovalStatus.REJECTED, old.getApprovalStatus());
@@ -152,8 +192,8 @@ class TicketCoreServiceTest {
         proposed.setId(3L);
         when(access.get(RepairItem.class, 3L)).thenReturn(proposed);
         when(access.lock(RepairItem.class, 3L)).thenReturn(proposed);
-        when(access.get(ServiceTicket.class, 1L)).thenReturn(t);
-        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(), TestData.CLOCK)
+
+        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK)
                 .recordApprovalDecision(3L, new ApprovalDecisionRequest(ApprovalStatus.APPROVED, 1L, "Accepted"));
         var total = new PaymentService(repairs, access, rules, TestData.CLOCK).calculateTicketTotal(1L);
         assertEquals(new BigDecimal("180.00"), total);
@@ -167,9 +207,9 @@ class TicketCoreServiceTest {
         old.setItemNameSnapshot("Repair"); old.setBasePrice(BigDecimal.TEN);
         items.add(old);
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(old.getServiceCatalogItem());
-        service.recordInspection(1L, new RecordInspectionRequest("Phát sinh chi phí", 1L, false,
+        service.recordInspection(1L, 1L, new RecordInspectionRequest("Phát sinh chi phí", false,
                 List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, new BigDecimal("20.00"), null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.PHONE, "Khách đồng ý báo giá"));
-        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
         assertEquals(ApprovalStatus.REJECTED, old.getApprovalStatus());
         assertEquals(ApprovalStatus.APPROVED, items.getLast().getApprovalStatus());
     }
@@ -181,9 +221,9 @@ class TicketCoreServiceTest {
         var removed = TestData.item(3, t, ApprovalStatus.APPROVED);
         items.addAll(List.of(retained, removed));
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(retained.getServiceCatalogItem());
-        service.recordInspection(1L, new RecordInspectionRequest("Đổi phạm vi", 1L, false,
+        service.recordInspection(1L, 1L, new RecordInspectionRequest("Đổi phương án", false,
                 List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.DIRECT, "Khách đổi phương án"));
-        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
         assertEquals(ApprovalStatus.REJECTED, removed.getApprovalStatus());
         assertTrue(items.stream().anyMatch(item -> item.getApprovalStatus() == ApprovalStatus.APPROVED));
     }
@@ -196,12 +236,12 @@ class TicketCoreServiceTest {
         var catalog = old.getServiceCatalogItem();
         old.setItemNameSnapshot(catalog.getName());
         when(access.get(ServiceCatalogItem.class, catalog.getId())).thenReturn(catalog);
-        service.recordInspection(1L, new RecordInspectionRequest("Confirmed plan", 1L, false,
-                List.of(new InspectionRepairItemRequest(catalog.getId(), old.getBasePrice(), old.getFinalPrice(), null))));
+        service.recordInspection(1L, 1L, new RecordInspectionRequest("Confirmed plan", false,
+                List.of(new InspectionRepairItemRequest(catalog.getId(), old.getBasePrice(), old.getFinalPrice(), null)), null, null));
         assertEquals(1, items.size());
         assertSame(old, items.getFirst());
         assertEquals(ApprovalStatus.APPROVED, old.getApprovalStatus());
-        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
     }
 
     void inspect(boolean required) {
@@ -211,7 +251,7 @@ class TicketCoreServiceTest {
         agreed.setBasePrice(BigDecimal.TEN);
         if (!required) items.add(agreed);
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(TestData.catalog(2));
-        service.recordInspection(1L, new RecordInspectionRequest("Inspected", 1L, required, List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null))));
+        service.recordInspection(1L, 1L, new RecordInspectionRequest("Inspected", required, List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null)), null, null));
     }
 
     @Test
@@ -240,7 +280,7 @@ class TicketCoreServiceTest {
         items.add(item);
         when(access.get(RepairItem.class, 2L)).thenReturn(item);
         when(access.lock(RepairItem.class, 2L)).thenReturn(item);
-        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(), TestData.CLOCK).recordApprovalDecision(2L, new ApprovalDecisionRequest(decision, 1L, "ok"));
+        new RepairItemService(repairs, histories, access, rules, status, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK).recordApprovalDecision(2L, new ApprovalDecisionRequest(decision, 1L, "ok"));
     }
 
     @Test
@@ -351,7 +391,6 @@ class TicketCoreServiceTest {
 
     @Test
     void durationExcludesWaitingAndTracksOpenInterval() {
-        var duration = new RepairDurationService(histories, access, TestData.CLOCK);
         var records = new ArrayList<ServiceStatusHistory>();
         ServiceTicketStatus previous = null;
         int[] minutes = {0, 0, 0, 0, 60, 120, 180, 210};
@@ -366,11 +405,11 @@ class TicketCoreServiceTest {
             records.add(h);
             previous = states[i];
         }
-        assertEquals(90, duration.calculate(records, null));
+        assertEquals(90, RepairDurationService.calculate(records, null));
         records.removeLast();
-        assertEquals(60, duration.calculate(records, null));
-        assertEquals(120, duration.calculate(records, start.plusMinutes(240)));
+        assertEquals(60, RepairDurationService.calculate(records, null));
+        assertEquals(120, RepairDurationService.calculate(records, start.plusMinutes(240)));
         records.get(1).setFromStatus(ServiceTicketStatus.ASSIGNED);
-        assertThrows(BusinessRuleViolationException.class, () -> duration.calculate(records, null));
+        assertThrows(BusinessRuleViolationException.class, () -> RepairDurationService.calculate(records, null));
     }
 }

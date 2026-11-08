@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request, List.of());
     }
 
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiErrorResponse> business(BusinessException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
@@ -142,6 +143,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> wrongMedia(Exception ex, HttpServletRequest request) {
         return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE",
                 "Định dạng nội dung gửi lên không được hỗ trợ.", request, List.of());
+    }
+
+    @ExceptionHandler(org.apache.catalina.connector.ClientAbortException.class)
+    public void handleClientAbort(org.apache.catalina.connector.ClientAbortException ex, HttpServletRequest request) {
+        LOG.warn("Client disconnected before response completed for {}: {}", request.getRequestURI(), ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

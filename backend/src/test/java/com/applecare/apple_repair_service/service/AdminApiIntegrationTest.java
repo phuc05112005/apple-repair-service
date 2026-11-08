@@ -40,7 +40,7 @@ class AdminApiIntegrationTest {
     @BeforeEach void fixture() throws Exception {
         f=new ApiFixture(em,clock); f.create();
         var response=mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(f.admin.getUsername(),ApiFixture.PASSWORD))))
+                        .content(json.writeValueAsString(new LoginRequest(f.admin.getUsername(),ApiFixture.PASSWORD))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         token=json.readTree(response).get("accessToken").asString();
     }
@@ -48,7 +48,7 @@ class AdminApiIntegrationTest {
         var request=new CreateUserRequest(f.prefix+"new",ApiFixture.PASSWORD,"New technician",null,UserRole.TECHNICIAN);
         String body=json.writeValueAsString(request);
         String response=mvc.perform(post("/api/v1/admin/users").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(body)).andExpect(status().isCreated())
+                        .contentType("application/json").content(body)).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist()).andExpect(jsonPath("$.password").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
         long id=json.readTree(response).get("id").asLong();
@@ -61,7 +61,7 @@ class AdminApiIntegrationTest {
     @Test void adminResetsEmployeePasswordAndRevokesOldSession() throws Exception {
         String originalHash = f.receptionist.getPasswordHash();
         String employeeToken = json.readTree(mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                        .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("accessToken").asString();
         String path = "/api/v1/admin/users/" + f.receptionist.getId() + "/password";
         String body = json.writeValueAsString(new ResetUserPasswordRequest("Fresh-password-2026!"));
@@ -73,81 +73,81 @@ class AdminApiIntegrationTest {
         assertTrue(encoder.matches("Fresh-password-2026!", em.find(User.class, f.receptionist.getId()).getPasswordHash()));
         assertNotEquals(originalHash, em.find(User.class, f.receptionist.getId()).getPasswordHash());
         mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                        .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + employeeToken))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), "Fresh-password-2026!"))))
+                        .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), "Fresh-password-2026!"))))
                 .andExpect(status().isOk());
         mvc.perform(put("/api/v1/admin/users/999999999/password").header("Authorization", "Bearer " + token)
                 .contentType("application/json").content(body)).andExpect(status().isNotFound());
         mvc.perform(put(path).header("Authorization", "Bearer " + token).contentType("application/json")
-                .content(json.writeValueAsString(new ResetUserPasswordRequest("short"))))
+                        .content(json.writeValueAsString(new ResetUserPasswordRequest("short"))))
                 .andExpect(status().isBadRequest());
     }
     @Test void receptionistCannotChangeWeeklyAppointmentConfiguration() throws Exception {
         var response = mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
+                        .content(json.writeValueAsString(new LoginRequest(f.receptionist.getUsername(), ApiFixture.PASSWORD))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String receptionistToken = json.readTree(response).get("accessToken").asString();
         mvc.perform(get("/api/v1/admin/appointment-weekly-schedules").param("branchId", f.branch.getId().toString())
                 .header("Authorization", "Bearer " + receptionistToken)).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/admin/appointment-weekly-schedules").header("Authorization", "Bearer " + receptionistToken)
-                .contentType("application/json").content(json.writeValueAsString(new SaveWeeklyScheduleRequest(
-                        f.branch.getId(), 1, true, List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true))))))
+                        .contentType("application/json").content(json.writeValueAsString(new SaveWeeklyScheduleRequest(
+                                f.branch.getId(), 1, true, List.of(new SlotRule(LocalTime.of(9, 0), LocalTime.of(10, 0), true))))))
                 .andExpect(status().isForbidden());
     }
     @Test void onlyAdminCanConfigureValidatedOnlineBookingDiscount() throws Exception {
         String receptionistToken = login(f.receptionist);
         String url = "/api/v1/admin/system-settings/" + PricePolicy.ONLINE_BOOKING_DISCOUNT_PERCENT;
         mvc.perform(put(url).header("Authorization", "Bearer " + receptionistToken)
-                .contentType("application/json").content("{\"settingValue\":\"5\"}"))
+                        .contentType("application/json").content("{\"settingValue\":\"5\"}"))
                 .andExpect(status().isForbidden());
         mvc.perform(put(url).header("Authorization", "Bearer " + token)
-                .contentType("application/json").content("{\"settingValue\":\"5\"}"))
+                        .contentType("application/json").content("{\"settingValue\":\"5\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.settingValue").value("5"));
         mvc.perform(put(url).header("Authorization", "Bearer " + token)
-                .contentType("application/json").content("{\"settingValue\":\"101\"}"))
+                        .contentType("application/json").content("{\"settingValue\":\"101\"}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(put(url).header("Authorization", "Bearer " + token)
-                .contentType("application/json").content("{\"settingValue\":\"0\"}"))
+                        .contentType("application/json").content("{\"settingValue\":\"0\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.settingValue").value("0"));
     }
     @Test void adminUpdatesDisablesReactivatesUsersButCannotDisableSelf() throws Exception {
         var request=new CreateUserRequest(f.prefix+"reception-new",ApiFixture.PASSWORD,"New receptionist",null,UserRole.RECEPTIONIST);
         var created=mvc.perform(post("/api/v1/admin/users").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(request))).andExpect(status().isCreated())
+                        .contentType("application/json").content(json.writeValueAsString(request))).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long id=json.readTree(created).get("id").asLong();
         mvc.perform(put("/api/v1/admin/users/"+id+"/profile").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new UpdateUserProfileRequest("Updated receptionist","0900000000"))))
+                        .contentType("application/json").content(json.writeValueAsString(new UpdateUserProfileRequest("Updated receptionist","0900000000","updated@example.com"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.fullName").value("Updated receptionist"));
         mvc.perform(put("/api/v1/admin/users/"+id+"/status").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.INACTIVE))))
+                        .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.INACTIVE))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INACTIVE"));
         mvc.perform(post("/api/v1/auth/login").contentType("application/json")
                 .content(json.writeValueAsString(new LoginRequest(request.username(),request.password())))).andExpect(status().isUnauthorized());
         mvc.perform(put("/api/v1/admin/users/"+id+"/status").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.ACTIVE))))
+                        .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.ACTIVE))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
         mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(request.username(),request.password())))).andExpect(status().isOk())
+                        .content(json.writeValueAsString(new LoginRequest(request.username(),request.password())))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.role").value("RECEPTIONIST"));
         mvc.perform(put("/api/v1/admin/users/"+f.admin.getId()+"/status").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.INACTIVE))))
+                        .contentType("application/json").content(json.writeValueAsString(new UpdateUserStatusRequest(UserStatus.INACTIVE))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BUSINESS_RULE_VIOLATION"));
     }
     @Test void masterCommandsAndStatisticsRequireAdminAndReturnTypedData() throws Exception {
         mvc.perform(post("/api/v1/admin/device-types").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new CreateDeviceTypeRequest(f.deviceType.getName()))))
+                        .contentType("application/json").content(json.writeValueAsString(new CreateDeviceTypeRequest(f.deviceType.getName()))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DUPLICATE_RESOURCE"));
         mvc.perform(post("/api/v1/admin/device-types/"+f.deviceType.getId()+"/deactivate").header("Authorization","Bearer "+token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INACTIVE"));
         mvc.perform(post("/api/v1/admin/device-types/"+f.deviceType.getId()+"/activate").header("Authorization","Bearer "+token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
         mvc.perform(get("/api/v1/admin/statistics/overview").header("Authorization","Bearer "+token)
-                .param("from",LocalDate.now(clock).toString()).param("to",LocalDate.now(clock).toString()).param("branchId",f.branch.getId().toString()))
+                        .param("from",LocalDate.now(clock).toString()).param("to",LocalDate.now(clock).toString()).param("branchId",f.branch.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalTickets").value(0)).andExpect(jsonPath("$.currentStatusCounts").isArray());
         mvc.perform(get("/api/v1/admin/branches/"+Long.MAX_VALUE).header("Authorization","Bearer "+token))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
@@ -161,30 +161,30 @@ class AdminApiIntegrationTest {
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
                 .contentType("application/json").content(spoof)).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/admin/inventory/stock-in").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(body)).andExpect(status().isOk())
+                        .contentType("application/json").content(body)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.lot.lotCode").value(command.lotCode()))
                 .andExpect(jsonPath("$.transaction.transactionCode", containsString("NHAP_")))
                 .andExpect(jsonPath("$.inventory.quantity").value(2));
         mvc.perform(get("/api/v1/admin/inventory").header("Authorization","Bearer "+token)
-                .param("branchId",f.branch.getId().toString()).param("partId",part.getId().toString()))
+                        .param("branchId",f.branch.getId().toString()).param("partId",part.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
                 .andExpect(jsonPath("$[0].quantity").value(2));
         mvc.perform(get("/api/v1/admin/parts/"+part.getId()+"/inventory-transactions")
-                .header("Authorization","Bearer "+token))
+                        .header("Authorization","Bearer "+token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
                 .andExpect(jsonPath("$[0].transactionType").value("STOCK_IN"))
                 .andExpect(jsonPath("$[0].transactionCode", containsString("NHAP_")));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
-                .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString())
-                .param("transactionType", "STOCK_IN").param("code", command.lotCode())
-                .param("from", LocalDate.now(clock).minusDays(1).toString()).param("to", LocalDate.now(clock).toString()))
+                        .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString())
+                        .param("transactionType", "STOCK_IN").param("code", command.lotCode())
+                        .param("from", LocalDate.now(clock).minusDays(1).toString()).param("to", LocalDate.now(clock).toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
                 .andExpect(jsonPath("$[0].lotCode").value(command.lotCode()));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
-                .param("partId", part.getId().toString()).param("code", "NHAP_"))
+                        .param("partId", part.getId().toString()).param("code", "NHAP_"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
-                .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString()))
+                        .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
         mvc.perform(get("/api/v1/admin/inventory/import-template").header("Authorization","Bearer "+token))
                 .andExpect(status().isOk())
@@ -200,7 +200,7 @@ class AdminApiIntegrationTest {
                 .setParameter("id",part.getId()).getSingleResult();
         assertEquals(f.admin.getId(),movement.getRecordedBy().getId());
         mvc.perform(post("/api/v1/admin/inventory/stock-out").header("Authorization","Bearer "+token)
-                .contentType("application/json").content(json.writeValueAsString(new StockAdjustmentCommand(f.branch.getId(),part.getId(),3,null))))
+                        .contentType("application/json").content(json.writeValueAsString(new StockAdjustmentCommand(f.branch.getId(),part.getId(),3,null))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INSUFFICIENT_STOCK"));
     }
 
@@ -225,21 +225,21 @@ class AdminApiIntegrationTest {
         var same = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
                 highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPLACEMENT, high.getId());
         mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
-                .content(json.writeValueAsString(same))).andExpect(status().isOk())
+                        .content(json.writeValueAsString(same))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.warrantyRemedy").value("REPLACEMENT"))
                 .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
 
         var different = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
                 highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPLACEMENT, standard.getId());
         mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
-                .content(json.writeValueAsString(different))).andExpect(status().isOk())
+                        .content(json.writeValueAsString(different))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.warrantyRemedy").value("REPLACEMENT"))
                 .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
 
         var repair = new UpdateServiceCatalogItemRequest(f.model.getId(), replacementType.getId(), f.issue.getId(),
                 highPart.getId(), null, null, 60, 180, WarrantyRemedy.REPAIR, null);
         mvc.perform(put(url).header("Authorization", "Bearer " + token).contentType("application/json")
-                .content(json.writeValueAsString(repair))).andExpect(status().isOk())
+                        .content(json.writeValueAsString(repair))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.warrantyRemedy").value("REPAIR"))
                 .andExpect(jsonPath("$.warrantyReplacementCatalogId").doesNotExist());
     }

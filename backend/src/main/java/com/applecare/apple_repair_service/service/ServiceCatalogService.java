@@ -87,6 +87,7 @@ public class ServiceCatalogService {
     private void apply(ServiceCatalogItem e, UpdateServiceCatalogItemRequest r) {
 
         DeviceModel deviceModel = access.get(DeviceModel.class, r.deviceModelId());
+        BusinessRules.require(deviceModel != null, "Dòng thiết bị không tồn tại."); // <-- Thêm dòng kiểm tra null này
         BusinessRules.require(deviceModel.getStatus() == ActiveStatus.ACTIVE, "Model thiết bị đã ngừng hoạt động, không thể chọn.");
 
         e.setDeviceModel(deviceModel);

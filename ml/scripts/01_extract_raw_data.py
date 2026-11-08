@@ -71,7 +71,7 @@ LEFT JOIN (
         service_ticket_id,
         SUM(CASE WHEN to_status = 'WAITING_PART' THEN 1 ELSE 0 END) AS count_waiting_part_events,
         SUM(CASE WHEN to_status = 'WAITING_APPROVAL' THEN 1 ELSE 0 END) AS count_waiting_approval_events,
-        COUNT(*) AS total_pause_events_count,
+        COUNT(*) AS total_pause_events_count, 
         SUM(TIMESTAMPDIFF(MINUTE, changed_at, resolved_at)) AS total_pause_duration_minutes
     FROM service_status_histories
     WHERE to_status IN ('WAITING_PART', 'WAITING_APPROVAL') AND resolved_at IS NOT NULL
@@ -80,9 +80,6 @@ LEFT JOIN (
 WHERE st.actual_repair_started_at IS NOT NULL
   AND st.actual_repair_completed_at IS NOT NULL
   AND dm.status = 'ACTIVE'
-  AND (TIMESTAMPDIFF(MINUTE, st.actual_repair_started_at, st.actual_repair_completed_at)
-       - COALESCE(pause_summary.total_pause_duration_minutes, 0)) > 0
-  AND (assign_summary.total_assignments IS NULL OR assign_summary.total_assignments = 1)
 ORDER BY st.id DESC;
 """
 

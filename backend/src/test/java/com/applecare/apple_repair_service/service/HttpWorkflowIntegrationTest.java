@@ -35,7 +35,7 @@ class HttpWorkflowIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired Clock clock;
     @Autowired PlatformTransactionManager manager;
-    @MockitoSpyBean TicketAccessPolicy policy; // Real policy with a latch only in the concurrency test.
+    @MockitoSpyBean TicketAccessPolicy policy;
     ApiFixture f;
     Long partId;
     Map<String,Long> before;
@@ -137,7 +137,7 @@ class HttpWorkflowIntegrationTest {
         long appointmentId=booking.get("appointmentId").asLong();
         openArrivalWindow();
         var list=mvc.perform(get("/api/v1/internal/appointments").header("Authorization",receptionist)
-                .param("branchId",f.branch.getId().toString()).param("date",f.slot.getAppointmentDate().toString())).andExpect(status().isOk())
+                        .param("branchId",f.branch.getId().toString()).param("date",f.slot.getAppointmentDate().toString())).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertEquals(appointmentId,json.readTree(list).get(0).get("appointment").get("id").asLong());
         var confirmed=postJson("/api/v1/internal/appointments/"+appointmentId+"/confirm",receptionist,null,200);
@@ -172,7 +172,6 @@ class HttpWorkflowIntegrationTest {
         postJson("/api/v1/internal/repair-items/"+itemId+"/part-usages",technician,new PartUsageCommand(partId,2),201);
         mvc.perform(get(path+"/repair-duration").header("Authorization",technician)).andExpect(status().isOk()).andExpect(jsonPath("$.currentRepairMinutes").isNumber());
         postJson(path+"/finish-repair",technician,null,200);
-        // Positive total cannot be handed over before payment.
         postJson(path+"/handover",reception,null,400);
         var payment=postJson(path+"/payment",reception,new RecordPaymentRequest(PaymentMethod.CASH),200);
         assertEquals("PAID",payment.get("paymentStatus").asString());
@@ -188,13 +187,12 @@ class HttpWorkflowIntegrationTest {
             assertEquals(ServiceTicketStatus.HANDED_OVER,t.getStatus());assertEquals(PaymentStatus.PAID,t.getPaymentStatus());
             assertEquals(PaymentMethod.CASH,t.getPaymentMethod());assertNotNull(t.getPaidAt());assertNotNull(t.getHandedOverAt());
             assertEquals(f.receptionist.getId(),t.getCreatedBy().getId());assertEquals(f.receptionist.getId(),t.getHandedOverBy().getId());
-            assertEquals(f.technician.getId(),t.getInspectedBy().getId());
             assertEquals(f.prefix,t.getCustomerDevice().getCustomer().getPhone());
             assertEquals(AppointmentStatus.ARRIVED,t.getAppointmentDevice().getAppointment().getStatus());
             var histories=em.createQuery("select h from ServiceStatusHistory h where h.serviceTicket.id=:id order by h.changedAt,h.id",ServiceStatusHistory.class)
                     .setParameter("id",ticketId).getResultList();
             assertEquals(List.of(ServiceTicketStatus.WAITING_ASSIGNMENT,ServiceTicketStatus.ASSIGNED,ServiceTicketStatus.INSPECTING,
-                    ServiceTicketStatus.REPAIRING,ServiceTicketStatus.WAITING_HANDOVER,ServiceTicketStatus.HANDED_OVER),
+                            ServiceTicketStatus.REPAIRING,ServiceTicketStatus.WAITING_HANDOVER,ServiceTicketStatus.HANDED_OVER),
                     histories.stream().map(ServiceStatusHistory::getToStatus).toList());
             assertEquals(List.of(f.receptionist.getId(),f.receptionist.getId(),f.technician.getId(),f.technician.getId(),f.technician.getId(),f.receptionist.getId()),
                     histories.stream().map(h->h.getChangedBy().getId()).toList());

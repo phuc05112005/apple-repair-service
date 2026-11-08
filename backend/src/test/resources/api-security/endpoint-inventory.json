@@ -333,7 +333,7 @@
   "handler" : "transactions",
   "access" : "hasRole('ADMIN')",
   "request" : "none",
-  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse>"
+  "response" : "org.springframework.data.domain.Page<com.applecare.apple_repair_service.dto.response.InventoryTransactionResponse>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/admin/inventory/transfer",
@@ -648,6 +648,30 @@
   "response" : "com.applecare.apple_repair_service.dto.response.TechnicianScheduleResponse"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/admin/tickets",
+  "controller" : "AdminTicketController",
+  "handler" : "getAllTickets",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "org.springframework.http.ResponseEntity<java.util.List<com.applecare.apple_repair_service.dto.response.AdminTicketSummaryResponse>>"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/tickets/{id}",
+  "controller" : "AdminTicketController",
+  "handler" : "getTicketDetail",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "org.springframework.http.ResponseEntity<com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse>"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/admin/tickets/{id}/items",
+  "controller" : "AdminTicketController",
+  "handler" : "getTicketRepairItems",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "org.springframework.http.ResponseEntity<java.util.List<com.applecare.apple_repair_service.dto.response.RepairItemDetailResponse>>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/admin/users",
   "controller" : "AdminUserController",
   "handler" : "list",
@@ -726,6 +750,14 @@
   "access" : "public",
   "request" : "none",
   "response" : "java.util.List<com.applecare.apple_repair_service.dto.publicapi.PublicAppointmentResponse>"
+}, {
+  "method" : "POST",
+  "path" : "/api/v1/auth/forgot-password",
+  "controller" : "AuthController",
+  "handler" : "forgotPassword",
+  "access" : "authenticated",
+  "request" : "ForgotPasswordRequest",
+  "response" : "org.springframework.http.ResponseEntity<java.util.Map<java.lang.String, java.lang.String>>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/auth/login",
@@ -992,14 +1024,6 @@
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
 }, {
   "method" : "POST",
-  "path" : "/api/v1/internal/service-tickets/{id}/inspection/start",
-  "controller" : "TechnicianController",
-  "handler" : "start",
-  "access" : "hasRole('TECHNICIAN')",
-  "request" : "none",
-  "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
-}, {
-  "method" : "POST",
   "path" : "/api/v1/internal/service-tickets/{id}/payment",
   "controller" : "ReceptionistController",
   "handler" : "payment",
@@ -1035,6 +1059,14 @@
   "path" : "/api/v1/internal/service-tickets/{id}/resume-repair",
   "controller" : "TechnicianController",
   "handler" : "resume",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
+}, {
+  "method" : "POST",
+  "path" : "/api/v1/internal/service-tickets/{id}/start-processing",
+  "controller" : "TechnicianController",
+  "handler" : "startProcessing",
   "access" : "hasRole('TECHNICIAN')",
   "request" : "none",
   "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
@@ -1119,6 +1151,14 @@
   "request" : "ApprovalCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.RepairItemResponse"
 }, {
+  "method" : "POST",
+  "path" : "/api/v1/internal/technician/service-tickets/{id}/cancel",
+  "controller" : "TechnicianController",
+  "handler" : "cancelTicket",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "NoteCommand",
+  "response" : "com.applecare.apple_repair_service.dto.response.ServiceTicketDetailResponse"
+}, {
   "method" : "GET",
   "path" : "/api/v1/internal/technician/work",
   "controller" : "TechnicianController",
@@ -1168,6 +1208,30 @@
   "response" : "com.applecare.apple_repair_service.dto.response.WarrantyHistoryResponse"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/profile",
+  "controller" : "ProfileController",
+  "handler" : "getMyProfile",
+  "access" : "hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')",
+  "request" : "none",
+  "response" : "org.springframework.http.ResponseEntity<com.applecare.apple_repair_service.dto.response.UserResponse>"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/profile",
+  "controller" : "ProfileController",
+  "handler" : "updateMyProfile",
+  "access" : "hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')",
+  "request" : "UpdateUserProfileRequest",
+  "response" : "org.springframework.http.ResponseEntity<com.applecare.apple_repair_service.dto.response.UserResponse>"
+}, {
+  "method" : "POST",
+  "path" : "/api/v1/profile/change-password",
+  "controller" : "ProfileController",
+  "handler" : "changeMyPassword",
+  "access" : "hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')",
+  "request" : "ChangePasswordRequest",
+  "response" : "org.springframework.http.ResponseEntity<java.lang.Void>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/service-catalog-items",
   "controller" : "PublicController",
   "handler" : "catalog",
@@ -1189,7 +1253,7 @@
   "handler" : "tickets",
   "access" : "public",
   "request" : "none",
-  "response" : "java.util.List<com.applecare.apple_repair_service.dto.publicapi.PublicTicketResponse>"
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.PublicTicketResponse>"
 }, {
   "method" : "POST",
   "path" : "/api/v1/service-tickets/{ticketCode}/feedback",

@@ -3,7 +3,6 @@ package com.applecare.apple_repair_service.service;
 import com.applecare.apple_repair_service.dto.request.CreatePartRequest;
 import com.applecare.apple_repair_service.dto.request.UpdatePartRequest;
 import com.applecare.apple_repair_service.entity.Part;
-import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.repository.PartRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,12 +20,11 @@ class PartOriginManufacturerIntegrationTest {
     @Autowired PartService parts;
     @Autowired PartRepository repository;
     @Autowired EntityManager em;
-    @Autowired Clock clock;
 
     @Test
     void createAndReadBackWithOriginAndManufacturer() {
         String code = "ORIGIN-" + System.nanoTime();
-        var created = parts.create(new CreatePartRequest(code, "Pin test", "Pisen", null,
+        var created = parts.create(new CreatePartRequest(null, null, code, "Pin test", "Pisen", null,
                 new BigDecimal("150000"), "Trung Quốc", "Shenzhen Example Co.", "Nhà cung cấp A"));
         em.flush(); em.clear();
         var reread = parts.getById(created.id());
