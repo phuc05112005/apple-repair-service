@@ -1,5 +1,5 @@
 const steps = [
-  ['Chọn thiết bị', 'Xác định loại thiết bị, model và vấn đề.'],
+  ['Chọn thiết bị', 'Xác định loại thiết bị, dòng thiết bị và vấn đề.'],
   ['Chọn dịch vụ', 'Xem đúng phương án đang có trong danh mục.'],
   ['Đặt lịch', 'Chọn chi nhánh và thời gian phù hợp.'],
   ['Tiếp nhận & kiểm tra', 'Ghi nhận tình trạng và kết quả kiểm tra.'],

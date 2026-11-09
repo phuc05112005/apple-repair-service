@@ -13,15 +13,14 @@ export function PremiumHero() {
 
   return <section className="studio-hero section-pad" onPointerMove={moveScene}>
     <div className="studio-hero__grid" aria-hidden="true" />
-    <div className="studio-hero__copy">
-      <span className="studio-kicker"><i /> Dịch vụ sửa chữa các thiết bị nhà táo<i /></span>
+    <div className="studio-hero__copy">  
+      <span className="studio-kicker"><i />ĐỒNG HÀNH CÙNG THIẾT BỊ APPLE CỦA BẠN<i /></span>
       <h1>Dịch vụ sửa chữa thiết bị Apple, <em>chuyên nghiệp trong từng bước xử lý.</em></h1>
-      <p>Chọn đúng thiết bị, xem phương án đang có và theo dõi toàn bộ hành trình sửa chữa trong một trải nghiệm liền mạch.</p>
       <div className="studio-hero__actions">
         <Link className="studio-button studio-button--primary" to="/booking">Đặt lịch sửa chữa <span aria-hidden="true">↗</span></Link>
         <Link className="studio-button studio-button--quiet" to="/lookup">Tra cứu dịch vụ <span aria-hidden="true">→</span></Link>
       </div>
-      <div className="studio-hero__note"><span aria-hidden="true" /><p>Phương án và chi phí được ghi nhận trước khi thực hiện.</p></div>
+      <div className="studio-hero__note"><span aria-hidden="true" /><p>Phương án và chi phí được ghi nhận minh bạch trước khi xử lý.</p></div>
     </div>
     <div className="studio-device-scene">
       <div className="studio-device-scene__halo" aria-hidden="true" />

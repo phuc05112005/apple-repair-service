@@ -854,7 +854,7 @@
 
   .studio-home { --studio-ink: #171a18; --studio-muted: #686d68; --studio-line: rgba(23,26,24,.14); --studio-warm: #f2f0ea; color: var(--studio-ink); background: #f7f6f2; font-family: "Segoe UI Variable Text", "Aptos", "Segoe UI", sans-serif; }
   .studio-home h1, .studio-home h2, .studio-home h3 { font-family: "Segoe UI Variable Display", "Aptos Display", "Segoe UI", sans-serif; }
-  .studio-kicker { display: inline-flex; gap: .7rem; align-items: center; color: #48524c; font-size: .9rem; font-weight: 760; letter-spacing: .17em; text-transform: uppercase; }
+  .studio-kicker { display: inline-flex; gap: .7rem; align-items: center; color: #48524c; font-size: .8rem; font-weight: 50 0; letter-spacing: .17em; text-transform: uppercase; }
   .studio-kicker i { width: 28px; height: 1px; background: #49564f; }
   .studio-button { display: inline-flex; min-height: 52px; gap: 1.2rem; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 999px; padding: .85rem 1.35rem; font-size: .82rem; font-weight: 720; transition: transform .25s ease, background .25s ease, border-color .25s ease, box-shadow .25s ease; }
   .studio-button span { transition: transform .25s ease; }
@@ -897,7 +897,7 @@
   .studio-hero__scroll i::after { position: absolute; right: 0; bottom: -2px; width: 5px; height: 5px; border-right: 1px solid #777d78; border-bottom: 1px solid #777d78; transform: rotate(-45deg); content: ""; }
 
   .studio-principles { display: grid; grid-template-columns: 1fr auto; gap: 3rem; align-items: center; min-height: 92px; border-top: 1px solid #dddcd6; border-bottom: 1px solid #dddcd6; background: #eeece6; }
-  .studio-principles > p { margin: 0; color: #626863; font-size: 1.05rem; }
+  .studio-principles > p { margin: 0; color: #626863; font-size: .9rem; }
   .studio-principles ul { display: flex; gap: clamp(1.4rem, 4vw, 4rem); margin: 0; padding: 0; list-style: none; }
   .studio-principles li { position: relative; font-size: .9rem; font-weight: 720; }
   .studio-principles li::before { display: inline-block; width: 4px; height: 4px; margin: 0 .65rem .1rem 0; border-radius: 50%; background: #50715e; content: ""; }
@@ -2109,8 +2109,8 @@
   .studio-hero__copy h1 {
     margin: 1rem 0 1.4rem;
     font-size: clamp(3.2rem, 5.5vw, 6.2rem);
-    font-weight: 600;
-    line-height: .93;
+    font-weight: 500;
+    line-height: 1 !important;
     letter-spacing: -.068em;
     text-wrap: balance;
   }
