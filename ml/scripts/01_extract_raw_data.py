@@ -12,7 +12,7 @@ ML_DIR = SCRIPT_DIR.parent
 if str(ML_DIR) not in sys.path:
     sys.path.append(str(ML_DIR))
 
-from config.config import RAW_DATA_PATH
+from config.config import RAW_DATA_PATH, SYNTHETIC_DATA, TICKET_CODE_PREFIX
 from src.sql_features import services_subquery
 
 sys.stdout.reconfigure(line_buffering=True)
@@ -24,6 +24,16 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT", "3307"),
     "database": os.getenv("DB_NAME", "apple_repair_service"),
 }
+
+def _prefix_filter() -> str:
+    """Chỉ lấy phiếu thuộc MỘT nguồn dữ liệu (TICKET_CODE_PREFIX trong config). None = lấy tất cả (dùng khi chuyển sang dữ liệu thật).
+    Không xóa gì trong DB: các phiếu khác vẫn còn nguyên, chỉ không được đưa vào tập huấn luyện."""
+    if not TICKET_CODE_PREFIX:
+        return ""
+    esc = TICKET_CODE_PREFIX.replace("'", "''")
+    # Dùng LEFT(...) thay cho LIKE 'xxx%': pymysql coi dấu % trong câu SQL là ký tự định dạng và báo lỗi.
+    return f"AND LEFT(st.ticket_code, {len(TICKET_CODE_PREFIX)}) = '{esc}'"
+
 
 SQL_QUERY = f"""
 SELECT
@@ -80,6 +90,7 @@ LEFT JOIN (
 WHERE st.actual_repair_started_at IS NOT NULL
   AND st.actual_repair_completed_at IS NOT NULL
   AND dm.status = 'ACTIVE'
+  {_prefix_filter()}
 ORDER BY st.id DESC;
 """
 
@@ -87,7 +98,8 @@ ORDER BY st.id DESC;
 def main():
     url = (f"mysql+pymysql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:"
            f"{DB_CONFIG['port']}/{DB_CONFIG['database']}?charset=utf8mb4")
-    print(f"[1/3] Kết nối {DB_CONFIG['host']}:{DB_CONFIG['port']} và trích xuất...")
+    scope = f"chỉ phiếu có mã bắt đầu bằng {TICKET_CODE_PREFIX!r}" if TICKET_CODE_PREFIX else "TẤT CẢ phiếu đã hoàn tất"
+    print(f"[1/3] Kết nối {DB_CONFIG['host']}:{DB_CONFIG['port']} và trích xuất ({scope}; SYNTHETIC_DATA={SYNTHETIC_DATA})...")
     try:
         df = pd.read_sql(SQL_QUERY, con=create_engine(url))
     except Exception as e:

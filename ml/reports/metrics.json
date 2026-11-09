@@ -1,70 +1,73 @@
 {
-  "model_name": "Ridge (log-nhân)",
+  "model_name": "CatBoost (native cat)",
   "model_version": "v3-20261108",
-  "trained_at": "2026-11-08T11:48:01",
+  "trained_at": "2026-11-08T20:27:58",
   "synthetic_data": true,
   "use_augmentation": false,
   "best_params": {
-    "regressor__ridge__alpha": 10.0
+    "depth": 4,
+    "iterations": 300,
+    "learning_rate": 0.05,
+    "loss_function": "MAE"
   },
-  "n_train_rows_final": 944,
-  "n_test_rows_eval": 189,
+  "n_train_rows_final": 1076,
+  "n_test_rows_eval": 216,
   "test_metrics": {
-    "MAE": 7.007028476832764,
-    "RMSE": 9.894523843999552,
-    "R2": 0.7835948779371991,
-    "P90_abs_err": 14.062398105471415,
-    "within_5min_pct": 48.148148148148145,
-    "bias": 0.11646741705343104
+    "MAE": 7.142803530771253,
+    "RMSE": 9.97487233792463,
+    "R2": 0.8829415217893403,
+    "P90_abs_err": 16.045827648362547,
+    "within_5min_pct": 45.370370370370374,
+    "bias": -1.3938988552957166
   },
   "test_mae_ci95": [
-    6.067995667704507,
-    8.04757700057847
+    6.272008197029568,
+    8.114596673788435
   ],
-  "baseline_primary_name": "B2 Tuyến tính theo catalog",
+  "baseline_primary_name": "B3 Định mức x hệ số KTV",
   "baseline_primary_test_metrics": {
-    "MAE": 8.910603866810854,
-    "RMSE": 12.075923667120549,
-    "R2": 0.6776568428146997,
-    "P90_abs_err": 19.010770842893983,
-    "within_5min_pct": 38.62433862433862,
-    "bias": 1.2372650039355226
+    "MAE": 7.843781890119991,
+    "RMSE": 11.119361524827045,
+    "R2": 0.8545385598407911,
+    "P90_abs_err": 18.235091881667188,
+    "within_5min_pct": 45.83333333333333,
+    "bias": 1.1102223111331593
   },
   "selection": {
     "rule": "CV-MAE nhỏ nhất theo nested CV",
-    "cv_mae": 7.789813429870189,
-    "cv_se": 0.2213977019458153,
+    "cv_mae": 7.2367164394643995,
+    "cv_se": 0.1569699267927598,
     "statistical_tie_set": [
-      "Ridge (log-nhân)",
       "CatBoost (native cat)",
-      "XGBoost"
+      "Ridge (log-nhân)"
     ],
-    "primary_baseline_cv_mae": 8.944874105295423,
+    "primary_baseline_cv_mae": 8.567832516119388,
     "outer_folds": 5,
     "inner_folds": 3
   },
   "noise_floor": {
-    "noise_rmse_floor": 9.149669720405727,
-    "noise_mae_floor": 7.101711081226475,
-    "rows_covered": 537.0,
-    "share_covered": 0.7112582781456953,
-    "n_groups_total": 399.0
+    "noise_rmse_floor": 7.180527267422473,
+    "noise_mae_floor": 5.4237941680863955,
+    "rows_covered": 583.0,
+    "share_covered": 0.6779069767441861,
+    "n_groups_total": 488.0
   },
   "interval_coverage": 0.9,
   "interval_method": "relative",
-  "interval_q_abs": 16.047643820595923,
-  "interval_q_rel": 0.28844073259198566,
-  "interval_halfwidth_minutes": 13.600055002226178,
-  "interval_test_coverage": 0.9153439153439153,
+  "interval_q_abs": 15.578161009684322,
+  "interval_q_rel": 0.25502020327001723,
+  "interval_halfwidth_minutes": 11.52789494952657,
+  "interval_test_coverage": 0.9120370370370371,
   "split_mode": "group",
   "cleaning": {
-    "rows_raw": 1029,
-    "dropped_reassigned": 84,
-    "dropped_invalid_target_or_no_service": 1,
+    "rows_raw": 1236,
+    "dropped_other_source": 0,
+    "dropped_reassigned": 160,
+    "dropped_invalid_target_or_no_service": 0,
     "dropped_missing_technician": 0,
     "dropped_implausible_duration": 0,
     "dropped_duplicate_tickets": 0,
-    "rows_clean": 944
+    "rows_clean": 1076
   },
   "features": [
     "total_services_count",
@@ -78,30 +81,8 @@
     "issue_5",
     "issue_6",
     "issue_7",
-    "device_model_id__318",
-    "device_model_id__319",
-    "device_model_id__320",
-    "device_model_id__405",
-    "device_model_id__782",
-    "device_model_id__789",
-    "device_model_id__790",
-    "device_model_id__792",
-    "device_model_id__794",
-    "device_model_id__1415",
-    "device_model_id__1416",
-    "device_model_id__1417",
-    "device_model_id__1427",
-    "device_model_id__1428",
-    "device_model_id__1429",
-    "device_model_id__1440",
-    "device_model_id__1441",
-    "device_model_id__1442",
-    "device_model_id__1443",
-    "device_model_id__1444",
-    "device_model_id__1445",
-    "technician_id__5343",
-    "technician_id__5344",
-    "technician_id__5345"
+    "device_model_id",
+    "technician_id"
   ],
   "technician_ids": [
     5343,

@@ -395,7 +395,7 @@ export function IntakePage() {
       <header>
         <span className="eyebrow">Tiếp nhận thiết bị</span>
         <h1>Tạo phiếu dịch vụ</h1>
-        <p>Ghi nhận thiết bị và tạo phiếu dịch vụ cho khách hàng. Mọi thông tin từ lịch hẹn (nếu có) sẽ tự động điền sẵn.</p>
+        <p>Ghi nhận thiết bị và tạo phiếu dịch vụ cho khách hàng. </p>
       </header>
 
       <form className="ops-form intake-form" onSubmit={submit}>
@@ -411,9 +411,9 @@ export function IntakePage() {
           {/* THÔNG BÁO TỰ ĐỘNG NẠP DỮ LIỆU TỪ LỊCH HẸN */}
           {initialAppointmentDeviceId && fullName && (
             <div className="intake-booking-card" style={{ background: '#eef6ff', border: '1px solid #b3d7ff', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-              <strong style={{ color: '#0066cc' }}>ℹ️ Đã tự động điền thông tin từ Lịch hẹn</strong>
+              <strong style={{ color: '#0066cc' }}>Tự động điền thông tin từ Lịch hẹn</strong>
               <p style={{ margin: '0.5rem 0 0', color: '#333' }}>
-                Hệ thống đã nạp sẵn thông tin khách hàng (<strong>{fullName}</strong> - {phone}), dòng máy và dịch vụ đã chọn từ lịch hẹn.
+                Thông tin khách hàng (<strong>{fullName}</strong> - {phone}), dòng máy và dịch vụ đã chọn từ lịch hẹn.
               </p>
             </div>
           )}
@@ -462,7 +462,7 @@ export function IntakePage() {
           {/* CHECKBOX TÍCH CHỌN NHIỀU VẤN ĐỀ KHÁCH GẶP PHẢI */}
           {modelId && (issues.data?.length ?? 0) > 0 && (
             <div className="field" style={{ marginTop: '1rem' }}>
-              <span>Vấn đề khách gặp phải <i>(Có thể tích chọn nhiều vấn đề)</i></span>
+              <span>Dịch vụ</span>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
                 {issues.data!.map(issue => {
                   const isChecked = selectedIssueIds.includes(issue.id)
@@ -526,7 +526,7 @@ export function IntakePage() {
           {groupedServicesByIssue.map(({ issue, services }) => (
             <div key={issue.id} style={{ marginBottom: '1.5rem', background: '#fafafa', padding: '1rem', borderRadius: '8px', border: '1px solid #eee' }}>
               <h3 style={{ margin: '0 0 0.75rem 0', color: '#0066cc', borderBottom: '1px solid #e0e0e0', paddingBottom: '0.4rem' }}>
-                📌 Mục dịch vụ cho vấn đề: {issue.name}
+                Dịch vụ: {issue.name}
               </h3>
               <div style={{ display: 'grid', gap: '0.5rem' }}>
                 {services.map(item => {
@@ -573,7 +573,7 @@ export function IntakePage() {
                 checked={hasAppointmentDiscount}
                 onChange={e => setHasAppointmentDiscount(e.target.checked)}
               />
-              <span>Áp dụng ưu đãi đặt lịch trước ({discountPercent}%)</span>
+              <span>Ưu đãi giảm giá ({discountPercent}%)</span>
             </label>
             <small style={{ display: 'block', marginTop: '0.25rem', color: '#7a5400', marginLeft: '1.95rem' }}>
               Tích chọn ô này để áp dụng mức giảm giá {discountPercent}% cho tất cả các dịch vụ trong phiếu tiếp nhận.

@@ -16,7 +16,7 @@ if str(ML_DIR) not in sys.path:
 
 from config.config import (BUNDLE_PATH, CV_FOLDS, FEATURE_COLS, GROUP_COL, INNER_CV_FOLDS, INTERVAL_COVERAGE, ISSUE_COL,
                            MAX_PLAUSIBLE_MINUTES, MIN_PREDICTED_MINUTES, QUICK_MODE, RANDOM_STATE, RAW_DATA_PATH,
-                           REPORTS_DIR, SPLIT_MODE, SYNTHETIC_DATA, TARGET_COL)
+                           REPORTS_DIR, SPLIT_MODE, SYNTHETIC_DATA, TARGET_COL, TICKET_CODE_PREFIX)
 from src.bundle import base_versions, fit_final_pipeline, new_version_tag, package_bundle, reload_check
 from src.evaluation import (baseline_predictions, bootstrap_mae_ci, calibrate_interval, interval_bounds,
                             regression_report, twin_noise_floor)
@@ -28,7 +28,7 @@ from src.modeling import (cv_baselines, fit_deployable, leaderboard_row, make_ca
 def main():
     if QUICK_MODE:
         print("CẢNH BÁO: QUICK_MODE=True (lưới rút gọn) - không dùng kết quả này cho báo cáo.")
-    df, clean_rep = clean_training_data(pd.read_csv(RAW_DATA_PATH), TARGET_COL, GROUP_COL, MAX_PLAUSIBLE_MINUTES)
+    df, clean_rep = clean_training_data(pd.read_csv(RAW_DATA_PATH), TARGET_COL, GROUP_COL, MAX_PLAUSIBLE_MINUTES, TICKET_CODE_PREFIX)
     print(f"1. Làm sạch: {clean_rep}")
     train, test = split_train_test(df)
     y_tr, y_te = train[TARGET_COL].to_numpy(float), test[TARGET_COL].to_numpy(float)

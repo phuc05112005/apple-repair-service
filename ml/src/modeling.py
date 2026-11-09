@@ -103,8 +103,8 @@ def make_candidates(seed: int = RANDOM_STATE) -> dict[str, Spec]:
         objs = ["reg:squarederror", "reg:absoluteerror"] if ver >= (1, 7) else ["reg:squarederror"]
         C["XGBoost"] = Spec(
             "XGBoost", XGBRegressor(random_state=seed, n_jobs=N_JOBS, verbosity=0),
-            _quick({"est__max_depth": [2, 3, 4, 6], "est__learning_rate": [0.03, 0.08],
-                    "est__n_estimators": [200, 400], "est__objective": objs}), "ohe",
+            _quick({"est__max_depth": [2, 3, 4, 6], "est__learning_rate": [0.02, 0.05],
+                    "est__n_estimators": [300, 600], "est__objective": objs}), "ohe",
             "boosting", "cây nối tiếp sửa lỗi, có điều chuẩn")
     except ImportError:
         pass
@@ -112,22 +112,20 @@ def make_candidates(seed: int = RANDOM_STATE) -> dict[str, Spec]:
         from lightgbm import LGBMRegressor
         C["LightGBM"] = Spec(
             "LightGBM", LGBMRegressor(random_state=seed, n_jobs=N_JOBS, verbose=-1),
-            _quick({"est__num_leaves": [7, 15, 31], "est__learning_rate": [0.03, 0.08],
+            _quick({"est__num_leaves": [4, 7, 15], "est__min_child_samples": [5, 20],
                     "est__n_estimators": [200, 400], "est__objective": ["regression", "regression_l1"]}), "ohe",
             "boosting (leaf-wise, histogram)", "nhanh, dễ quá khớp khi ít dữ liệu")
     except ImportError:
         pass
-    try:
-        from catboost import CatBoostRegressor
+    from src.estimators import CatBoostSK
+    if CatBoostSK is not None:
         C["CatBoost (native cat)"] = Spec(
             "CatBoost (native cat)",
-            CatBoostRegressor(random_seed=seed, verbose=0, thread_count=N_JOBS if N_JOBS > 0 else None,
-                              allow_writing_files=False, cat_features=list(CAT_COLS)),
+            CatBoostSK(random_seed=seed, verbose=0, thread_count=N_JOBS if N_JOBS > 0 else None,
+                       allow_writing_files=False, cat_features=list(CAT_COLS)),
             _quick({"est__depth": [4, 6], "est__learning_rate": [0.05, 0.1],
                     "est__iterations": [300], "est__loss_function": ["RMSE", "MAE"]}), "native",
             "boosting (cây đối xứng)", "tự mã hóa biến định danh (ordered target statistics)")
-    except ImportError:
-        pass
     return C
 
 

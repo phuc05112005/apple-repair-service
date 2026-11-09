@@ -247,6 +247,11 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
   }
 
   const displayEstimatedCompletion = useMemo(() => {
+    // Nếu phiếu đang chờ phân công, không hiển thị mốc ngày giờ hoàn thành ảo
+    if (ticket.status === 'WAITING_ASSIGNMENT') {
+      return 'Chờ phân công'
+    }
+
     const rawEst = ticket.estimatedCompletionAt || ticket.timing?.estimatedCompletionAt
     if (rawEst) return formatDateTime(rawEst)
 
@@ -282,7 +287,7 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
         <div className="ticket-card__detail" style={{ padding: '20px' }}>
           <div className="ticket-meta" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
             <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Thanh toán</span><br /><strong style={{ color: '#0f172a' }}>{paymentStatusLabels[ticket.paymentStatus]}</strong></div>
-            <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Tổng đã duyệt</span><br /><strong style={{ color: '#0f172a' }}>{formatMoney(ticket.approvedTotal)}</strong></div>
+            <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Giá dịch vụ</span><br /><strong style={{ color: '#0f172a' }}>{formatMoney(ticket.approvedTotal)}</strong></div>
             <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Dự kiến hoàn thành</span><br /><strong style={{ color: '#0f172a' }}>{displayEstimatedCompletion}</strong></div>
           </div>
 

@@ -26,6 +26,7 @@ FEATURE_COLS = NUM_COLS + CAT_COLS + [ISSUE_COL]   # 5 thuộc tính gốc, tấ
 # (lúc train = linh kiện đã xuất kho thực tế, lúc dự đoán chưa biết -> lệch train/serve).
 
 # ------------------------------------------------------------------ Làm sạch
+TICKET_CODE_PREFIX = "ST-SEED-"  # chỉ huấn luyện trên phiếu do script seed sinh (None = không lọc). Đặt None khi dùng dữ liệu vận hành thật.
 MAX_PLAUSIBLE_MINUTES = 480.0   # nhãn > 8 giờ thi công thuần coi là nhập liệu lỗi (quên đóng phiếu)
 
 # ------------------------------------------------------------------ Huấn luyện / đánh giá

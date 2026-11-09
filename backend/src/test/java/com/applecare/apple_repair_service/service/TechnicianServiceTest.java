@@ -54,7 +54,7 @@ class TechnicianServiceTest {
     final User tech = TestData.user(2);
     final TechnicianEligibility eligibility = new TechnicianEligibility(access, schedules, TestData.CLOCK);
     final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
-    final AssignmentService service = new AssignmentService(tickets, assignments, access, rules, eligibility, statuses, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ApplicationEventPublisher.class));
+    final AssignmentService service = new AssignmentService(tickets, assignments, access, rules, eligibility, statuses, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ApplicationEventPublisher.class), mock(MlCandidateEstimateService.class));
     final ServiceTicket ticket = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
 
     TechnicianSchedule shift(User user) {

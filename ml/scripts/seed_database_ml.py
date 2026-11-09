@@ -17,7 +17,7 @@ engine = create_engine(DATABASE_URL)
 
 # ---------------------------------------------------------------- THAM SỐ MÔ PHỎNG (công khai để báo cáo mô tả đúng)
 SEED = 42                      # cố định hạt ngẫu nhiên => cùng một bộ dữ liệu mỗi lần chạy (tái lập được)
-N_PASSES = 5                   # mỗi dịch vụ trong danh mục được sinh N_PASSES lần
+N_PASSES = 10                  # mỗi dịch vụ trong danh mục được sinh N_PASSES lần
 SIGMA = 0.15                   # nhiễu NHÂN lognormal: thời gian = định mức x hệ số KTV x exp(N(0, SIGMA^2))
 SPEED = {"t1": 0.90, "t2": 1.00, "t3": 1.15}   # hệ số tốc độ KTV (nhỏ = nhanh)
 P_MULTI = 0.35                 # xác suất phiếu có nhiều dịch vụ

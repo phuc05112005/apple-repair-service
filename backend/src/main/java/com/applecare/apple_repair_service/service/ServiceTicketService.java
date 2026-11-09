@@ -119,6 +119,7 @@ public class ServiceTicketService {
         ticket.setDiscountPercent(isDiscountEligible(appointment) && bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null)
                 ? appointment.getDiscountPercent() : BigDecimal.ZERO);
         tickets.saveAndFlush(ticket);
+
         if (replacements == null) {
             for (var booked : bookedItems) {
                 if (booked.getWarrantySourceItem() != null) {
@@ -151,6 +152,10 @@ public class ServiceTicketService {
         }
         if (replacements != null) bookedItems.stream().filter(item -> item.getWarrantySourceItem() != null)
                 .forEach(booked -> repairItems.save(warrantyClaimItem(ticket, booked)));
+
+        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
+        repairItems.flush();
+
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
     }
@@ -176,6 +181,7 @@ public class ServiceTicketService {
         ticket.setCustomerReportedIssue(BusinessRules.text(r.customerReportedIssue()));
         ticket.setAuthorizedScope(BusinessRules.text(r.authorizedScope()));
         tickets.saveAndFlush(ticket);
+
         for (var id : selected) {
             var c = catalog(id, r.deviceModelId());
             var item = new RepairItem();
@@ -188,6 +194,10 @@ public class ServiceTicketService {
             item.setApprovalStatus(ApprovalStatus.APPROVED);
             repairItems.save(item);
         }
+
+        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
+        repairItems.flush();
+
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
     }
@@ -299,7 +309,6 @@ public class ServiceTicketService {
         rules.validate(r);
         var t = access.lock(ServiceTicket.class, id);
 
-        // Chấp nhận thêm WAITING_ASSIGNMENT (trạng thái khởi tạo phiếu mới tiếp nhận)
         BusinessRules.require(t.getPaymentStatus() != PaymentStatus.PAID &&
                 (t.getStatus() == ServiceTicketStatus.WAITING_ASSIGNMENT
                         || t.getStatus() == ServiceTicketStatus.ASSIGNED
@@ -318,7 +327,6 @@ public class ServiceTicketService {
 
         boolean requiresApproval = r.requiresCustomerApproval();
 
-        // Tự động gán PRE_AUTHORIZED nếu r.confirmationMethod() bị null nhưng phiếu đã có phạm vi cho phép trước (authorizedScope)
         var confirmationMethod = r.confirmationMethod();
         if (confirmationMethod == null && t.getAuthorizedScope() != null) {
             confirmationMethod = com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED;
@@ -383,6 +391,8 @@ public class ServiceTicketService {
                 old.setApprovalNote("Superseded by inspection plan");
             }
         t.setInspectionResult(r.inspectionResult().trim());
+
+        repairItems.flush();
 
         var next = requiresApproval ? ServiceTicketStatus.WAITING_APPROVAL : ServiceTicketStatus.REPAIRING;
         if (t.getStatus() != next) statuses.changeStatus(t, next, actor, requiresApproval ? "Chờ liên hệ khách hàng" : "Đã ghi nhận phương án và xác nhận nội bộ");

@@ -49,9 +49,11 @@ public class MlClient {
                     .retrieve()
                     .body(PredictResponse.class);
 
-            if (response != null && "success".equals(response.status())) {
+            if (response != null && "success".equals(response.status()) && response.predicted_duration_minutes() != null && response.predicted_duration_minutes() > 0) {
                 log.info("ML Prediction applied successfully for Ticket ID: {}. Duration: {} mins",
                         ticketId, response.predicted_duration_minutes());
+            } else {
+                log.warn("ML Prediction ignored for Ticket ID: {} due to null or invalid duration.", ticketId);
             }
         } catch (Exception e) {
             log.error("Failed to call ML Service for Ticket ID: {}. Error: {}", ticketId, e.getMessage());

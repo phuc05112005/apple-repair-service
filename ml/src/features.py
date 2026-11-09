@@ -24,12 +24,26 @@ def issue_key(value) -> str:
     return ",".join(map(str, parse_issue_ids(value)))
 
 
-def clean_training_data(df: pd.DataFrame, target_col: str, group_col: str,
-                        max_minutes: float = 480.0) -> tuple[pd.DataFrame, dict]:
+def source_patterns(df: pd.DataFrame, code_col: str = "ticket_code") -> pd.Series:
+    """Đếm số phiếu theo 'dạng mã phiếu' (số được thay bằng #). Nhiều dạng mã = dữ liệu đến từ nhiều nguồn/đợt sinh khác nhau."""
+    return df[code_col].astype(str).str.replace(r"\d+", "#", regex=True).value_counts()
+
+
+def clean_training_data(df: pd.DataFrame, target_col: str, group_col: str, max_minutes: float = 480.0,
+                        code_prefix: str | None = None) -> tuple[pd.DataFrame, dict]:
     """Làm sạch dữ liệu huấn luyện. Trả về (df sạch, báo cáo từng luật) để đưa vào báo cáo đồ án.
-    Mỗi luật chỉ đếm những dòng bị loại BỞI RIÊNG luật đó (áp tuần tự)."""
+    Mỗi luật chỉ đếm những dòng bị loại BỞI RIÊNG luật đó (áp tuần tự).
+    code_prefix: chỉ giữ phiếu có ticket_code bắt đầu bằng tiền tố này (một nguồn dữ liệu duy nhất, đã được mô tả)."""
     rep = {"rows_raw": int(len(df))}
     out = df.copy()
+
+    # Luật 0: một nguồn dữ liệu duy nhất. Trộn nhiều nguồn có quy luật khác nhau làm sai nhãn học và sai mọi kiểm định.
+    if code_prefix and "ticket_code" in out.columns:
+        mask = ~out["ticket_code"].astype(str).str.startswith(code_prefix)
+        rep["dropped_other_source"] = int(mask.sum())
+        out = out[~mask]
+    else:
+        rep["dropped_other_source"] = 0
 
     # Luật 1: phiếu chuyển giao KTV -> nhãn là thời gian trộn của nhiều người
     if "is_reassigned" in out.columns:

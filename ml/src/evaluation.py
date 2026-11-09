@@ -128,6 +128,14 @@ def twin_noise_floor(df: pd.DataFrame, target: str, issue_col: str) -> dict:
             "rows_covered": int(rows), "share_covered": float(rows / len(df)), "n_groups_total": int(key.nunique())}
 
 
+def twin_covered_mask(df: pd.DataFrame, issue_col: str) -> np.ndarray:
+    """True cho các phiếu có ít nhất một phiếu song sinh. Trần nhiễu CHỈ đo được trên tập này (thường là ca ngắn, dễ hơn),
+    nên so sánh công bằng là: sai số của mô hình trên CHÍNH tập này so với trần, không phải sai số trên toàn bộ phiếu."""
+    key = (df["device_model_id"].astype(str) + "|" + df[issue_col].map(issue_key) + "|" +
+           df["technician_id"].astype(str) + "|" + df[SERVICES_COL].astype(str) + "|" + df[CATALOG_COL].astype(str))
+    return (key.map(key.value_counts()) >= 2).to_numpy()
+
+
 # =====================================================================================================
 # 4. Kiểm định tín hiệu KTV có hiệu chỉnh độ khó ca (ANCOVA bằng F-test từng phần trên log nhãn)
 # =====================================================================================================

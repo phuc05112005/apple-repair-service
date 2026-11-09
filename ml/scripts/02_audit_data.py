@@ -10,13 +10,13 @@ ML_DIR = Path(__file__).resolve().parent.parent
 if str(ML_DIR) not in sys.path:
     sys.path.append(str(ML_DIR))
 
-from config.config import GROUP_COL, ISSUE_COL, MAX_PLAUSIBLE_MINUTES, RAW_DATA_PATH, REPORTS_DIR, TARGET_COL
+from config.config import GROUP_COL, ISSUE_COL, MAX_PLAUSIBLE_MINUTES, RAW_DATA_PATH, REPORTS_DIR, TARGET_COL, TICKET_CODE_PREFIX
 from src.evaluation import technician_effect_test, twin_noise_floor
 from src.features import clean_training_data, issue_key
 
 
 def main():
-    df, rep = clean_training_data(pd.read_csv(RAW_DATA_PATH), TARGET_COL, GROUP_COL, MAX_PLAUSIBLE_MINUTES)
+    df, rep = clean_training_data(pd.read_csv(RAW_DATA_PATH), TARGET_COL, GROUP_COL, MAX_PLAUSIBLE_MINUTES, TICKET_CODE_PREFIX)
     print("=== LÀM SẠCH ===")
     for k, v in rep.items():
         print(f"  {k}: {v}")
