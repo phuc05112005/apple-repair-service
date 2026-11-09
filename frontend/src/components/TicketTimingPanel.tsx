@@ -2,7 +2,12 @@ import type { ServiceTicketResponse } from '../api/contracts'
 import { TicketTimingSummary } from './TicketTimingSummary'
 import { useBusinessNow } from '../hooks/useBusinessNow'
 
-export function TicketTimingPanel({ ticket }: { ticket: ServiceTicketResponse }) {
+interface Props {
+  ticket: ServiceTicketResponse
+  canViewHistory?: boolean
+}
+
+export function TicketTimingPanel({ ticket }: Props) {
   const now = useBusinessNow()
 
   // Ẩn hoàn toàn khối Thời gian xử lý khi chưa phân công kỹ thuật viên
