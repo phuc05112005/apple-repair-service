@@ -15,6 +15,7 @@ import com.applecare.apple_repair_service.enums.WarrantyRemedy;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.exception.DuplicateResourceException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
+import com.applecare.apple_repair_service.repository.AssignmentRepository;
 import com.applecare.apple_repair_service.repository.DeviceTypeRepository;
 import com.applecare.apple_repair_service.repository.AdminReferenceRepository;
 import com.applecare.apple_repair_service.repository.PartRepository;
@@ -36,7 +37,7 @@ class MasterDataServiceTest {
     @Test
     void partRejectsNegativePriceBeforePersistence() {
         var repo = mock(PartRepository.class);
-        var service = new PartService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new PartService(repo, mock(DomainAccess.class), rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreatePartRequest("P", "Pin", null, null, new BigDecimal("-1"))));
         verifyNoInteractions(repo);
     }
@@ -48,7 +49,7 @@ class MasterDataServiceTest {
         var type = new ServiceType();
         type.setCode(ServiceTypeCode.REPLACEMENT);
         when(access.get(ServiceType.class, 2L)).thenReturn(type);
-        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, null, "Replace", BigDecimal.TEN, 30, 90)));
         verifyNoInteractions(repo);
     }
@@ -64,7 +65,7 @@ class MasterDataServiceTest {
         when(access.get(DeviceModel.class, 1L)).thenReturn(model);
         when(access.get(ServiceType.class, 2L)).thenReturn(repairType);
         when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
-        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateServiceCatalogItemRequest(
                 1L, 2L, 3L, null, "Sửa nguồn", BigDecimal.TEN, 30, 90, null, null)));
 
@@ -88,7 +89,7 @@ class MasterDataServiceTest {
         when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
         when(access.get(Part.class, 7L)).thenReturn(part);
         when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class));
 
         service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, 7L, null,
                 BigDecimal.TEN, 60, 180, WarrantyRemedy.REPAIR, null));
@@ -116,7 +117,7 @@ class MasterDataServiceTest {
         when(access.get(ServiceIssue.class, 3L)).thenReturn(issue);
         when(access.get(Part.class, 7L)).thenReturn(currentPart);
         when(repo.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(), mock(AdminReferenceRepository.class));
+        var service = new ServiceCatalogService(repo, access, rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class));
 
         service.create(new CreateServiceCatalogItemRequest(1L, 2L, 3L, 7L, null,
                 BigDecimal.TEN, 60, 180, WarrantyRemedy.REPLACEMENT, 9L));
@@ -133,7 +134,7 @@ class MasterDataServiceTest {
         var e = new SystemSetting();
         e.setSettingValue("abc");
         when(repo.findBySettingKey("K")).thenReturn(Optional.of(e));
-        var service = new SystemSettingService(repo, rules, new EntityResponses());
+        var service = new SystemSettingService(repo, rules, new EntityResponses(mock(AssignmentRepository.class)));
         assertThrows(BusinessRuleViolationException.class, () -> service.getInteger("K"));
         assertThrows(BusinessRuleViolationException.class, () -> service.getDecimal("K"));
     }
@@ -144,7 +145,7 @@ class MasterDataServiceTest {
         var existing = new DeviceType();
         existing.setId(2L);
         when(repo.findByNameIgnoreCase("iPhone")).thenReturn(Optional.of(existing));
-        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses(), mock(AdminReferenceRepository.class), mock(com.applecare.apple_repair_service.repository.ServiceIssueRepository.class));
+        var service = new DeviceTypeService(repo, mock(DomainAccess.class), rules, new EntityResponses(mock(AssignmentRepository.class)), mock(AdminReferenceRepository.class), mock(com.applecare.apple_repair_service.repository.ServiceIssueRepository.class));
         assertThrows(DuplicateResourceException.class, () -> service.create(new CreateDeviceTypeRequest(" iPhone ")));
         verify(repo, never()).saveAndFlush(any());
     }

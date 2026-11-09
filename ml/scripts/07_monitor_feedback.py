@@ -9,6 +9,9 @@ ML_DIR = Path(__file__).resolve().parent.parent
 if str(ML_DIR) not in sys.path:
     sys.path.append(str(ML_DIR))
 
+from config.config import RETRAIN_MAE_RATIO
+from src.inference import interval_bounds
+
 FEEDBACK_SQL = """
 SELECT mp.id AS prediction_id, mp.service_ticket_id, mp.technician_id, mp.predicted_duration_minutes,
        mp.model_version, mp.predicted_at,
@@ -35,12 +38,15 @@ def summarize(df: pd.DataFrame, metadata: dict, min_rows: int = 30) -> dict:
         return {"status": "NOT_ENOUGH_DATA", "n": int(len(d)), "need": min_rows}
     err = d["predicted_duration_minutes"] - d["actual_net_minutes"]
     mae, ref = float(err.abs().mean()), float(metadata["test_metrics"]["MAE"])
-    q = float(metadata["interval_halfwidth_minutes"])
+    pred = d["predicted_duration_minutes"].to_numpy(float)
+    lo, hi = interval_bounds(pred, metadata)
+    actual = d["actual_net_minutes"].to_numpy(float)
+    cover = float(((actual >= lo) & (actual <= hi)).mean())
     out = {"n": int(len(d)), "MAE_live": round(mae, 2), "MAE_at_training_test": round(ref, 2),
-           "bias_live": round(float(err.mean()), 2), "interval_coverage_live": round(float((err.abs() <= q).mean()), 3),
+           "bias_live": round(float(err.mean()), 2), "interval_coverage_live": round(cover, 3),
            "interval_coverage_nominal": metadata["interval_coverage"],
            "by_technician_MAE": d.assign(abs_err=err.abs()).groupby("technician_id")["abs_err"].mean().round(2).to_dict()}
-    out["status"] = "RETRAIN_RECOMMENDED" if mae > 1.5 * ref else "OK"
+    out["status"] = "RETRAIN_RECOMMENDED" if mae > RETRAIN_MAE_RATIO * ref else "OK"
     return out
 
 

@@ -1,68 +1,79 @@
 {
-  "model_name": "XGBoost",
-  "model_version": "v2-20261106",
-  "trained_at": "2026-11-06T18:35:48",
+  "model_name": "CatBoost (native cat)",
+  "model_version": "v3-20261108",
+  "trained_at": "2026-11-08T20:27:58",
   "synthetic_data": true,
   "use_augmentation": false,
   "best_params": {
-    "learning_rate": 0.03,
-    "max_depth": 3,
-    "n_estimators": 200
+    "depth": 4,
+    "iterations": 300,
+    "learning_rate": 0.05,
+    "loss_function": "MAE"
   },
-  "feature_mode": "ohe",
-  "n_train_rows_final": 832,
-  "n_test_rows_eval": 167,
+  "n_train_rows_final": 1076,
+  "n_test_rows_eval": 216,
   "test_metrics": {
-    "MAE": 2.1109468037496786,
-    "RMSE": 2.9386512766208255,
-    "R2": 0.9607074611701468,
-    "P90_abs_err": 3.9376121520996095,
-    "within_5min_pct": 95.80838323353294,
-    "bias": 0.23697179234670307
+    "MAE": 7.142803530771253,
+    "RMSE": 9.97487233792463,
+    "R2": 0.8829415217893403,
+    "P90_abs_err": 16.045827648362547,
+    "within_5min_pct": 45.370370370370374,
+    "bias": -1.3938988552957166
   },
   "test_mae_ci95": [
-    1.8368029543025766,
-    2.4517331705835765
+    6.272008197029568,
+    8.114596673788435
   ],
-  "baseline_B3_test_metrics": {
-    "MAE": 8.111605055135222,
-    "RMSE": 13.885419364077451,
-    "R2": 0.12273260625165672,
-    "P90_abs_err": 17.379591836734697,
-    "within_5min_pct": 61.67664670658682,
-    "bias": -1.5993599255418054
+  "baseline_primary_name": "B3 Định mức x hệ số KTV",
+  "baseline_primary_test_metrics": {
+    "MAE": 7.843781890119991,
+    "RMSE": 11.119361524827045,
+    "R2": 0.8545385598407911,
+    "P90_abs_err": 18.235091881667188,
+    "within_5min_pct": 45.83333333333333,
+    "bias": 1.1102223111331593
   },
   "selection": {
-    "rule": "CV-MAE nhỏ nhất (GroupKFold)",
-    "cv_mae": 2.484577018336246,
-    "cv_se": 0.08301385178242346,
+    "rule": "CV-MAE nhỏ nhất theo nested CV",
+    "cv_mae": 7.2367164394643995,
+    "cv_se": 0.1569699267927598,
     "statistical_tie_set": [
-      "XGBoost",
-      "XGBoost",
       "CatBoost (native cat)",
-      "Random Forest",
-      "Random Forest",
-      "CatBoost (one-hot)",
-      "CatBoost (one-hot)",
-      "LightGBM",
-      "LightGBM"
-    ]
+      "Ridge (log-nhân)"
+    ],
+    "primary_baseline_cv_mae": 8.567832516119388,
+    "outer_folds": 5,
+    "inner_folds": 3
+  },
+  "noise_floor": {
+    "noise_rmse_floor": 7.180527267422473,
+    "noise_mae_floor": 5.4237941680863955,
+    "rows_covered": 583.0,
+    "share_covered": 0.6779069767441861,
+    "n_groups_total": 488.0
   },
   "interval_coverage": 0.9,
-  "interval_halfwidth_minutes": 4.057243347167969,
-  "interval_test_coverage": 0.9041916167664671,
+  "interval_method": "relative",
+  "interval_q_abs": 15.578161009684322,
+  "interval_q_rel": 0.25502020327001723,
+  "interval_halfwidth_minutes": 11.52789494952657,
+  "interval_test_coverage": 0.9120370370370371,
   "split_mode": "group",
   "cleaning": {
-    "rows_raw": 832,
-    "dropped_reassigned": 0,
+    "rows_raw": 1236,
+    "dropped_other_source": 0,
+    "dropped_reassigned": 160,
     "dropped_invalid_target_or_no_service": 0,
+    "dropped_missing_technician": 0,
+    "dropped_implausible_duration": 0,
     "dropped_duplicate_tickets": 0,
-    "rows_clean": 832
+    "rows_clean": 1076
   },
   "features": [
     "total_services_count",
     "total_catalog_standard_duration_minutes",
     "duration_per_service",
+    "log_catalog",
     "issue_1",
     "issue_2",
     "issue_3",
@@ -70,30 +81,8 @@
     "issue_5",
     "issue_6",
     "issue_7",
-    "device_model_id__318",
-    "device_model_id__319",
-    "device_model_id__320",
-    "device_model_id__405",
-    "device_model_id__782",
-    "device_model_id__789",
-    "device_model_id__790",
-    "device_model_id__792",
-    "device_model_id__794",
-    "device_model_id__1415",
-    "device_model_id__1416",
-    "device_model_id__1417",
-    "device_model_id__1427",
-    "device_model_id__1428",
-    "device_model_id__1429",
-    "device_model_id__1440",
-    "device_model_id__1441",
-    "device_model_id__1442",
-    "device_model_id__1443",
-    "device_model_id__1444",
-    "device_model_id__1445",
-    "technician_id__5343",
-    "technician_id__5344",
-    "technician_id__5345"
+    "device_model_id",
+    "technician_id"
   ],
   "technician_ids": [
     5343,
@@ -104,6 +93,7 @@
     "python": "3.13.5",
     "sklearn": "1.6.1",
     "pandas": "2.2.3",
+    "numpy": "2.1.3",
     "xgboost": "3.4.1",
     "lightgbm": "4.7.0",
     "catboost": "1.2.10"

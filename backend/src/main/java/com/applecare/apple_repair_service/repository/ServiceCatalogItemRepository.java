@@ -7,8 +7,9 @@ import java.util.List;
 
 public interface ServiceCatalogItemRepository extends JpaRepository<ServiceCatalogItem, Long> {
     boolean existsByServiceIssue_IdAndDeviceModel_DeviceType_Id(Long serviceIssueId, Long deviceTypeId);
+
     @org.springframework.data.jpa.repository.Query("""
-            select c from ServiceCatalogItem c left join c.part p join c.serviceIssue.deviceTypes issueType
+            select c from ServiceCatalogItem c left join fetch c.part p join c.serviceIssue.deviceTypes issueType
             where c.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
               and c.deviceModel.deviceType.status = com.applecare.apple_repair_service.enums.ActiveStatus.ACTIVE
@@ -22,8 +23,8 @@ public interface ServiceCatalogItemRepository extends JpaRepository<ServiceCatal
             order by c.name, c.id
             """)
     List<ServiceCatalogItem> findPublicCatalog(@org.springframework.data.repository.query.Param("deviceModelId") Long deviceModelId,
-            @org.springframework.data.repository.query.Param("serviceIssueId") Long serviceIssueId,
-            @org.springframework.data.repository.query.Param("serviceTypeId") Long serviceTypeId);
+                                               @org.springframework.data.repository.query.Param("serviceIssueId") Long serviceIssueId,
+                                               @org.springframework.data.repository.query.Param("serviceTypeId") Long serviceTypeId);
 
     List<ServiceCatalogItem> findAllByDeviceModel_IdAndServiceIssue_Id(Long deviceModelId, Long serviceIssueId);
 }

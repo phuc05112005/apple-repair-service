@@ -42,7 +42,8 @@ export function TicketWorkspacePage() {
   }
 
   const assign = useMutation({
-    mutationFn: ({ technicianId, source }: { technicianId: number; source: AssignmentSource }) => receptionistApi.assign(id, technicianId, source),
+    mutationFn: ({ technicianId, source, predictedDurationMinutes }: { technicianId: number; source: AssignmentSource; predictedDurationMinutes?: number }) =>
+      receptionistApi.assign(id, technicianId, source, predictedDurationMinutes),
     onSuccess: async () => { setSelectedCandidate(undefined); await refresh() },
     onError: async error => {
       if (error instanceof ApiError && [400, 409].includes(error.status)) await refresh()
@@ -67,7 +68,9 @@ export function TicketWorkspacePage() {
     <header className="ticket-header"><div><span className="record-code">Phiếu #{ticket.id}</span><h1>Phiếu dịch vụ</h1><p>{context.branchName} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}</p></div><StatusBadge label={ticketStatusLabels[ticket.status]} tone={ticketStatusTones[ticket.status]} /></header>
     <div className="ticket-reference"><div><span>Mã tra cứu phiếu</span><code>{ticket.ticketCode}</code><small>Dùng mã này khi khách hàng tra cứu phiếu dịch vụ.</small></div><button type="button" className="button button--quiet" onClick={async () => { try { await navigator.clipboard.writeText(ticket.ticketCode); setCopiedCode(true) } catch { setCopiedCode(false) } }}>{copiedCode ? 'Đã sao chép' : 'Sao chép mã'}</button></div>
     <div className="ticket-milestones"><div><span>Tiếp nhận</span><strong>{formatDateTime(ticket.receivedAt)}</strong></div><div><span>Cập nhật gần nhất</span><strong>{formatDateTime(ticket.updatedAt)}</strong></div>{ticket.paidAt && <div><span>Thanh toán</span><strong>{formatDateTime(ticket.paidAt)}</strong></div>}{ticket.handedOverAt && <div><span>Bàn giao</span><strong>{formatDateTime(ticket.handedOverAt)}</strong></div>}</div>
-    <TicketTimingPanel ticket={ticket} canAdjust />
+    
+    <TicketTimingPanel ticket={ticket} />
+
     <div className="ticket-layout"><main>
       <section className="ops-section"><div className="ops-section__title"><span>01</span><h2>Thông tin tiếp nhận</h2></div><dl className="record-grid"><div><dt>Khách hàng</dt><dd>{context.customerFullName}<br /><small>{context.customerPhone}</small></dd></div><div><dt>Thiết bị</dt><dd>{context.deviceModelName}<br /><small>{context.deviceTypeName}{context.storage ? ` · ${context.storage}` : ''}</small></dd></div><div><dt>Vấn đề</dt><dd>{context.serviceIssues.join(', ') || 'Chưa xác định'}</dd></div><div><dt>Thanh toán</dt><dd>{paymentStatusLabels[ticket.paymentStatus]}</dd></div></dl>{context.symptomDescription && <div className="detail-note"><span>Vấn đề khách mô tả ban đầu</span><p>{context.symptomDescription}</p></div>}<div className="detail-note"><span>Tình trạng khi nhận</span><p>{ticket.receivedCondition}</p></div>{ticket.inspectionResult && <div className="detail-note"><span>Kết quả kiểm tra</span><p>{ticket.inspectionResult}</p></div>}</section>
 
@@ -91,7 +94,7 @@ export function TicketWorkspacePage() {
       {!['HANDED_OVER', 'CANCELLED'].includes(ticket.status) && <section className="danger-zone"><h3>Hủy phiếu</h3><label className="field"><span>Lý do</span><textarea placeholder="Nhập lý do hủy phiếu" value={cancelReason} onChange={event => setCancelReason(event.target.value)} /></label><button className="button button--quiet" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate()}>Hủy phiếu dịch vụ</button></section>}
       {pendingError && <ErrorState error={pendingError} />}
     </aside></div>
-    {selectedCandidate && <ConfirmDialog title="Xác nhận phân công kỹ thuật viên?" confirmLabel="Xác nhận phân công" busyLabel="Đang phân công…" danger={false} busy={assign.isPending} onCancel={() => { setSelectedCandidate(undefined); assign.reset() }} onConfirm={() => assign.mutate({ technicianId: selectedCandidate.technicianId, source: 'ACCEPTED_RECOMMENDATION' })}>
+    {selectedCandidate && <ConfirmDialog title="Xác nhận phân công kỹ thuật viên?" confirmLabel="Xác nhận phân công" busyLabel="Đang phân công…" danger={false} busy={assign.isPending} onCancel={() => { setSelectedCandidate(undefined); assign.reset() }} onConfirm={() => assign.mutate({ technicianId: selectedCandidate.technicianId, source: 'ACCEPTED_RECOMMENDATION', predictedDurationMinutes: Math.round(selectedCandidate.predictedTechnicalMinutes) })}>
       <p>Hệ thống sẽ kiểm tra lại ca làm việc, trạng thái phiếu và khả năng nhận việc trước khi lưu.</p>
       <strong>{selectedCandidate.technicianName} · hoàn tất dự kiến {formatDateTime(selectedCandidate.estimatedCompletionAt)}</strong>
       {assign.isError && <ErrorState error={assign.error} />}

@@ -176,7 +176,7 @@ export function SchedulesPage() {
       <header className="admin-page-header">
         <div>
           <span className="eyebrow">Nhân sự</span>
-          <h1>Quản lý lịch làm việc (Bản mới)</h1>
+          <h1>Quản lý lịch làm việc</h1>
           <p>Tra cứu lịch làm việc theo cá nhân hoặc xem danh sách nhân sự trực tại chi nhánh theo ngày.</p>
         </div>
         <div className="row-actions">

@@ -854,7 +854,7 @@
 
   .studio-home { --studio-ink: #171a18; --studio-muted: #686d68; --studio-line: rgba(23,26,24,.14); --studio-warm: #f2f0ea; color: var(--studio-ink); background: #f7f6f2; font-family: "Segoe UI Variable Text", "Aptos", "Segoe UI", sans-serif; }
   .studio-home h1, .studio-home h2, .studio-home h3 { font-family: "Segoe UI Variable Display", "Aptos Display", "Segoe UI", sans-serif; }
-  .studio-kicker { display: inline-flex; gap: .7rem; align-items: center; color: #48524c; font-size: .65rem; font-weight: 760; letter-spacing: .17em; text-transform: uppercase; }
+  .studio-kicker { display: inline-flex; gap: .7rem; align-items: center; color: #48524c; font-size: .9rem; font-weight: 760; letter-spacing: .17em; text-transform: uppercase; }
   .studio-kicker i { width: 28px; height: 1px; background: #49564f; }
   .studio-button { display: inline-flex; min-height: 52px; gap: 1.2rem; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 999px; padding: .85rem 1.35rem; font-size: .82rem; font-weight: 720; transition: transform .25s ease, background .25s ease, border-color .25s ease, box-shadow .25s ease; }
   .studio-button span { transition: transform .25s ease; }
@@ -877,7 +877,7 @@
   .studio-hero__copy h1 em { display: block; margin-top: .08em; color: #6f7771; font-style: normal; font-weight: 390; }
   .studio-hero__copy > p { max-width: 590px; margin-bottom: 2.1rem; color: #656b66; font-size: clamp(1rem, 1.2vw, 1.12rem); line-height: 1.72; }
   .studio-hero__actions { display: flex; flex-wrap: wrap; gap: .7rem; }
-  .studio-hero__note { display: flex; gap: .8rem; align-items: center; margin-top: 2.3rem; color: #777d78; font-size: .75rem; }
+  .studio-hero__note { display: flex; gap: .8rem; align-items: center; margin-top: 2.3rem; color: #777d78; font-size: 1.9rem; }
   .studio-hero__note span { width: 7px; height: 7px; border: 1px solid #65726a; border-radius: 50%; box-shadow: 0 0 0 5px rgba(83,99,90,.09); }
   .studio-hero__note p { margin: 0; }
   .studio-device-scene { position: relative; z-index: 2; width: min(100%, 760px); aspect-ratio: 1 / .96; justify-self: end; transform-style: preserve-3d; animation: studioSceneIn 1.1s cubic-bezier(.2,.75,.25,1) .08s both; }
@@ -897,9 +897,9 @@
   .studio-hero__scroll i::after { position: absolute; right: 0; bottom: -2px; width: 5px; height: 5px; border-right: 1px solid #777d78; border-bottom: 1px solid #777d78; transform: rotate(-45deg); content: ""; }
 
   .studio-principles { display: grid; grid-template-columns: 1fr auto; gap: 3rem; align-items: center; min-height: 92px; border-top: 1px solid #dddcd6; border-bottom: 1px solid #dddcd6; background: #eeece6; }
-  .studio-principles > p { margin: 0; color: #626863; font-size: .72rem; }
+  .studio-principles > p { margin: 0; color: #626863; font-size: 1.05rem; }
   .studio-principles ul { display: flex; gap: clamp(1.4rem, 4vw, 4rem); margin: 0; padding: 0; list-style: none; }
-  .studio-principles li { position: relative; font-size: .68rem; font-weight: 720; }
+  .studio-principles li { position: relative; font-size: .9rem; font-weight: 720; }
   .studio-principles li::before { display: inline-block; width: 4px; height: 4px; margin: 0 .65rem .1rem 0; border-radius: 50%; background: #50715e; content: ""; }
 
   .studio-devices, .studio-process, .studio-branches { padding-top: clamp(6rem, 10vw, 10rem); padding-bottom: clamp(6rem, 10vw, 10rem); }

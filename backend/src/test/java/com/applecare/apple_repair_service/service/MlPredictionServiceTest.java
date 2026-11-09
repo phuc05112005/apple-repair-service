@@ -9,6 +9,7 @@ import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
 import com.applecare.apple_repair_service.enums.UserRole;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
+import com.applecare.apple_repair_service.repository.AssignmentRepository;
 import com.applecare.apple_repair_service.repository.MlPredictionRepository;
 import jakarta.validation.Validation;
 
@@ -27,7 +28,7 @@ class MlPredictionServiceTest {
     final MlPredictionRepository repository = mock(MlPredictionRepository.class);
     final DomainAccess access = mock(DomainAccess.class);
     final List<MlPrediction> saved = new ArrayList<>();
-    final MlPredictionService service = new MlPredictionService(repository, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(), TestData.CLOCK);
+    final MlPredictionService service = new MlPredictionService(repository, access, new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK);
 
     @BeforeEach
     void setup() {

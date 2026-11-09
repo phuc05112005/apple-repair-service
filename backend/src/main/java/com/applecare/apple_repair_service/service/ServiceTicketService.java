@@ -119,6 +119,7 @@ public class ServiceTicketService {
         ticket.setDiscountPercent(isDiscountEligible(appointment) && bookedItems.stream().noneMatch(item -> item.getWarrantySourceItem() != null)
                 ? appointment.getDiscountPercent() : BigDecimal.ZERO);
         tickets.saveAndFlush(ticket);
+
         if (replacements == null) {
             for (var booked : bookedItems) {
                 if (booked.getWarrantySourceItem() != null) {
@@ -151,6 +152,10 @@ public class ServiceTicketService {
         }
         if (replacements != null) bookedItems.stream().filter(item -> item.getWarrantySourceItem() != null)
                 .forEach(booked -> repairItems.save(warrantyClaimItem(ticket, booked)));
+
+        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
+        repairItems.flush();
+
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
     }
@@ -176,6 +181,7 @@ public class ServiceTicketService {
         ticket.setCustomerReportedIssue(BusinessRules.text(r.customerReportedIssue()));
         ticket.setAuthorizedScope(BusinessRules.text(r.authorizedScope()));
         tickets.saveAndFlush(ticket);
+
         for (var id : selected) {
             var c = catalog(id, r.deviceModelId());
             var item = new RepairItem();
@@ -188,6 +194,10 @@ public class ServiceTicketService {
             item.setApprovalStatus(ApprovalStatus.APPROVED);
             repairItems.save(item);
         }
+
+        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
+        repairItems.flush();
+
         statuses.initialize(ticket, ticket.getCreatedBy());
         return detail(ticket);
     }
@@ -298,8 +308,11 @@ public class ServiceTicketService {
     public ServiceTicketDetailResponse recordInspection(Long id, Long userId, RecordInspectionRequest r) {
         rules.validate(r);
         var t = access.lock(ServiceTicket.class, id);
+
         BusinessRules.require(t.getPaymentStatus() != PaymentStatus.PAID &&
-                (t.getStatus() == ServiceTicketStatus.ASSIGNED || t.getStatus() == ServiceTicketStatus.REPAIRING
+                (t.getStatus() == ServiceTicketStatus.WAITING_ASSIGNMENT
+                        || t.getStatus() == ServiceTicketStatus.ASSIGNED
+                        || t.getStatus() == ServiceTicketStatus.REPAIRING
                         || t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL), "Chỉ cập nhật phương án khi phiếu đang xử lý hoặc chờ khách.");
 
         var actor = access.get(User.class, userId);
@@ -313,9 +326,15 @@ public class ServiceTicketService {
                         && sameAmount(old.getFinalPrice(), request.finalPrice())));
 
         boolean requiresApproval = r.requiresCustomerApproval();
+
+        var confirmationMethod = r.confirmationMethod();
+        if (confirmationMethod == null && t.getAuthorizedScope() != null) {
+            confirmationMethod = com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED;
+        }
+
         if (!requiresApproval && (changedScope || t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL))
-            BusinessRules.require(r.confirmationMethod() != null, "Vui lòng ghi nhận khách đã đồng ý trực tiếp, qua điện thoại hoặc trong phạm vi cho phép trước.");
-        if (r.confirmationMethod() == com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED)
+            BusinessRules.require(confirmationMethod != null, "Vui lòng ghi nhận khách đã đồng ý trực tiếp, qua điện thoại hoặc trong phạm vi cho phép trước.");
+        if (confirmationMethod == com.applecare.apple_repair_service.enums.ConfirmationMethod.PRE_AUTHORIZED)
             BusinessRules.required(t.getAuthorizedScope(), "Phiếu chưa có phạm vi khách cho phép trước");
 
         var retained = new HashSet<RepairItem>();
@@ -352,10 +371,10 @@ public class ServiceTicketService {
             } else item.setWarrantySourceItem(null);
             if (!requiresApproval || item.getId() == null || item.getApprovalStatus() != ApprovalStatus.APPROVED)
                 item.setApprovalStatus(requiresApproval ? ApprovalStatus.PENDING : ApprovalStatus.APPROVED);
-            if (!requiresApproval && r.confirmationMethod() != null) {
+            if (!requiresApproval && confirmationMethod != null) {
                 item.setApprovalRecordedBy(actor);
                 item.setApprovalDecisionAt(LocalDateTime.now(clock));
-                item.setConfirmationMethod(r.confirmationMethod());
+                item.setConfirmationMethod(confirmationMethod);
                 item.setApprovalNote(BusinessRules.text(r.confirmationNote()) != null ? r.confirmationNote().trim() : t.getAuthorizedScope());
             }
             repairItems.save(item);
@@ -372,6 +391,8 @@ public class ServiceTicketService {
                 old.setApprovalNote("Superseded by inspection plan");
             }
         t.setInspectionResult(r.inspectionResult().trim());
+
+        repairItems.flush();
 
         var next = requiresApproval ? ServiceTicketStatus.WAITING_APPROVAL : ServiceTicketStatus.REPAIRING;
         if (t.getStatus() != next) statuses.changeStatus(t, next, actor, requiresApproval ? "Chờ liên hệ khách hàng" : "Đã ghi nhận phương án và xác nhận nội bộ");
@@ -409,14 +430,14 @@ public class ServiceTicketService {
                 if (item.getWarrantyDecision() == WarrantyDecision.APPROVED) {
                     item.setWarrantyStartDate(item.getWarrantySourceItem().getWarrantyStartDate());
                     item.setWarrantyEndDate(item.getWarrantySourceItem().getWarrantyEndDate());
-                    repairItems.save(item); // Thêm save
+                    repairItems.save(item);
                     continue;
                 }
             }
             if (item.getServiceCatalogItem().getWarrantyDays() > 0) {
                 item.setWarrantyStartDate(today);
                 item.setWarrantyEndDate(today.plusDays(item.getServiceCatalogItem().getWarrantyDays()));
-                repairItems.save(item); // Thêm save
+                repairItems.save(item);
             }
         }
         statuses.changeStatus(t, ServiceTicketStatus.WAITING_HANDOVER, access.get(User.class, userId), "Repair finished");

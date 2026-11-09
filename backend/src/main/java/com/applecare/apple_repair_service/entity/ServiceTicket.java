@@ -3,6 +3,7 @@ package com.applecare.apple_repair_service.entity;
 import com.applecare.apple_repair_service.enums.PaymentMethod;
 import com.applecare.apple_repair_service.enums.PaymentStatus;
 import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -106,6 +107,7 @@ public class ServiceTicket {
     @Column(name = "payment_method")
     private PaymentMethod paymentMethod;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
@@ -114,34 +116,43 @@ public class ServiceTicket {
             foreignKey = @ForeignKey(name = "fk_service_tickets_handed_over_by"))
     private User handedOverBy;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name = "handed_over_at")
     private LocalDateTime handedOverAt;
 
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @NotNull
     @Column(name = "received_at", nullable = false)
     private LocalDateTime receivedAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="assignment_due_at")
     private LocalDateTime assignmentDueAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="initial_estimated_start_at")
     private LocalDateTime initialEstimatedStartAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="estimated_start_at")
     private LocalDateTime estimatedStartAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="initial_estimated_completion_at")
     private LocalDateTime initialEstimatedCompletionAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="estimated_completion_at")
     private LocalDateTime estimatedCompletionAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="actual_repair_started_at")
     private LocalDateTime actualRepairStartedAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Column(name="actual_repair_completed_at")
     private LocalDateTime actualRepairCompletedAt;
 
@@ -152,6 +163,7 @@ public class ServiceTicket {
     @Column(name="estimate_source")
     private com.applecare.apple_repair_service.enums.EstimateSource estimateSource;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

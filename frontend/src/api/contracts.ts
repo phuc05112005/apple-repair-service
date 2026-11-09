@@ -276,15 +276,31 @@ export interface InventoryImportResultResponse { importedRows: number; transacti
 export type TechnicianScheduleStatus = 'WORKING' | 'OFF' | 'CANCELLED'
 export interface TechnicianScheduleResponse { id: number; technicianId: number; branchId: number; workDate: string; startTime: string; endTime: string; status: TechnicianScheduleStatus; createdAt: string; updatedAt: string }
 
+export type EstimateSource = 'STANDARD' | 'MANUAL' | 'ML'
+
 export interface TicketTiming {
- assignmentDueAt: string | null; initialEstimatedStartAt: string | null; estimatedStartAt: string | null
- initialEstimatedCompletionAt: string | null; estimatedCompletionAt: string | null; estimatedDurationMinutes: number | null
- actualRepairStartedAt: string | null; actualRepairCompletedAt: string | null; estimateSource: 'STANDARD' | 'MANUAL' | null
+  assignmentDueAt: string | null
+  initialEstimatedStartAt: string | null
+  estimatedStartAt: string | null
+  initialEstimatedCompletionAt: string | null
+  estimatedCompletionAt: string | null
+  estimatedDurationMinutes: number | null
+  actualRepairStartedAt: string | null
+  actualRepairCompletedAt: string | null
+  estimateSource: EstimateSource | null // Cập nhật để hỗ trợ 'ML' và null
 }
 export interface TimeEstimateHistory {
- id: number; technicianId: number | null; estimatedStartAt: string | null; estimatedCompletionAt: string | null
- estimatedDurationMinutes: number | null; estimateSource: 'STANDARD' | 'MANUAL'; reason: string; breakMinutesSnapshot: number
- approvedPriceSnapshot: number | null; createdAt: string; createdById: number | null
+  id: number
+  technicianId: number | null
+  estimatedStartAt: string | null
+  estimatedCompletionAt: string | null
+  estimatedDurationMinutes: number | null
+  estimateSource: EstimateSource // Cập nhật sử dụng EstimateSource
+  reason: string
+  breakMinutesSnapshot: number
+  approvedPriceSnapshot: number | null
+  createdAt: string
+  createdById: number | null
 }
 export type DefectivePartStatus = 'IN_STOCK' | 'SENT_TO_SUPPLIER' | 'RESOLVED' | 'DISPOSED'
 export interface DefectivePartReturn {

@@ -134,7 +134,24 @@ class ClosureServiceTest {
         var histories = mock(ServiceStatusHistoryRepository.class);
         var assignments = mock(AssignmentRepository.class);
         when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
-        return new ServiceTicketService(mock(ServiceTicketRepository.class), repairs, mock(AppointmentServiceItemRepository.class), histories, mock(CustomerIdentity.class), access, rules, new EntityResponses(), new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class), access), mock(TicketCodeGenerator.class), new WarrantyPolicy(), TestData.CLOCK, new RetryingWrites(new WriteTransaction()), payments, mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class));
+        return new ServiceTicketService(
+                mock(ServiceTicketRepository.class),
+                repairs,
+                mock(AppointmentServiceItemRepository.class),
+                histories,
+                mock(ServiceFeedbackRepository.class),
+                mock(CustomerIdentity.class),
+                access,
+                rules,
+                new EntityResponses(mock(AssignmentRepository.class)),
+                new ServiceStatusService(histories, assignments, TestData.CLOCK, mock(ServiceTimingService.class), access),
+                mock(TicketCodeGenerator.class),
+                new WarrantyPolicy(),
+                TestData.CLOCK,
+                new RetryingWrites(new WriteTransaction()),
+                payments,
+                mock(com.applecare.apple_repair_service.repository.PartUsageRepository.class)
+        );
     }
 
     RepairItem source() {
@@ -147,7 +164,7 @@ class ClosureServiceTest {
     }
 
     WarrantyService warranty() {
-        return new WarrantyService(access, rules, new WarrantyPolicy(), new EntityResponses(), TestData.CLOCK, org.mockito.Mockito.mock(ServiceTimingService.class));
+        return new WarrantyService(access, rules, new WarrantyPolicy(), new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, org.mockito.Mockito.mock(ServiceTimingService.class));
     }
 
     @Test
@@ -186,7 +203,7 @@ class ClosureServiceTest {
     @Test
     void feedbackRequiresHandoverAndIsUnique() {
         var repo = mock(ServiceFeedbackRepository.class);
-        var service = new FeedbackService(repo, access, rules, new EntityResponses());
+        var service = new FeedbackService(repo, access, rules, new EntityResponses(mock(AssignmentRepository.class)));
         var r = new CreateServiceFeedbackRequest(1L, true, " Great ");
         assertThrows(BusinessRuleViolationException.class, () -> service.createFeedback(r));
         ticket.setStatus(ServiceTicketStatus.HANDED_OVER);

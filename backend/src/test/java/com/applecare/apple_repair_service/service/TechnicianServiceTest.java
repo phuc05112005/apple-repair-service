@@ -32,6 +32,7 @@ import com.applecare.apple_repair_service.repository.ServiceTicketRepository;
 import com.applecare.apple_repair_service.repository.TechnicianScheduleRepository;
 import com.applecare.apple_repair_service.repository.TransferRepository;
 import jakarta.validation.Validation;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -53,7 +54,7 @@ class TechnicianServiceTest {
     final User tech = TestData.user(2);
     final TechnicianEligibility eligibility = new TechnicianEligibility(access, schedules, TestData.CLOCK);
     final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
-    final AssignmentService service = new AssignmentService(tickets, assignments, access, rules, eligibility, statuses, new EntityResponses(), TestData.CLOCK);
+    final AssignmentService service = new AssignmentService(tickets, assignments, access, rules, eligibility, statuses, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ApplicationEventPublisher.class), mock(MlCandidateEstimateService.class));
     final ServiceTicket ticket = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
 
     TechnicianSchedule shift(User user) {
@@ -179,7 +180,7 @@ class TechnicianServiceTest {
         when(schedules.findAllByTechnician_IdAndWorkDate(any(), any())).thenReturn(List.of(old));
         when(access.get(Branch.class, 1L)).thenReturn(ticket.getBranch());
         when(schedules.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
-        var service = new TechnicianScheduleService(schedules, access, rules, new EntityResponses());
+        var service = new TechnicianScheduleService(schedules, access, rules, new EntityResponses(mock(AssignmentRepository.class)));
         assertNotNull(service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(10, 0), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
         assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(9, 59), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
     }
@@ -214,7 +215,7 @@ class TechnicianServiceTest {
             when(access.lock(Transfer.class, 9L)).thenReturn(t);
             return t;
         });
-        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(), TestData.CLOCK, mock(ServiceTimingService.class));
+        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ServiceTimingService.class));
         var request = new CreateTransferRequest(5L, 2L, 1L, direct ? TransferMode.DIRECT : TransferMode.REQUEST,
                 "Need transfer", "Inspection completed", "Device is stable");
         var result = direct ? service.directTransfer(request) : service.requestTransfer(request);

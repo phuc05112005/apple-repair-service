@@ -31,6 +31,7 @@ import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AppointmentDeviceRepository;
 import com.applecare.apple_repair_service.repository.AppointmentRepository;
 import com.applecare.apple_repair_service.repository.AppointmentServiceItemRepository;
+import com.applecare.apple_repair_service.repository.AssignmentRepository;
 import jakarta.validation.Validation;
 
 import java.math.BigDecimal;
@@ -61,7 +62,7 @@ class AppointmentServiceTest {
     final DomainAccess access = mock(DomainAccess.class);
     final WarrantyPolicy warranty = new WarrantyPolicy();
     final AppointmentService service = new AppointmentService(appointments, devices, items, tickets, catalogRepository, customers, settings, access,
-            new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), warranty, new EntityResponses(), clock, new RetryingWrites(new WriteTransaction()));
+            new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator()), warranty, new EntityResponses(mock(AssignmentRepository.class)), clock, new RetryingWrites(new WriteTransaction()));
     final AppointmentSlot slot = new AppointmentSlot();
     final DeviceModel model = new DeviceModel();
     final Customer customer = new Customer();
@@ -282,8 +283,9 @@ class AppointmentServiceTest {
         var early = appointment(AppointmentStatus.CONFIRMED);
         slot.setStartTime(LocalTime.of(10, 0, 1));
         slot.setEndTime(LocalTime.of(11, 0));
-        assertThrows(AppointmentTooEarlyException.class, () -> service.markArrived(10L));
-        assertEquals(AppointmentStatus.CONFIRMED, early.getStatus());
+        // Khách đến sớm vẫn cho phép ghi nhận thành công
+        service.markArrived(10L);
+        assertEquals(AppointmentStatus.ARRIVED, early.getStatus());
 
         var valid = appointment(AppointmentStatus.CONFIRMED);
         slot.setStartTime(LocalTime.of(9, 0));

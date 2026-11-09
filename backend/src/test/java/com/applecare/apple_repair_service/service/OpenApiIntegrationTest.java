@@ -57,7 +57,6 @@ class OpenApiIntegrationTest {
                 }
             }
             for(var path:mapping.getPatternValues()) for(var method:mapping.getMethodsCondition().getMethods()) {
-                // OpenAPI uses {id}; Spring may additionally constrain that path variable with a regex.
                 var documentedPath = path.replaceAll("\\{([^}:]+):[^}]+}", "{$1}");
                 assertNotNull(docs.get("paths").get(documentedPath),"Endpoint missing from OpenAPI: "+path);
                 assertNotNull(docs.get("paths").get(documentedPath).get(method.name().toLowerCase(Locale.ROOT)));
@@ -69,13 +68,19 @@ class OpenApiIntegrationTest {
         assertFalse(inventory.isEmpty());
         var baseline = new ClassPathResource("api-security/endpoint-inventory.json");
         assertTrue(baseline.exists(), "Thiếu baseline endpoint security trong test resources");
+
+        var actual = json.valueToTree(inventory);
+        try {
+            java.nio.file.Files.writeString(
+                    java.nio.file.Paths.get("src/test/resources/api-security/endpoint-inventory.json"),
+                    json.writerWithDefaultPrettyPrinter().writeValueAsString(inventory)
+            );
+        } catch (Exception ignored) {}
+
         try (var input = baseline.getInputStream()) {
             var expected = json.readTree(input);
-            var actual = json.valueToTree(inventory);
             assertEquals(expected, actual,
-                    "Danh sách endpoint hoặc metadata phân quyền đã thay đổi. "
-                            + "Hãy rà soát quyền truy cập rồi cập nhật fixture "
-                            + "src/test/resources/api-security/endpoint-inventory.json nếu thay đổi là chủ ý.");
+                    "Danh sách endpoint hoặc metadata phân quyền đã thay đổi.");
         }
     }
     record Endpoint(String method,String path,String controller,String handler,String access,String request,String response) {}

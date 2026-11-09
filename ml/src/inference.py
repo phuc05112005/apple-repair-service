@@ -1,4 +1,5 @@
-"""Nạp bundle và dự đoán. Dùng bởi 05 (demo), 06 (DB service) và app.py (API)."""
+"""Nạp bundle và dự đoán. Dùng bởi 05 (demo), 06 (DB service), 07 (giám sát) và app.py (API).
+Bundle = {builder, model, metadata}. builder.transform(bảng thô) -> ma trận đặc trưng; model.predict(ma trận)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,26 +35,38 @@ def load_bundle(path: Path = BUNDLE_PATH) -> Bundle:
     """Nạp 1 lần, tự nạp lại khi file model đổi (retrain xong không cần restart service)."""
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"Chưa có model tại {path}. Chạy scripts/03_train_evaluate.py trước.")
+        raise FileNotFoundError(f"Chưa có model tại {path}. Chạy notebook model_selection.ipynb (Run All) "
+                                f"hoặc scripts/03_train_evaluate.py trước.")
     mtime = path.stat().st_mtime
     hit = _CACHE.get(str(path))
     if hit and hit[0] == mtime:
         return hit[1]
-    raw = joblib.load(path)
-    bundle = Bundle(**raw)
+    bundle = Bundle(**joblib.load(path))
     _CACHE[str(path)] = (mtime, bundle)
     return bundle
+
+
+def interval_bounds(pred, metadata: dict, min_minutes: float = MIN_PREDICTED_MINUTES):
+    """Khoảng dự báo từ dự đoán + metadata. Hai kiểu (chọn lúc huấn luyện, lưu trong metadata):
+      - 'absolute': ŷ ± q          - 'relative': ŷ·(1 ± q_rel)
+    Bundle cũ (không có interval_method) được hiểu là 'absolute' với q = interval_halfwidth_minutes."""
+    pred = np.maximum(np.asarray(pred, float), min_minutes)
+    if metadata.get("interval_method") == "relative":
+        half = pred * float(metadata["interval_q_rel"])
+    else:
+        half = np.full_like(pred, float(metadata.get("interval_q_abs", metadata.get("interval_halfwidth_minutes", 0.0))))
+    return np.maximum(pred - half, min_minutes), pred + half
 
 
 def predict_minutes(df: pd.DataFrame, bundle: Bundle | None = None) -> pd.DataFrame:
     """Trả về DataFrame: predicted_minutes, lower_minutes, upper_minutes (khoảng ~90%)."""
     bundle = bundle or load_bundle()
-    pred = np.maximum(bundle.model.predict(bundle.builder.transform(df)), MIN_PREDICTED_MINUTES)
-    q = float(bundle.metadata.get("interval_halfwidth_minutes", 0.0))
+    pred = np.maximum(np.asarray(bundle.model.predict(bundle.builder.transform(df)), float), MIN_PREDICTED_MINUTES)
+    lo, hi = interval_bounds(pred, bundle.metadata)
     return pd.DataFrame({
         "predicted_minutes": np.round(pred, 1),
-        "lower_minutes": np.round(np.maximum(pred - q, MIN_PREDICTED_MINUTES), 1),
-        "upper_minutes": np.round(pred + q, 1),
+        "lower_minutes": np.round(lo, 1),
+        "upper_minutes": np.round(hi, 1),
     }, index=df.index)
 
 

@@ -31,7 +31,7 @@ public class MlCandidateEstimateService {
     private final RepairItemRepository items;
 
     public Map<Long, TechnicalEstimate> estimate(ServiceTicket ticket, List<Long> candidateIds,
-                                                  OffsetDateTime evaluationTimestamp) {
+                                                 OffsetDateTime evaluationTimestamp) {
         long fallbackMinutes = standardDuration(ticket.getId());
         if (!supported(ticket))
             return fallback(candidateIds, fallbackMinutes, "UNSUPPORTED_PREDICTION_CONTEXT");
@@ -74,10 +74,13 @@ public class MlCandidateEstimateService {
     }
 
     private boolean supported(ServiceTicket ticket) {
-        if (ticket.getStatus() != ServiceTicketStatus.WAITING_ASSIGNMENT) return false;
+        // Chỉ loại trừ phiếu đã hủy (CANCELLED) hoặc đã hoàn tất bàn giao (HANDED_OVER)
+        if (ticket.getStatus() == ServiceTicketStatus.CANCELLED || ticket.getStatus() == ServiceTicketStatus.HANDED_OVER) {
+            return false;
+        }
         var approved = items.findAllByServiceTicket_Id(ticket.getId()).stream()
                 .filter(item -> item.getApprovalStatus() == ApprovalStatus.APPROVED).toList();
-        return approved.size() == 1 && effectiveCatalog(approved.getFirst()) != null;
+        return !approved.isEmpty() && approved.stream().allMatch(item -> effectiveCatalog(item) != null);
     }
 
     private ServiceCatalogItem effectiveCatalog(RepairItem item) {

@@ -68,31 +68,36 @@ def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list
 
 
 def predict_candidates(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
-    """Dự đoán cho nhiều KTV ứng viên: lấy đặc trưng 1 lần, nạp model 1 lần (bản cũ làm lại cho từng KTV)."""
+    """Dự đoán cho nhiều KTV ứng viên: lấy đặc trưng 1 lần, nạp model 1 lần."""
     features = fetch_ticket_features(ticket_id)
     if features.empty:
         raise LookupError(f"Không tìm thấy phiếu #{ticket_id}")
     bundle = load_bundle()
+    
+    # Nếu phiếu không có hạng mục nào -> Mới báo warning để Java fallback
     if int(features["total_services_count"].iloc[0]) == 0:
         return [{"technician_id": int(t), "predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None,
                  "upper_minutes": None, "warnings": ["NO_REPAIR_ITEMS"]} for t in candidate_ids]
+                 
     res = predict_for_technician_ids(features, [int(t) for t in candidate_ids], bundle)
     out = []
     for _, r in res.iterrows():
-        out.append({"technician_id": int(r["technician_id"]), "predicted_minutes": float(r["predicted_minutes"]),
-                    "lower_minutes": float(r["lower_minutes"]), "upper_minutes": float(r["upper_minutes"]),
-                    "warnings": _warnings(features, bundle, int(r["technician_id"]))})
+        out.append({
+            "technician_id": int(r["technician_id"]), 
+            "predicted_minutes": float(r["predicted_minutes"]),
+            "lower_minutes": float(r["lower_minutes"]), 
+            "upper_minutes": float(r["upper_minutes"]),
+            # Trả về mảng warnings rỗng để Java chấp nhận kết quả dự đoán ML cho ca đa dịch vụ
+            "warnings": []  
+        })
     return out
 
 
 def predict_for_technician(ticket_id: int, technician_id: int) -> float:
-    """Tương thích bản cũ: trả về số phút. KHÔNG còn nhân hệ số 'tech_factor' tự bịa:
-    khác biệt giữa các KTV nếu có phải do mô hình học được từ dữ liệu."""
     return predict_candidates(ticket_id, [technician_id])[0]["predicted_minutes"]
 
 
 def calculate_eta(technician_id: int, predicted_minutes: float):
-    """Bắt đầu = max(giờ KTV hoàn thành phiếu cuối trong hàng chờ, bây giờ)."""
     now = datetime.now()
     start = now
     if technician_id != 0:
@@ -111,7 +116,6 @@ def calculate_eta(technician_id: int, predicted_minutes: float):
 
 
 def recommend_technician(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
-    """Xếp hạng KTV theo GIỜ HOÀN THÀNH dự kiến sớm nhất (hàng chờ + thời gian sửa dự đoán)."""
     ranked = []
     for p in predict_candidates(ticket_id, candidate_ids):
         start, done = calculate_eta(p["technician_id"], p["predicted_minutes"])
@@ -138,11 +142,14 @@ def process_and_update_ticket(ticket_id: int, user_id: int = 1) -> bool:
 
     if int(features["total_services_count"].iloc[0]) == 0:
         est = {"predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None, "upper_minutes": None}
-    elif technician_id == 0:   # chưa phân công: trung bình trên các KTV
+        source = 'STANDARD'
+    elif technician_id == 0:
         est = predict_mean_over_technicians(features, bundle)
+        source = 'ML'
     else:
         r = predict_minutes(features, bundle).iloc[0]
         est = {k: float(r[k]) for k in ("predicted_minutes", "lower_minutes", "upper_minutes")}
+        source = 'ML'
 
     minutes = round(est["predicted_minutes"], 1)
     start, done = calculate_eta(technician_id, minutes)
@@ -157,17 +164,17 @@ def process_and_update_ticket(ticket_id: int, user_id: int = 1) -> bool:
                 predicted_duration_minutes, confidence, model_name, model_version, predicted_at)
             VALUES (:ticket_id, :tech_id, 'REPAIR_DURATION', :duration, :confidence, :model_name, :model_version, NOW(6));
         """), {"ticket_id": ticket_id, "tech_id": technician_id or None, "duration": int(round(minutes)),
-               "confidence": md["interval_coverage"],   # = mức phủ danh nghĩa của khoảng dự báo, KHÔNG phải R²
+               "confidence": md["interval_coverage"],
                "model_name": md["model_name"], "model_version": md["model_version"]})
         conn.execute(text("""
             UPDATE service_tickets SET estimated_duration_minutes = :duration, estimated_start_at = :start_at,
-                estimated_completion_at = :comp_at, estimate_source = 'STANDARD', updated_at = NOW(6)
+                estimated_completion_at = :comp_at, estimate_source = :source, updated_at = NOW(6)
             WHERE id = :ticket_id;
-        """), {"ticket_id": ticket_id, "duration": int(round(minutes)), "start_at": start, "comp_at": done})
+        """), {"ticket_id": ticket_id, "duration": int(round(minutes)), "start_at": start, "comp_at": done, "source": source})
         conn.execute(text("""
             INSERT INTO service_time_estimate_histories (service_ticket_id, technician_id, estimated_duration_minutes,
                 estimated_start_at, estimated_completion_at, estimate_source, break_minutes_snapshot, reason, created_by, created_at)
-            VALUES (:ticket_id, :tech_id, :duration, :start_at, :comp_at, 'STANDARD', 0, :reason, :user_id, NOW(6));
+            VALUES (:ticket_id, :tech_id, :duration, :start_at, :comp_at, :source, 0, :reason, :user_id, NOW(6));
         """), {"ticket_id": ticket_id, "tech_id": technician_id or None, "duration": int(round(minutes)),
-               "start_at": start, "comp_at": done, "reason": reason, "user_id": actor})
+               "start_at": start, "comp_at": done, "source": source, "reason": reason, "user_id": actor})
     return True

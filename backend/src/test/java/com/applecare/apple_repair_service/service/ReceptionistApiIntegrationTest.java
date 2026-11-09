@@ -30,7 +30,9 @@ class ReceptionistApiIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired Clock clock;
     ApiFixture f;
+
     @BeforeEach void fixture() { f=new ApiFixture(em,clock);f.create(); }
+
     void openArrivalWindow() {
         var now = LocalDateTime.now(clock);
         f.slot.setAppointmentDate(now.toLocalDate());
@@ -38,12 +40,14 @@ class ReceptionistApiIntegrationTest {
         f.slot.setEndTime(java.time.LocalTime.of(23, 59, 59));
         em.flush();
     }
+
     String login(User user) throws Exception {
         var body=mvc.perform(post("/api/v1/auth/login").contentType("application/json")
-                .content(json.writeValueAsString(new LoginRequest(user.getUsername(),ApiFixture.PASSWORD))))
+                        .content(json.writeValueAsString(new LoginRequest(user.getUsername(),ApiFixture.PASSWORD))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(body).get("accessToken").asString();
     }
+
     @Test void receptionistIntakeWritesJwtActorAndRejectsInvalidTransition() throws Exception {
         String contactName = f.prefix + " Customer";
         String contactPhone = f.prefix + "-phone";
@@ -60,7 +64,7 @@ class ReceptionistApiIntegrationTest {
         assertEquals(contactPhone, persistedCustomer.getPhone());
         String bearer="Bearer "+login(f.receptionist);
         mvc.perform(get("/api/v1/internal/appointments").header("Authorization",bearer).param("branchId",f.branch.getId().toString())
-                .param("status","PENDING_CONFIRMATION")).andExpect(status().isOk())
+                        .param("status","PENDING_CONFIRMATION")).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].appointment.id").value(id))
                 .andExpect(jsonPath("$[0].appointment.customerFullName").value(contactName))
                 .andExpect(jsonPath("$[0].appointment.customerPhone").value(contactPhone));
@@ -70,14 +74,14 @@ class ReceptionistApiIntegrationTest {
                 .andExpect(jsonPath("$.appointment.customerPhone").value(contactPhone));
         // A body on this bodyless command cannot override the authenticated actor.
         mvc.perform(post("/api/v1/internal/appointments/"+id+"/confirm").header("Authorization",bearer)
-                .contentType("application/json").content("{\"confirmedByUserId\":"+f.technician.getId()+"}"))
+                        .contentType("application/json").content("{\"confirmedByUserId\":"+f.technician.getId()+"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.confirmedById").value(f.receptionist.getId()));
         mvc.perform(post("/api/v1/internal/appointments/"+id+"/arrive").header("Authorization",bearer))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.appointment.status").value("ARRIVED"));
         long deviceId=em.createQuery("select d.id from AppointmentDevice d where d.appointment.id=:id",Long.class)
                 .setParameter("id",id).getSingleResult();
         String result=mvc.perform(post("/api/v1/internal/appointment-devices/"+deviceId+"/intake").header("Authorization",bearer)
-                .contentType("application/json").content(json.writeValueAsString(new IntakeDeviceCommand(f.prefix,"128 GB",null))))
+                        .contentType("application/json").content(json.writeValueAsString(new IntakeDeviceCommand(f.prefix,"128 GB",null))))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.ticket.createdById").value(f.receptionist.getId()))
                 .andExpect(jsonPath("$.ticket.status").value("WAITING_ASSIGNMENT")).andReturn().getResponse().getContentAsString();
         long ticketId=json.readTree(result).get("ticket").get("id").asLong();
@@ -86,6 +90,7 @@ class ReceptionistApiIntegrationTest {
         mvc.perform(post("/api/v1/internal/appointments/"+id+"/confirm").header("Authorization",bearer))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
     }
+
     @Test void technicianCannotTakeReceptionistPaymentOrAppointmentCommands() throws Exception {
         String bearer="Bearer "+login(f.technician);
         mvc.perform(get("/api/v1/internal/appointments/ready-for-intake").header("Authorization",bearer))
@@ -108,6 +113,7 @@ class ReceptionistApiIntegrationTest {
     }
 
     @Test void checkInReturnsClearEarlyAndExpiredErrorsAtServerTime() throws Exception {
+        // 1. Khách đến sớm: API trả về 200 OK và cập nhật trạng thái ARRIVED
         var request = new CreateAppointmentRequest(f.prefix + " customer", f.prefix + " arrival-phone", f.slot.getId(), null,
                 List.of(new AppointmentDeviceRequest(f.model.getId(), null,
                         List.of(new AppointmentServiceItemRequest(f.catalog.getId(), null)))));
@@ -117,22 +123,35 @@ class ReceptionistApiIntegrationTest {
         long appointmentId = json.readTree(booking).get("appointmentId").asLong();
         String bearer = "Bearer " + login(f.receptionist);
         String base = "/api/v1/internal/appointments/" + appointmentId;
+
         mvc.perform(post(base + "/confirm").header("Authorization", bearer)).andExpect(status().isOk());
         mvc.perform(post(base + "/arrive").header("Authorization", bearer))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("APPOINTMENT_TOO_EARLY"))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Chưa đến khung giờ")));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appointment.status").value("ARRIVED"));
+
+        // 2. Khách đến khi slot đã hết hạn: API trả về 409 CONFLICT (APPOINTMENT_EXPIRED)
+        var expiredRequest = new CreateAppointmentRequest(f.prefix + " expired-customer", f.prefix + " expired-phone", f.slot.getId(), null,
+                List.of(new AppointmentDeviceRequest(f.model.getId(), null,
+                        List.of(new AppointmentServiceItemRequest(f.catalog.getId(), null)))));
+        var expiredBooking = mvc.perform(post("/api/v1/appointments").contentType("application/json")
+                        .content(json.writeValueAsString(expiredRequest))).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expiredAppointmentId = json.readTree(expiredBooking).get("appointmentId").asLong();
+        String expiredBase = "/api/v1/internal/appointments/" + expiredAppointmentId;
+
+        mvc.perform(post(expiredBase + "/confirm").header("Authorization", bearer)).andExpect(status().isOk());
 
         var now = LocalDateTime.now(clock);
         f.slot.setAppointmentDate(now.toLocalDate());
         f.slot.setStartTime(now.toLocalTime().minusHours(2));
         f.slot.setEndTime(now.toLocalTime().minusHours(1));
         em.flush();
-        mvc.perform(post(base + "/arrive").header("Authorization", bearer))
+
+        mvc.perform(post(expiredBase + "/arrive").header("Authorization", bearer))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("APPOINTMENT_EXPIRED"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("không còn đủ điều kiện hưởng ưu đãi")));
-        mvc.perform(get(base).header("Authorization", bearer))
+        mvc.perform(get(expiredBase).header("Authorization", bearer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.appointment.status").value("EXPIRED"))
                 .andExpect(jsonPath("$.appointment.arrivedAt").doesNotExist());
@@ -161,7 +180,7 @@ class ReceptionistApiIntegrationTest {
                 List.of(new AppointmentDeviceRequest(f.model.getId(), null,
                         List.of(new AppointmentServiceItemRequest(f.catalog.getId(), null)))));
         var booking = mvc.perform(post("/api/v1/appointments").contentType("application/json")
-                .content(json.writeValueAsString(request))).andExpect(status().isCreated())
+                        .content(json.writeValueAsString(request))).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long appointmentId = json.readTree(booking).get("appointmentId").asLong();
         openArrivalWindow();
@@ -184,8 +203,8 @@ class ReceptionistApiIntegrationTest {
 
         var command = new IntakeDeviceCommand(f.prefix, "128 GB", "Received", List.of(replacement.getId()));
         var response = mvc.perform(post("/api/v1/internal/appointment-devices/" + deviceId + "/intake")
-                .header("Authorization", bearer).contentType("application/json")
-                .content(json.writeValueAsString(command)))
+                        .header("Authorization", bearer).contentType("application/json")
+                        .content(json.writeValueAsString(command)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ticket.discountPercent").value(10))
                 .andExpect(jsonPath("$.repairItems[0].serviceCatalogItemId").value(replacement.getId()))
@@ -236,7 +255,7 @@ class ReceptionistApiIntegrationTest {
                 f.model.getId(), null, null, "Device received", List.of(replacement.getId()));
         String bearer = "Bearer " + login(f.receptionist);
         var response = mvc.perform(post("/api/v1/internal/service-tickets/walk-in").header("Authorization", bearer)
-                .contentType("application/json").content(json.writeValueAsString(request)))
+                        .contentType("application/json").content(json.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.repairItems[0].serviceCatalogItemId").value(replacement.getId()))
                 .andExpect(jsonPath("$.repairItems[0].basePrice").value(750000))

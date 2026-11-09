@@ -6,6 +6,7 @@ import com.applecare.apple_repair_service.dto.response.UserResponse;
 import com.applecare.apple_repair_service.security.CurrentActor;
 import com.applecare.apple_repair_service.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,16 +25,19 @@ public class ProfileController {
     private final CurrentActor actor;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')")
     public ResponseEntity<UserResponse> getMyProfile() {
         return ResponseEntity.ok(userService.getById(actor.id()));
     }
 
     @PutMapping
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')")
     public ResponseEntity<UserResponse> updateMyProfile(@Valid @RequestBody UpdateUserProfileRequest request) {
         return ResponseEntity.ok(userService.updateProfile(actor.id(), request));
     }
 
     @PostMapping("/change-password")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST', 'TECHNICIAN', 'ADMIN')")
     public ResponseEntity<Void> changeMyPassword(@Valid @RequestBody ChangePasswordRequest request) {
         userService.changePassword(actor.id(), request);
         return ResponseEntity.noContent().build();
