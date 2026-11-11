@@ -74,7 +74,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT},http://54.199.34.128:${FRONTEND_PORT}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT},http://127.0.0.1:${FRONTEND_PORT},http://54.199.34.128:${FRONTEND_PORT},https://taocare.ddns.net
       
       ML_ENABLED: "true"
       APP_ML_ENABLED: "true"
