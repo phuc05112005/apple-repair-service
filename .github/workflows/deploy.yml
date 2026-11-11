@@ -54,8 +54,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             cd ~/apple-repair-service
+            git reset --hard HEAD
+            git clean -fd
             git pull origin main
             docker compose pull
             docker compose up -d
-            docker image prune -f
+            docker image prune -af
