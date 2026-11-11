@@ -46,12 +46,33 @@ public class MlCandidateEstimateService {
                     result.put(candidateId, fallback(candidateId, fallbackMinutes, "MISSING_ML_CANDIDATE"));
                     continue;
                 }
-                result.put(candidateId, new TechnicalEstimate(candidateId,
-                        prediction.predictedTechnicalMinutes(), rounded(prediction.predictedTechnicalMinutes()),
-                        PredictionSource.ML, safeWarnings(prediction.warnings()), response.model().name(),
-                        response.model().version(), response.model().status(), response.model().featureContractVersion(),
-                        Boolean.TRUE.equals(response.model().syntheticData()),
-                        Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
+
+                var warnings = safeWarnings(prediction.warnings());
+                // Kiểm tra nếu KTV mới hoặc định mức nằm ngoài khoảng học của ML
+                boolean isColdStartOrOutOfBounds = warnings.contains("UNKNOWN_TECHNICIAN")
+                        || warnings.contains("UNKNOWN_SERVICE_ISSUE")
+                        || warnings.contains("UNKNOWN_DEVICE_MODEL")
+                        || warnings.contains("TOO_MANY_SERVICES")
+                        || warnings.contains("CATALOG_OUT_OF_BOUNDS")
+                        || warnings.contains("NO_REPAIR_ITEMS");
+
+                if (isColdStartOrOutOfBounds) {
+                    // Fallback sang Định mức chuẩn (STANDARD)
+                    result.put(candidateId, new TechnicalEstimate(candidateId,
+                            (double) fallbackMinutes, fallbackMinutes,
+                            PredictionSource.STANDARD_DURATION_FALLBACK, warnings, response.model().name(),
+                            response.model().version(), response.model().status(), response.model().featureContractVersion(),
+                            Boolean.TRUE.equals(response.model().syntheticData()),
+                            Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
+                } else {
+                    // Giữ nguyên nguồn ML
+                    result.put(candidateId, new TechnicalEstimate(candidateId,
+                            prediction.predictedTechnicalMinutes(), rounded(prediction.predictedTechnicalMinutes()),
+                            PredictionSource.ML, warnings, response.model().name(),
+                            response.model().version(), response.model().status(), response.model().featureContractVersion(),
+                            Boolean.TRUE.equals(response.model().syntheticData()),
+                            Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
+                }
             }
             log.info("Candidate duration estimates ready ticketId={} candidateCount={} predictionSource=ML modelVersion={}",
                     ticket.getId(), candidateIds.size(), response.model().version());

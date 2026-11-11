@@ -61,6 +61,18 @@ export interface RepairItemApiDetail {
   partVariant?: string | null
   approvalStatus?: string
 }
+export interface CustomerFeedbackRecord {
+  id: number
+  ticketId: number
+  ticketCode: string
+  customerName: string
+  customerPhone: string
+  deviceModelName: string
+  branchName: string
+  satisfied: boolean
+  comment?: string | null
+  createdAt: string
+}
 
 export const adminApi = {
   statistics: (filters: { from: string; to: string; branchId?: number; deviceTypeId?: number }, signal?: AbortSignal) =>
@@ -120,4 +132,6 @@ export const adminApi = {
     apiRequest<unknown>(`/api/v1/admin/tickets/${id}`, { auth: true, signal }),
   ticketItems: (id: number, signal?: AbortSignal) =>
     apiRequest<RepairItemApiDetail[]>(`/api/v1/admin/tickets/${id}/items`, { auth: true, signal }),
+  feedbacks: (filters: { from?: string; to?: string; branchId?: number; satisfied?: boolean } = {}, signal?: AbortSignal) =>
+    apiRequest<CustomerFeedbackRecord[]>('/api/v1/admin/statistics/feedbacks/list', { auth: true, query: filters, signal }),
 }

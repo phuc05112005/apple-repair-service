@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { adminApi, type RepairItemApiDetail } from '../../../api/adminApi'
+import { adminApi, type CustomerFeedbackRecord, type RepairItemApiDetail } from '../../../api/adminApi'
 import { publicApi } from '../../../api/publicApi'
 import { AdminDataTable, type DataColumn, type TableFilter } from '../../../components/AdminDataTable'
 import { DetailDrawer } from '../../../components/Dialog'
 import { ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
-import { ticketStatusLabels } from '../../../types/labels'
+import { paymentMethodLabels, ticketStatusLabels } from '../../../types/labels'
 import { addBusinessDays, businessDate, formatDateTime, formatMoney } from '../../../utils/format'
 import { compareText } from '../../../utils/table'
 
@@ -24,6 +24,7 @@ export interface ServiceTicketRecord {
   branchName?: string | null
   technicianName?: string | null
   serviceType?: string
+  paymentMethod?: string | null
 }
 
 interface ParsedRepairItem {
@@ -61,9 +62,25 @@ interface RawSummaryApiItem {
   serviceType?: string
   service_type?: string
   service_type_codes_list?: string
+  paymentMethod?: string
+  payment_method?: string
 }
 
 interface RawDetailResponse {
+  ticket?: {
+    paymentMethod?: string
+    payment_method?: string
+    paymentStatus?: string
+    payment_status?: string
+    paidAt?: string
+    paid_at?: string
+  }
+  paymentMethod?: string
+  payment_method?: string
+  paymentStatus?: string
+  payment_status?: string
+  paidAt?: string
+  paid_at?: string
   repairItems?: RepairItemApiDetail[]
   histories?: Array<{
     status?: string
@@ -84,7 +101,11 @@ export function StatisticsPage() {
   const [branchId, setBranchId] = useState<number>()
   const [deviceTypeId, setDeviceTypeId] = useState<number>()
   const [serviceFilterType, setServiceFilterType] = useState<string>('')
+  
+  // Trạng thái hiển thị Drawer
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null)
+  const [showFeedbackDrawer, setShowFeedbackDrawer] = useState(false)
+  const [feedbackSatisfiedFilter, setFeedbackSatisfiedFilter] = useState<string>('')
 
   const branches = useQuery({
     queryKey: ['public', 'branches'],
@@ -100,10 +121,18 @@ export function StatisticsPage() {
     queryFn: ({ signal }) => adminApi.statistics({ from, to, branchId, deviceTypeId }, signal),
     enabled: Boolean(from && to),
   })
+
   const feedback = useQuery({
     queryKey: ['admin', 'feedback-statistics', from, to],
     queryFn: ({ signal }) => adminApi.feedbackStatistics({ from, to }, signal),
     enabled: Boolean(from && to),
+  })
+
+  // Query danh sách phản hồi của khách hàng (hiển thị trong Drawer Phản hồi)
+  const feedbacksQuery = useQuery({
+    queryKey: ['admin', 'feedbacks-list', from, to, branchId],
+    queryFn: ({ signal }) => adminApi.feedbacks({ from, to, branchId }, signal),
+    enabled: showFeedbackDrawer,
   })
 
   const ticketsQuery = useQuery({
@@ -147,6 +176,7 @@ export function StatisticsPage() {
       status: item.status ?? '',
       receivedAt: item.receivedAt ?? item.received_at ?? '',
       serviceType: item.serviceType ?? item.service_type ?? item.service_type_codes_list ?? 'REPAIR',
+      paymentMethod: item.paymentMethod ?? item.payment_method ?? null,
     }))
   }, [ticketsQuery.data])
 
@@ -173,6 +203,89 @@ export function StatisticsPage() {
     }
     return list
   }, [ticketList, branchId, from, to])
+
+  // Cấu hình các cột cho Bảng danh sách Phản hồi khách hàng
+  const feedbackColumns: DataColumn<CustomerFeedbackRecord>[] = [
+    {
+      key: 'ticketCode',
+      label: 'MÃ PHIẾU',
+      render: row => (
+        <button
+          type="button"
+          className="text-action"
+          style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1e40af' }}
+          onClick={() => {
+            setShowFeedbackDrawer(false)
+            setSelectedTicketId(row.ticketId)
+          }}
+        >
+          {row.ticketCode || `#${row.ticketId}`}
+        </button>
+      ),
+    },
+    {
+      key: 'customer',
+      label: 'KHÁCH HÀNG',
+      render: row => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', whiteSpace: 'nowrap' }}>
+          <strong>{row.customerName}</strong>
+          <small style={{ color: '#64748b' }}>{row.customerPhone}</small>
+        </div>
+      ),
+    },
+    {
+      key: 'device',
+      label: 'THIẾT BỊ & CHI NHÁNH',
+      render: row => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', whiteSpace: 'nowrap' }}>
+          <span>{row.deviceModelName}</span>
+          <small style={{ color: '#64748b' }}>{row.branchName}</small>
+        </div>
+      ),
+    },
+    {
+      key: 'satisfied',
+      label: 'ĐÁNH GIÁ',
+      render: row => (
+        <StatusBadge
+          label={row.satisfied ? 'Hài lòng' : 'Chưa hài lòng'}
+          tone={row.satisfied ? 'success' : 'warning'}
+        />
+      ),
+    },
+    {
+      key: 'comment',
+      label: 'NHẬN XÉT CỦA KHÁCH',
+      render: row => (
+        <div style={{ maxWidth: '280px', whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8125rem' }}>
+          {row.comment ? (
+            <span style={{ fontStyle: 'italic', color: '#334155' }}>"{row.comment}"</span>
+          ) : (
+            <span className="muted-text">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'createdAt',
+      label: 'THỜI GIAN',
+      render: row => <span style={{ whiteSpace: 'nowrap', fontSize: '0.8125rem' }}>{formatDateTime(row.createdAt)}</span>,
+    },
+  ]
+
+  const feedbackFilters: TableFilter<CustomerFeedbackRecord>[] = [
+    {
+      key: 'satisfied',
+      label: 'Đánh giá',
+      value: feedbackSatisfiedFilter,
+      onChange: setFeedbackSatisfiedFilter,
+      options: [
+        { value: 'true', label: 'Hài lòng' },
+        { value: 'false', label: 'Chưa hài lòng' },
+      ],
+      matches: (row, val) => String(row.satisfied) === val,
+    },
+  ]
 
   const columns: DataColumn<ServiceTicketRecord>[] = [
     {
@@ -257,6 +370,19 @@ export function StatisticsPage() {
       key: 'totalAmount',
       label: 'TỔNG TIỀN',
       render: row => <strong style={{ whiteSpace: 'nowrap', color: '#0f172a' }}>{formatMoney(row.totalAmount ?? 0)}</strong>,
+    },
+    {
+      key: 'paymentMethod',
+      label: 'THANH TOÁN',
+      render: row => (
+        <span style={{ whiteSpace: 'nowrap', fontSize: '0.8125rem' }}>
+          {row.status === 'CANCELLED'
+            ? 'Đã hủy'
+            : row.paymentMethod
+            ? (paymentMethodLabels[row.paymentMethod] ?? row.paymentMethod)
+            : 'Chưa thanh toán'}
+        </span>
+      ),
     },
     {
       key: 'status',
@@ -461,16 +587,46 @@ export function StatisticsPage() {
 
               {feedback.data && (
                 <>
-                  <div className="metric-card" style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.8125rem', color: '#1e40af', fontWeight: 500 }}>Lượt phản hồi</span>
+                  {/* METRIC CARD: PHẢN HỒI KHÁCH HÀNG (CLICK ĐỂ MỞ DRAWER CÓ PHÂN TRANG) */}
+                  <div
+                    className="metric-card"
+                    onClick={() => setShowFeedbackDrawer(true)}
+                    style={{
+                      background: '#fff',
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      border: '1px solid #93c5fd',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    title="Bấm để xem danh sách phản hồi & ghi chú của khách"
+                  >
+                    <span style={{ fontSize: '0.8125rem', color: '#1e40af', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      Lượt phản hồi (Xem danh sách)
+                      <span style={{ fontSize: '0.875rem' }}>↗</span>
+                    </span>
                     <strong style={{ fontSize: '1.75rem', display: 'block', marginTop: '4px', color: '#1d4ed8' }}>
                       {feedback.data.total}
                     </strong>
-                    <small style={{ color: '#94a3b8', fontSize: '0.75rem' }}>Đánh giá từ khách hàng</small>
+                    <small style={{ color: '#3b82f6', fontSize: '0.75rem', fontWeight: 500 }}>Bấm để mở danh sách chi tiết</small>
                   </div>
 
-                  <div className="metric-card" style={{ background: '#fff', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.8125rem', color: '#0f766e', fontWeight: 500 }}>Tỷ lệ hài lòng</span>
+                  <div
+                    className="metric-card"
+                    onClick={() => setShowFeedbackDrawer(true)}
+                    style={{
+                      background: '#fff',
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                    }}
+                    title="Bấm để xem danh sách phản hồi & ghi chú của khách"
+                  >
+                    <span style={{ fontSize: '0.8125rem', color: '#0f766e', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      Tỷ lệ hài lòng
+                      <span style={{ fontSize: '0.875rem' }}>↗</span>
+                    </span>
                     <strong style={{ fontSize: '1.75rem', display: 'block', marginTop: '4px', color: '#0d9488' }}>
                       {Math.round(feedback.data.satisfactionRate * 100)}%
                     </strong>
@@ -515,8 +671,16 @@ export function StatisticsPage() {
             </section>
 
             <section className="ops-section" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
-              <div className="ops-section__title" style={{ marginBottom: '16px' }}>
+              <div className="ops-section__title" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>ĐÁNH GIÁ DỊCH VỤ</span>
+                <button
+                  type="button"
+                  className="button button--quiet"
+                  onClick={() => setShowFeedbackDrawer(true)}
+                  style={{ fontSize: '0.8125rem' }}
+                >
+                  Xem tất cả ý kiến khách ↗
+                </button>
               </div>
               {feedback.isLoading ? (
                 <LoadingState label="Đang nạp dữ liệu phản hồi…" />
@@ -576,7 +740,8 @@ export function StatisticsPage() {
                     const name = row.customerFullName || ''
                     const phone = row.customerPhone || ''
                     const branch = row.branchName || ''
-                    return `${row.ticketCode} ${name} ${phone} ${row.deviceModelName ?? ''} ${row.serialNumber ?? ''} ${row.technicianName ?? ''} ${branch}`
+                    const method = row.paymentMethod ? (paymentMethodLabels[row.paymentMethod] ?? row.paymentMethod) : ''
+                    return `${row.ticketCode} ${name} ${phone} ${row.deviceModelName ?? ''} ${row.serialNumber ?? ''} ${row.technicianName ?? ''} ${branch} ${method}`
                   }}
                   sortOptions={[
                     { value: 'date-desc', label: 'Mới nhất', compare: (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime() },
@@ -591,6 +756,42 @@ export function StatisticsPage() {
         )
       )}
 
+      {/* DRAWER DANH SÁCH PHẢN HỒI KÈM PHÂN TRANG & BỘ LỌC */}
+      {showFeedbackDrawer && (
+        <DetailDrawer
+          eyebrow="Ý kiến khách hàng"
+          title="Danh sách Phản hồi &amp; Nhận xét của Khách"
+          onClose={() => setShowFeedbackDrawer(false)}
+          footer={
+            <button type="button" className="button button--quiet" onClick={() => setShowFeedbackDrawer(false)}>
+              Đóng
+            </button>
+          }
+        >
+          <div style={{ marginTop: '12px' }}>
+            {feedbacksQuery.isLoading ? (
+              <LoadingState label="Đang tải danh sách phản hồi…" />
+            ) : feedbacksQuery.isError ? (
+              <ErrorState error={feedbacksQuery.error as Error} />
+            ) : (
+              <AdminDataTable
+                rows={feedbacksQuery.data ?? []}
+                rowKey={row => row.id}
+                columns={feedbackColumns}
+                filters={feedbackFilters}
+                searchPlaceholder="Tìm kiếm mã phiếu, khách hàng, SĐT hoặc nội dung nhận xét..."
+                searchableText={row => `${row.ticketCode} ${row.customerName} ${row.customerPhone} ${row.comment ?? ''} ${row.deviceModelName} ${row.branchName}`}
+                sortOptions={[
+                  { value: 'date-desc', label: 'Thời gian mới nhất', compare: (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() },
+                  { value: 'date-asc', label: 'Thời gian cũ nhất', compare: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() },
+                ]}
+              />
+            )}
+          </div>
+        </DetailDrawer>
+      )}
+
+      {/* DRAWER CHI TIẾT CA DỊCH VỤ (HIỂN THỊ PHƯƠNG THỨC THANH TOÁN) */}
       {selectedRecord && (
         <DetailDrawer
           eyebrow="Chi tiết ca dịch vụ"
@@ -655,7 +856,7 @@ export function StatisticsPage() {
             </div>
 
             <div className="detail-section">
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase' }}>THIẾT BỊ &amp; YÊU CẦU</h3>
+              <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase' }}>THIẾT BỊ &amp; THANH TOÁN</h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.875rem' }}>
                 <div>
                   <span style={{ color: '#64748b', display: 'block' }}>Dòng máy / Model</span>
@@ -665,10 +866,42 @@ export function StatisticsPage() {
                   <span style={{ color: '#64748b', display: 'block' }}>Số IMEI / Serial</span>
                   <span style={{ fontFamily: 'monospace' }}>{selectedRecord.serialNumber || '—'}</span>
                 </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block' }}>Phương thức thanh toán</span>
+                  <strong style={{ color: selectedRecord.status === 'CANCELLED' ? '#94a3b8' : '#1e40af' }}>
+                    {(() => {
+                      if (selectedRecord.status === 'CANCELLED') {
+                        return 'Phiếu đã hủy (Không phát sinh thanh toán)'
+                      }
+                      const method =
+                        selectedDetail?.ticket?.paymentMethod ??
+                        selectedDetail?.ticket?.payment_method ??
+                        selectedDetail?.paymentMethod ??
+                        selectedDetail?.payment_method ??
+                        selectedRecord.paymentMethod
+
+                      return method ? (paymentMethodLabels[method] ?? method) : 'Chưa thanh toán'
+                    })()}
+                  </strong>
+                </div>
+                {(() => {
+                  const paidAt =
+                    selectedDetail?.ticket?.paidAt ??
+                    selectedDetail?.ticket?.paid_at ??
+                    selectedDetail?.paidAt ??
+                    selectedDetail?.paid_at
+
+                  return paidAt ? (
+                    <div>
+                      <span style={{ color: '#64748b', display: 'block' }}>Thời gian thanh toán</span>
+                      <span>{formatDateTime(paidAt)}</span>
+                    </div>
+                  ) : null
+                })()}
               </div>
             </div>
 
-            {/* BẢNG TÁCH RIÊNG NẰM TRÊN TỪNG DÒNG RÕ RÀNG */}
+            {/* BẢNG DỊCH VỤ & CHI PHÍ */}
             <div className="detail-section">
               <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1e293b', marginBottom: '10px', textTransform: 'uppercase' }}>
                 CHI TIẾT DỊCH VỤ &amp; CHI PHÍ
@@ -700,7 +933,6 @@ export function StatisticsPage() {
                               {item.serviceType === 'REPLACEMENT' ? 'THAY THẾ LINH KIỆN' : 'SỬA CHỮA'}
                             </span>
 
-                            {/* HIỂN THỊ CHÍNH XÁC TÊN LINH KIỆN HOẶC TÊN DỊCH VỤ THỰC TẾ KẾ BÊN BADGE */}
                             <strong style={{ color: '#0f172a', fontSize: '0.875rem' }}>
                               {item.displayName}
                             </strong>
@@ -734,44 +966,6 @@ export function StatisticsPage() {
                 </strong>
               </div>
             </div>
-
-            <div className="detail-section">
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#1e293b', marginBottom: '14px', textTransform: 'uppercase' }}>
-                NHẬT KÝ TIẾN TRÌNH XỬ LÝ
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '2px solid #e2e8f0', paddingLeft: '16px', marginLeft: '6px' }}>
-                <div style={{ position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }} />
-                  <strong style={{ fontSize: '0.875rem', display: 'block', color: '#0f172a' }}>Tiếp nhận thiết bị</strong>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatDateTime(selectedRecord.receivedAt)}</span>
-                </div>
-
-                {selectedDetail?.histories && selectedDetail.histories.length > 0 ? (
-                  selectedDetail.histories.map((log, index) => (
-                    <div key={index} style={{ position: 'relative' }}>
-                      <div style={{ position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', background: '#22c55e' }} />
-                      <strong style={{ fontSize: '0.875rem', display: 'block', color: '#0f172a' }}>
-                        {(ticketStatusLabels as Record<string, string>)[log.status ?? ''] || log.status}
-                      </strong>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {formatDateTime(log.changedAt ?? '')} {log.changedByFullName ? `· Bởi: ${log.changedByFullName}` : ''}
-                      </span>
-                      {log.note && <p style={{ fontSize: '0.8125rem', color: '#475569', margin: '4px 0 0', background: '#f8fafc', padding: '6px 10px', borderRadius: '6px' }}>{log.note}</p>}
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: '-21px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', background: '#15803d' }} />
-                    <strong style={{ fontSize: '0.875rem', display: 'block', color: '#0f172a' }}>
-                      {(ticketStatusLabels as Record<string, string>)[selectedRecord.status] ?? selectedRecord.status}
-                    </strong>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatDateTime(selectedRecord.receivedAt)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
           </div>
         </DetailDrawer>
       )}

@@ -66,7 +66,13 @@ public class AssignmentService {
                 : (long) mlCandidateEstimateService.standardDuration(ticketId);
 
         ticket.setEstimatedDurationMinutes(duration);
-        ticket.setEstimateSource(EstimateSource.ML);
+
+        // Kiểm tra nếu thời gian dự đoán đến từ Fallback hay ML chuẩn
+        if (r.predictedDurationMinutes() != null && r.predictedDurationMinutes() == mlCandidateEstimateService.standardDuration(ticketId)) {
+            ticket.setEstimateSource(EstimateSource.STANDARD);
+        } else {
+            ticket.setEstimateSource(EstimateSource.ML);
+        }
 
         // Không set gán cứng estimatedStartAt và estimatedCompletionAt tại đây.
         // Cần để ServiceTimingService.statusChanged() tự động xếp lịch hàng đợi chính xác.

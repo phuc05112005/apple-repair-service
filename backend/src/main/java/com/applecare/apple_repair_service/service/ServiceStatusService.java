@@ -41,7 +41,7 @@ public class ServiceStatusService {
         var old = ticket.getStatus();
         boolean allowed = switch (old) {
             case WAITING_ASSIGNMENT -> next == ServiceTicketStatus.ASSIGNED || next == ServiceTicketStatus.CANCELLED;
-            case ASSIGNED -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.CANCELLED;
+            case ASSIGNED -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.INSPECTING || next == ServiceTicketStatus.WAITING_APPROVAL || next == ServiceTicketStatus.CANCELLED;
             case INSPECTING -> Set.of(ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.CANCELLED).contains(next);
             case WAITING_APPROVAL -> next == ServiceTicketStatus.REPAIRING || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED;
             case REPAIRING -> next == ServiceTicketStatus.WAITING_PART || next == ServiceTicketStatus.WAITING_APPROVAL || next == ServiceTicketStatus.WAITING_HANDOVER || next == ServiceTicketStatus.CANCELLED;

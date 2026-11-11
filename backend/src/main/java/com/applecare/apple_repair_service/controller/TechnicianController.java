@@ -27,6 +27,11 @@ public class TechnicianController {
         return queries.myWork(status);
     }
 
+    @GetMapping("/technician/history")
+    public List<OperationalTicketResponse> history(@RequestParam(required=false) ServiceTicketStatus status) {
+        return queries.myHistory(status);
+    }
+
     @GetMapping("/service-tickets/{id}/transfer-candidates")
     public List<TechnicianRecommendationResponse> transferCandidates(@PathVariable @Positive Long id) {
         return queries.transferCandidates(id);

@@ -4,3 +4,4 @@ public enum PredictionSource {
     ML,
     STANDARD_DURATION_FALLBACK
 }
+

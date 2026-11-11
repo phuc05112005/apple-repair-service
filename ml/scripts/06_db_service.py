@@ -54,10 +54,21 @@ def fetch_ticket_features(ticket_id: int) -> pd.DataFrame:
 
 def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list[str]:
     w = []
-    if int(features["total_services_count"].iloc[0]) == 0:
+    total_services = int(features["total_services_count"].iloc[0])
+    total_catalog = float(features["total_catalog_standard_duration_minutes"].iloc[0])
+
+    if total_services == 0:
         w.append("NO_REPAIR_ITEMS")
-    unk = bundle.builder.unknown_values(features.assign(technician_id=technician_id if technician_id is not None
-                                                        else features["technician_id"]))
+    # Kiểm tra ca ngoài khoảng ngoại suy CatBoost [30, 225]
+    if total_catalog < 30 or total_catalog > 225:
+        w.append("CATALOG_OUT_OF_BOUNDS")
+    # Kiểm tra ca quá nhiều dịch vụ ghép
+    if total_services >= 4:
+        w.append("TOO_MANY_SERVICES")
+
+    unk = bundle.builder.unknown_values(
+        features.assign(technician_id=technician_id if technician_id is not None else features["technician_id"])
+    )
     if "technician_id" in unk:
         w.append("UNKNOWN_TECHNICIAN")
     if "device_model_id" in unk:
@@ -68,13 +79,11 @@ def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list
 
 
 def predict_candidates(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
-    """Dự đoán cho nhiều KTV ứng viên: lấy đặc trưng 1 lần, nạp model 1 lần."""
     features = fetch_ticket_features(ticket_id)
     if features.empty:
         raise LookupError(f"Không tìm thấy phiếu #{ticket_id}")
     bundle = load_bundle()
     
-    # Nếu phiếu không có hạng mục nào -> Mới báo warning để Java fallback
     if int(features["total_services_count"].iloc[0]) == 0:
         return [{"technician_id": int(t), "predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None,
                  "upper_minutes": None, "warnings": ["NO_REPAIR_ITEMS"]} for t in candidate_ids]
@@ -82,13 +91,15 @@ def predict_candidates(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
     res = predict_for_technician_ids(features, [int(t) for t in candidate_ids], bundle)
     out = []
     for _, r in res.iterrows():
+        t_id = int(r["technician_id"])
+        # GỌI HÀM _WARNINGS CHO TỪNG KTV ỨNG VIÊN
+        tech_warnings = _warnings(features, bundle, t_id)
         out.append({
-            "technician_id": int(r["technician_id"]), 
+            "technician_id": t_id, 
             "predicted_minutes": float(r["predicted_minutes"]),
             "lower_minutes": float(r["lower_minutes"]), 
             "upper_minutes": float(r["upper_minutes"]),
-            # Trả về mảng warnings rỗng để Java chấp nhận kết quả dự đoán ML cho ca đa dịch vụ
-            "warnings": []  
+            "warnings": tech_warnings  # Trả về cảnh báo thực tế thay vì mảng rỗng []
         })
     return out
 

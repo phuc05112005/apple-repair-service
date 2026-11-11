@@ -24,5 +24,10 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = { PENDING: 'Ch
 export const confirmationLabels: Record<import('../api/contracts').ConfirmationMethod, string> = {
   DIRECT: 'Trao đổi trực tiếp', PHONE: 'Qua điện thoại', PRE_AUTHORIZED: 'Trong phạm vi đã cho phép',
 }
-
+export const paymentMethodLabels: Record<string, string> = {
+  CASH: 'Tiền mặt',
+  BANK_TRANSFER: 'Chuyển khoản ngân hàng',
+  CARD: 'Thẻ ATM / Thẻ tín dụng',
+  OTHER: 'Phương thức khác',
+}
 export const defectiveStatusLabels: Record<import('../api/contracts').DefectivePartStatus, string> = { IN_STOCK: 'Đang giữ tại chi nhánh', SENT_TO_SUPPLIER: 'Đã gửi nhà cung cấp', RESOLVED: 'Đã xử lý', DISPOSED: 'Đã tiêu hủy' }
