@@ -369,8 +369,7 @@ public class ServiceTicketService {
                 if (item.getId() == null) warranty.validateBooking(source, t.getCustomerDevice().getCustomer().getId(), c, LocalDate.now(clock));
                 item.setWarrantySourceItem(source);
             } else item.setWarrantySourceItem(null);
-            if (!requiresApproval || item.getId() == null || item.getApprovalStatus() != ApprovalStatus.APPROVED)
-                item.setApprovalStatus(requiresApproval ? ApprovalStatus.PENDING : ApprovalStatus.APPROVED);
+            item.setApprovalStatus(requiresApproval ? ApprovalStatus.PENDING : ApprovalStatus.APPROVED);
             if (!requiresApproval && confirmationMethod != null) {
                 item.setApprovalRecordedBy(actor);
                 item.setApprovalDecisionAt(LocalDateTime.now(clock));
@@ -394,8 +393,14 @@ public class ServiceTicketService {
 
         repairItems.flush();
 
+        if (!requiresApproval && t.getStatus() == ServiceTicketStatus.WAITING_APPROVAL) {
+            statuses.resolveWait(t, LocalDateTime.now(clock), actor, "Đã ghi nhận phản hồi đồng ý từ khách hàng");
+        }
+
         var next = requiresApproval ? ServiceTicketStatus.WAITING_APPROVAL : ServiceTicketStatus.REPAIRING;
-        if (t.getStatus() != next) statuses.changeStatus(t, next, actor, requiresApproval ? "Chờ liên hệ khách hàng" : "Đã ghi nhận phương án và xác nhận nội bộ");
+        if (t.getStatus() != next)
+            statuses.changeStatus(t, next, actor, requiresApproval ? "Chờ liên hệ khách hàng" : "Đã ghi nhận phương án và xác nhận nội bộ");
+
         statuses.planChanged(t, actor);
         return detail(t);
     }

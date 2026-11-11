@@ -10,7 +10,6 @@ import { formatDate, formatDateTime, formatMoney } from '../../utils/format'
 
 const processSteps: { status: ServiceTicketStatus; label: string }[] = [
   { status: 'WAITING_ASSIGNMENT', label: 'Đã tiếp nhận' },
-  { status: 'INSPECTING', label: 'Đang kiểm tra' },
   { status: 'REPAIRING', label: 'Đang sửa chữa' },
   { status: 'WAITING_HANDOVER', label: 'Chờ bàn giao' },
   { status: 'HANDED_OVER', label: 'Đã bàn giao' },

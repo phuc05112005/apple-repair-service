@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -90,6 +91,16 @@ public class OperationalQueryService {
     public List<PartUsageResponse> partUsages(Long repairItemId) {
         policy.requireItemRead(repairItemId);
         return partUsages.findAllByRepairItem_Id(repairItemId).stream().map(mapper::map).toList();
+    }
+
+    @PreAuthorize("hasRole('TECHNICIAN')")
+    @Transactional(readOnly = true)
+    public List<OperationalTicketResponse> myHistory(ServiceTicketStatus status) {
+        Long technicianId = actor.id();
+        List<Assignment> selected = assignments.findHistoryAssignmentsByTechnician(technicianId, status);
+        return selected.stream()
+                .map(a -> operational(a.getServiceTicket(), a))
+                .collect(Collectors.toList());
     }
 
     private Assignment active(Long ticketId) {

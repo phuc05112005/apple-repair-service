@@ -2,7 +2,11 @@ package com.applecare.apple_repair_service.repository;
 
 import com.applecare.apple_repair_service.entity.Assignment;
 import com.applecare.apple_repair_service.enums.AssignmentStatus;
+import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,4 +30,18 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"serviceTicket.customerDevice.customer","serviceTicket.customerDevice.deviceModel","serviceTicket.branch","technician"})
     List<Assignment> findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(Long technicianId, AssignmentStatus status);
+
+    @Query("""
+        select distinct a from Assignment a 
+        where a.technician.id = :technicianId 
+          and (:status is null or a.serviceTicket.status = :status)
+          and a.serviceTicket.status in (com.applecare.apple_repair_service.enums.ServiceTicketStatus.HANDED_OVER, com.applecare.apple_repair_service.enums.ServiceTicketStatus.WAITING_HANDOVER, com.applecare.apple_repair_service.enums.ServiceTicketStatus.CANCELLED)
+        order by a.assignedAt desc
+    """)
+    @EntityGraph(attributePaths={"serviceTicket.customerDevice.customer","serviceTicket.customerDevice.deviceModel","serviceTicket.branch","technician"})
+    List<Assignment> findHistoryAssignmentsByTechnician(
+            @Param("technicianId") Long technicianId,
+            @Param("status") ServiceTicketStatus status
+    );
+
 }

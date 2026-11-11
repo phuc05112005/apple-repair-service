@@ -16,6 +16,7 @@ const AdminHomePage = safeLazy(() => import('../pages/internal/WorkspaceHomePage
 const ReceptionistHomePage = safeLazy(() => import('../pages/internal/WorkspaceHomePages'), 'ReceptionistHomePage')
 const TechnicianHomePage = safeLazy(() => import('../pages/internal/WorkspaceHomePages'), 'TechnicianHomePage')
 const NotFoundPage = safeLazy(() => import('../pages/NotFoundPage'), 'NotFoundPage')
+const TechnicianHistoryPage = safeLazy(() => import('../pages/internal/technician/TechnicianHistoryPage'), 'TechnicianHistoryPage')
 const AppointmentsPage = safeLazy(() => import('../pages/internal/receptionist/AppointmentsPage'), 'AppointmentsPage')
 const IntakePage = safeLazy(() => import('../pages/internal/receptionist/IntakePage'), 'IntakePage')
 const TicketWorkspacePage = safeLazy(() => import('../pages/internal/receptionist/TicketWorkspacePage'), 'TicketWorkspacePage')
@@ -73,6 +74,7 @@ export function App() {
 
         <Route path="internal/technician" element={<RequireRole roles={['TECHNICIAN']}><InternalLayout role="TECHNICIAN" /></RequireRole>}>
           <Route index element={<TechnicianHomePage />} />
+          <Route path="history" element={<TechnicianHistoryPage />} />
           <Route path="tickets/:ticketId" element={<TechnicianTicketPage />} />
         </Route>
 

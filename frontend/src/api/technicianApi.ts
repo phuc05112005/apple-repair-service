@@ -3,6 +3,7 @@ import type { ConfirmationMethod, WarrantyRemedy, AvailablePartResponse, Incomin
 
 export const technicianApi = {
   work: (status?: ServiceTicketStatus, signal?: AbortSignal) => apiRequest<OperationalTicketResponse[]>('/api/v1/internal/technician/work', { auth: true, query: { status }, signal }),
+  history: (status?: ServiceTicketStatus, signal?: AbortSignal) => apiRequest<OperationalTicketResponse[]>('/api/v1/internal/technician/history', { auth: true, query: { status }, signal }),
   incomingTransfers: (signal?: AbortSignal) => apiRequest<IncomingTransferResponse[]>('/api/v1/internal/transfers/incoming', { auth: true, signal }),
   acceptTransfer: (id: number, note?: string) => apiRequest<TransferResponse>(`/api/v1/internal/transfers/${id}/accept`, { auth: true, method: 'POST', body: { note } }),
   rejectTransfer: (id: number, note?: string) => apiRequest<TransferResponse>(`/api/v1/internal/transfers/${id}/reject`, { auth: true, method: 'POST', body: { note } }),

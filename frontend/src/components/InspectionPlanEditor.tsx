@@ -1,5 +1,5 @@
 import { ConfirmationFields } from './ConfirmationFields'
-import type { ConfirmationMethod } from '../api/contracts'
+import type { ConfirmationMethod, ServiceTicketStatus } from '../api/contracts'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { publicApi } from '../api/publicApi'
@@ -8,6 +8,7 @@ import { ErrorState, LoadingState } from './AsyncState'
 import { formatMoney } from '../utils/format'
 
 interface Props {
+  status: ServiceTicketStatus
   modelId: number
   discountPercent: number
   existingItems: RepairItemResponse[]
@@ -15,15 +16,15 @@ interface Props {
   onItemsChange: (items: InspectionRepairItemRequest[]) => void
   result: string
   onResultChange: (value: string) => void
-  requiresApproval: boolean
-  onApprovalChange: (value: boolean) => void
   confirmationMethod: ConfirmationMethod | ''
   confirmationNote: string
   authorizedScope?: string | null
   onMethodChange: (value: ConfirmationMethod | '') => void
   onNoteChange: (value: string) => void
   busy: boolean
-  onSubmit: () => void
+  onConfirm: () => void
+  onPause: () => void
+  onCancel?: () => void
 }
 
 export function InspectionPlanEditor(props: Props) {
@@ -31,8 +32,14 @@ export function InspectionPlanEditor(props: Props) {
   const [serviceType, setServiceType] = useState<ServiceTypeCode | 'ALL'>('ALL')
   const [catalogId, setCatalogId] = useState<number>()
 
-  const catalog = useQuery({ queryKey: ['public', 'catalog', props.modelId], queryFn: ({ signal }) => publicApi.catalog({ deviceModelId: props.modelId }, signal) })
-  const issues = useQuery({ queryKey: ['public', 'service-issues'], queryFn: ({ signal }) => publicApi.serviceIssues(undefined, signal) })
+  const catalog = useQuery({ 
+    queryKey: ['public', 'catalog', props.modelId], 
+    queryFn: ({ signal }) => publicApi.catalog({ deviceModelId: props.modelId }, signal) 
+  })
+  const issues = useQuery({ 
+    queryKey: ['public', 'service-issues'], 
+    queryFn: ({ signal }) => publicApi.serviceIssues(undefined, signal) 
+  })
 
   const available = (catalog.data ?? []).filter(item => item.serviceTypeCode !== 'WARRANTY')
   
@@ -56,29 +63,19 @@ export function InspectionPlanEditor(props: Props) {
     setCatalogId(undefined)
   }
 
-  function handleSubmit() {
-    // Nếu chưa gõ kết quả kiểm tra, tự động điền chuỗi mặc định
-    if (!props.result.trim()) {
-      props.onResultChange('Đã kiểm tra thiết bị và thống nhất phương án xử lý.')
-    }
-    // Nếu chưa chọn hình thức xác nhận, tự động gán 'DIRECT' (Trao đổi trực tiếp)
-    if (!props.requiresApproval && !props.confirmationMethod) {
-      props.onMethodChange('DIRECT')
-    }
-    props.onSubmit()
-  }
-
-  // Điều kiện disabled duy nhất: Đang gửi API hoặc chưa chọn dịch vụ nào
   const isSubmitDisabled = props.busy || !props.items.length
+  const isWaitingApproval = props.status === 'WAITING_APPROVAL'
 
   return (
     <section className="ops-section inspection-plan">
-      <div className="ops-section__title"><h2>Kết quả kiểm tra & phương án sửa chữa</h2></div>
+      <div className="ops-section__title">
+        <h2>{isWaitingApproval ? 'Ghi nhận phản hồi & Cập nhật phương án' : 'Phương án kỹ thuật & Dịch vụ'}</h2>
+      </div>
       
       <label className="field">
-        <span>Kết quả kiểm tra thực tế</span>
+        <span>Kết quả chẩn đoán thực tế</span>
         <textarea 
-          placeholder="Nhập kết quả kiểm tra thực tế (Tùy chọn, hệ thống sẽ tự ghi nhận nếu để trống)" 
+          placeholder="Nhập ghi chú chẩn đoán thực tế..." 
           maxLength={5000} 
           value={props.result} 
           onChange={event => props.onResultChange(event.target.value)} 
@@ -86,10 +83,13 @@ export function InspectionPlanEditor(props: Props) {
       </label>
 
       <div className="inspection-plan__picker">
-        <h3>Thêm dịch vụ cho thiết bị này</h3>
-        <p>Chọn dịch vụ kỹ thuật phù hợp từ danh mục để đưa vào phương án.</p>
+        <h3>Thêm dịch vụ kỹ thuật</h3>
         
-        {catalog.isLoading || issues.isLoading ? <LoadingState label="Đang tải dịch vụ phù hợp…" /> : catalog.isError || issues.isError ? <ErrorState error={catalog.error ?? issues.error} retry={() => { void catalog.refetch(); void issues.refetch() }} /> : (
+        {catalog.isLoading || issues.isLoading ? (
+          <LoadingState label="Đang tải dịch vụ…" />
+        ) : catalog.isError || issues.isError ? (
+          <ErrorState error={catalog.error ?? issues.error} retry={() => { void catalog.refetch(); void issues.refetch() }} />
+        ) : (
           <>
             <div className="form-grid">
               <label className="field">
@@ -103,7 +103,7 @@ export function InspectionPlanEditor(props: Props) {
               </label>
 
               <label className="field">
-                <span>Phương án thực hiện</span>
+                <span>Phương án</span>
                 <select value={serviceType} onChange={event => { setServiceType(event.target.value as ServiceTypeCode | 'ALL'); setCatalogId(undefined) }}>
                   <option value="ALL">Tất cả phương án (Sửa / Thay thế)</option>
                   <option value="REPAIR">Sửa chữa</option>
@@ -124,8 +124,6 @@ export function InspectionPlanEditor(props: Props) {
               </select>
             </label>
 
-            {issueId && !choices.length && <p role="status">Không có dịch vụ mới hoặc dịch vụ này đã được thêm vào phương án.</p>}
-
             {selected && (
               <div className="inspection-plan__quote">
                 <strong>{selected.name}</strong>
@@ -134,7 +132,7 @@ export function InspectionPlanEditor(props: Props) {
             )}
 
             <button type="button" className="button button--secondary" disabled={!selected || props.busy} onClick={add}>
-              + Thêm vào phương án
+              + Thêm dịch vụ
             </button>
           </>
         )}
@@ -160,18 +158,16 @@ export function InspectionPlanEditor(props: Props) {
                 <span>Giá áp dụng</span>
                 <input disabled={original?.warrantyDecision === 'APPROVED'} type="number" min="0" value={item.finalPrice ?? ''} onChange={event => update('finalPrice', event.target.value)} />
               </label>
-              <button type="button" className="text-action text-action--danger" disabled={props.busy || original?.warrantyDecision === 'APPROVED'} onClick={() => props.onItemsChange(props.items.filter((_, i) => i !== index))}>Xóa</button>
+              <button type="button" className="text-action text-action--danger" disabled={props.busy || original?.warrantyDecision === 'APPROVED'} onClick={() => props.onItemsChange(props.items.filter((_, i) => i !== index))}>
+                Xóa
+              </button>
             </article>
           )
         })}
       </div>
 
-      <label className="check-field" style={{ margin: '15px 0' }}>
-        <input type="checkbox" checked={props.requiresApproval} onChange={event => props.onApprovalChange(event.target.checked)} />
-        <span>Chưa liên hệ được khách — tạm dừng chờ xác nhận</span>
-      </label>
-
-      {!props.requiresApproval && (
+      <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e2e8f0' }}>
+        <h3 style={{ fontSize: '1rem', marginBottom: '10px' }}>Hình thức xác nhận ý kiến khách hàng</h3>
         <ConfirmationFields 
           method={props.confirmationMethod || 'DIRECT'} 
           note={props.confirmationNote} 
@@ -179,17 +175,51 @@ export function InspectionPlanEditor(props: Props) {
           onMethod={props.onMethodChange} 
           onNote={props.onNoteChange} 
         />
-      )}
+      </div>
 
-      <button 
-        type="button" 
-        className="button button--primary" 
-        disabled={isSubmitDisabled} 
-        onClick={handleSubmit}
-        style={{ marginTop: '15px' }}
-      >
-        {props.busy ? 'Đang lưu…' : props.requiresApproval ? 'Lưu & Chờ liên hệ khách' : 'Lưu phương án & Tiếp tục'}
-      </button>
+      <div className="button-row" style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {isWaitingApproval ? (
+          <>
+            <button 
+              type="button" 
+              className="button button--primary" 
+              disabled={isSubmitDisabled} 
+              onClick={props.onConfirm}
+            >
+              {props.busy ? 'Đang lưu…' : 'Khách đã xác nhận & Tiếp tục'}
+            </button>
+            {props.onCancel && (
+              <button type="button" className="button button--quiet" onClick={props.onCancel}>
+                Thu gọn form
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button 
+              type="button" 
+              className="button button--primary" 
+              disabled={isSubmitDisabled} 
+              onClick={props.onConfirm}
+            >
+              {props.busy ? 'Đang lưu…' : 'Khách đã xác nhận & Tiếp tục'}
+            </button>
+            <button 
+              type="button" 
+              className="button button--secondary" 
+              disabled={isSubmitDisabled} 
+              onClick={props.onPause}
+            >
+              {props.busy ? 'Đang lưu…' : 'Chờ khách xác nhận'}
+            </button>
+            {props.onCancel && (
+              <button type="button" className="button button--quiet" onClick={props.onCancel}>
+                Hủy
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </section>
   )
 }

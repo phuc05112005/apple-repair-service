@@ -32,6 +32,14 @@ public class AdminConfigurationController {
     public SystemSettingResponse setting(@PathVariable String key, @Valid @RequestBody UpdateSystemSettingRequest request) {
         return settings.update(key, request);
     }
+    @GetMapping("/statistics/feedbacks/list")
+    public List<CustomerFeedbackResponse> feedbackList(
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) Boolean satisfied,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        return feedback.listFeedbacks(branchId, satisfied, from, to);
+    }
     @PostMapping("/appointment-slots")
     @ResponseStatus(HttpStatus.CREATED)
     public SlotAvailabilityResponse createSlot(@Valid @RequestBody SaveAppointmentSlotRequest request) { return slots.create(request); }

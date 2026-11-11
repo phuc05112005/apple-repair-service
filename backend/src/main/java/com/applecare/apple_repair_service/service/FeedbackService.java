@@ -1,6 +1,7 @@
 package com.applecare.apple_repair_service.service;
 
 import com.applecare.apple_repair_service.dto.request.CreateServiceFeedbackRequest;
+import com.applecare.apple_repair_service.dto.response.CustomerFeedbackResponse;
 import com.applecare.apple_repair_service.dto.response.ServiceFeedbackResponse;
 import com.applecare.apple_repair_service.entity.ServiceFeedback;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
@@ -47,6 +48,39 @@ public class FeedbackService {
 
     public ServiceFeedbackResponse getByTicket(Long ticketId) {
         return repository.findByServiceTicket_Id(ticketId).map(mapper::map).orElseThrow(() -> new ResourceNotFoundException("Feedback not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CustomerFeedbackResponse> listFeedbacks(Long branchId, Boolean satisfied, LocalDate from, LocalDate to) {
+        var start = from != null ? from.atStartOfDay() : LocalDate.of(2000, 1, 1).atStartOfDay();
+        var end = to != null ? to.plusDays(1).atStartOfDay() : LocalDate.of(2099, 12, 31).atStartOfDay();
+
+        return repository.findAll().stream()
+                .filter(f -> f.getCreatedAt() != null && !f.getCreatedAt().isBefore(start) && f.getCreatedAt().isBefore(end))
+                .filter(f -> satisfied == null || java.util.Objects.equals(f.isSatisfied(), satisfied))
+                .filter(f -> branchId == null || (f.getServiceTicket() != null && f.getServiceTicket().getBranch() != null
+                        && java.util.Objects.equals(f.getServiceTicket().getBranch().getId(), branchId)))
+                .map(f -> {
+                    var ticket = f.getServiceTicket();
+                    var device = ticket != null ? ticket.getCustomerDevice() : null;
+                    var customer = device != null ? device.getCustomer() : null;
+                    var model = device != null ? device.getDeviceModel() : null;
+                    var branch = ticket != null ? ticket.getBranch() : null;
+                    return new CustomerFeedbackResponse(
+                            f.getId(),
+                            ticket != null ? ticket.getId() : null,
+                            ticket != null ? ticket.getTicketCode() : "",
+                            customer != null ? customer.getFullName() : "Khách lẻ",
+                            customer != null ? customer.getPhone() : "—",
+                            model != null ? model.getName() : "Chưa xác định",
+                            branch != null ? branch.getName() : "Hệ thống",
+                            f.isSatisfied(),
+                            f.getComment(),
+                            f.getCreatedAt()
+                    );
+                })
+                .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
