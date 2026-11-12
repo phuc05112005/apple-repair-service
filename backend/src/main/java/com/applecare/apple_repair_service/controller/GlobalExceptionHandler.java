@@ -6,12 +6,14 @@ import com.applecare.apple_repair_service.exception.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.method.MethodValidationException;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -36,7 +39,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> notFound(ResourceNotFoundException ex, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage(), request, List.of());
     }
-
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiErrorResponse> business(BusinessException ex, HttpServletRequest request) {
@@ -78,7 +80,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiErrorResponse> invalidConstraint(ConstraintViolationException ex,
-                                                               HttpServletRequest request) {
+                                                              HttpServletRequest request) {
         var fields = ex.getConstraintViolations().stream()
                 .map(violation -> new FieldErrorResponse(
                         violation.getPropertyPath().toString(), violation.getMessage()))
@@ -95,7 +97,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> malformed(HttpMessageNotReadableException ex,
-                                                       HttpServletRequest request) {
+                                                      HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "MALFORMED_JSON",
                 "Nội dung yêu cầu không đúng định dạng hoặc có giá trị không được hỗ trợ.", request, List.of());
     }
@@ -122,7 +124,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> integrity(DataIntegrityViolationException ex,
-                                                       HttpServletRequest request) {
+                                                      HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "CONFLICT",
                 "Dữ liệu đang được sử dụng hoặc xung đột với dữ liệu hiện có.", request, List.of());
     }
@@ -145,17 +147,44 @@ public class GlobalExceptionHandler {
                 "Định dạng nội dung gửi lên không được hỗ trợ.", request, List.of());
     }
 
-    @ExceptionHandler(org.apache.catalina.connector.ClientAbortException.class)
-    public void handleClientAbort(org.apache.catalina.connector.ClientAbortException ex, HttpServletRequest request) {
+    @ExceptionHandler({ClientAbortException.class, AsyncRequestNotUsableException.class})
+    public void handleClientAbort(Exception ex, HttpServletRequest request) {
         LOG.warn("Client disconnected before response completed for {}: {}", request.getRequestURI(), ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public void handleNotWritable(HttpMessageNotWritableException ex, HttpServletRequest request) {
+        if (isClientDisconnected(ex)) {
+            LOG.warn("Client disconnected while writing response for {}: {}", request.getRequestURI(), ex.getMessage());
+            return;
+        }
+        LOG.error("Failed to write JSON response for {}", request.getRequestURI(), ex);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> unexpected(Exception ex, HttpServletRequest request) {
+        if (isClientDisconnected(ex)) {
+            LOG.warn("Client disconnected for {}: {}", request.getRequestURI(), ex.getMessage());
+            return null;
+        }
         LOG.error("Unhandled server error for {}", request.getRequestURI(), ex);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
                 "Không thể hoàn tất thao tác. Vui lòng thử lại hoặc liên hệ quản trị viên.",
                 request, List.of());
+    }
+
+    private boolean isClientDisconnected(Throwable ex) {
+        Throwable cause = ex;
+        while (cause != null) {
+            if (cause instanceof ClientAbortException || cause instanceof AsyncRequestNotUsableException) {
+                return true;
+            }
+            if (cause.getMessage() != null && cause.getMessage().contains("An established connection was aborted")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status, String code, String message,

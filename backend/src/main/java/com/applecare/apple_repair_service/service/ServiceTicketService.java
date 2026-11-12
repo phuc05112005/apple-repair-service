@@ -58,13 +58,11 @@ public class ServiceTicketService {
         t.setHandedOverBy(actor);
         t.setHandedOverAt(now);
 
-        // --- CẬP NHẬT: Tự động tính & lưu hạn bảo hành khi bàn giao máy cho khách ---
         var handoverDate = now.toLocalDate();
         var items = repairItems.findAllByServiceTicket_Id(id);
         for (var item : items) {
             if (item.getApprovalStatus() != ApprovalStatus.APPROVED) continue;
 
-            // Trường hợp 1: Hạng mục đi bảo hành -> Giữ nguyên hạn bảo hành của phiếu gốc
             if (item.getWarrantySourceItem() != null && item.getWarrantyDecision() == WarrantyDecision.APPROVED) {
                 item.setWarrantyStartDate(item.getWarrantySourceItem().getWarrantyStartDate());
                 item.setWarrantyEndDate(item.getWarrantySourceItem().getWarrantyEndDate());
@@ -72,7 +70,6 @@ public class ServiceTicketService {
                 continue;
             }
 
-            // Trường hợp 2: Dịch vụ/linh kiện mới -> Ngày bắt đầu = Ngày bàn giao, Ngày kết thúc = Ngày bàn giao + warrantyDays
             if (item.getServiceCatalogItem() != null
                     && item.getServiceCatalogItem().getWarrantyDays() != null
                     && item.getServiceCatalogItem().getWarrantyDays() > 0) {
@@ -153,7 +150,6 @@ public class ServiceTicketService {
         if (replacements != null) bookedItems.stream().filter(item -> item.getWarrantySourceItem() != null)
                 .forEach(booked -> repairItems.save(warrantyClaimItem(ticket, booked)));
 
-        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
         repairItems.flush();
 
         statuses.initialize(ticket, ticket.getCreatedBy());
@@ -195,7 +191,6 @@ public class ServiceTicketService {
             repairItems.save(item);
         }
 
-        // Flush toàn bộ danh sách repairItems xuống MySQL trước khi chuyển giao trạng thái
         repairItems.flush();
 
         statuses.initialize(ticket, ticket.getCreatedBy());
@@ -223,7 +218,9 @@ public class ServiceTicketService {
     }
 
     public ServiceTicketDetailResponse getById(Long id) {
-        return detail(access.get(ServiceTicket.class, id));
+        var ticket = tickets.findDetailById(id)
+                .orElseGet(() -> access.get(ServiceTicket.class, id));
+        return detail(ticket);
     }
 
     public List<ServiceTicketSummaryResponse> findByPhone(String phone) {
@@ -450,7 +447,8 @@ public class ServiceTicketService {
     }
 
     private ServiceTicketDetailResponse detail(ServiceTicket t) {
-        var items = repairItems.findAllByServiceTicket_Id(t.getId());
+        // Sử dụng phương thức FETCH JOIN để lấy sẵn toàn bộ thông tin liên quan trong 1 câu SQL duy nhất
+        var items = repairItems.findByServiceTicket_IdWithDetails(t.getId());
         var device = t.getCustomerDevice();
         var customer = device.getCustomer();
         var model = device.getDeviceModel();
@@ -464,7 +462,7 @@ public class ServiceTicketService {
                 t.getBranch().getId(), t.getBranch().getName(),
                 items.stream().map(RepairItem::getServiceCatalogItem).filter(Objects::nonNull)
                         .map(ServiceCatalogItem::getServiceIssue).filter(Objects::nonNull)
-                        .map(issue -> issue.getName()).distinct().toList(),
+                        .map(ServiceIssue::getName).distinct().toList(),
                 items.stream().map(RepairItem::getItemNameSnapshot).distinct().toList()
         );
 

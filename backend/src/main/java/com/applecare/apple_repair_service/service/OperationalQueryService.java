@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,9 +46,19 @@ public class OperationalQueryService {
     @PreAuthorize("hasAnyRole('ADMIN','RECEPTIONIST')")
     public List<OperationalTicketResponse> queue(Long branchId, ServiceTicketStatus status, String query) {
         var selected = tickets.findOperationalTickets(branchId, status, BusinessRules.text(query));
-        var itemMap = batchedItems(selected.stream().map(ServiceTicket::getId).toList());
-        var activeMap = assignments.findTimingAssignments().stream().collect(java.util.stream.Collectors.toMap(a -> a.getServiceTicket().getId(), a -> a));
-        return selected.stream().map(ticket -> operational(ticket, activeMap.get(ticket.getId()), itemMap.getOrDefault(ticket.getId(), List.of()))).toList();
+        var ticketIds = selected.stream().map(ServiceTicket::getId).toList();
+        var itemMap = batchedItems(ticketIds);
+        var assignmentMap = ticketIds.isEmpty()
+                ? Map.<Long, Assignment>of()
+                : assignments.findPreferredAssignmentsForTickets(ticketIds).stream()
+                .collect(Collectors.toMap(
+                        a -> a.getServiceTicket().getId(),
+                        a -> a,
+                        (existing, replacement) -> existing
+                ));
+        return selected.stream()
+                .map(ticket -> operational(ticket, assignmentMap.get(ticket.getId()), itemMap.getOrDefault(ticket.getId(), List.of())))
+                .toList();
     }
 
     @PreAuthorize("hasRole('TECHNICIAN')")

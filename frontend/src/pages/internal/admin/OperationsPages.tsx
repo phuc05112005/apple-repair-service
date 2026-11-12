@@ -74,6 +74,26 @@ const formatVND = (val?: number | null) => {
   return new Intl.NumberFormat('vi-VN').format(Number(val)) + ' VNĐ'
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!err) return fallback
+  if (typeof err === 'string') return err
+  if (typeof err === 'object') {
+    const maybeErr = err as {
+      message?: string
+      detail?: string
+      error?: string
+      response?: { data?: { message?: string; detail?: string; error?: string } }
+    }
+    const backendMsg =
+      maybeErr.response?.data?.message ||
+      maybeErr.response?.data?.detail ||
+      maybeErr.response?.data?.error
+    if (backendMsg && backendMsg.trim()) return backendMsg
+    if (maybeErr.message && maybeErr.message.trim()) return maybeErr.message
+  }
+  return fallback
+}
+
 function ExpandableHistoryNote({ row }: { row: InventoryTransactionRecord }) {
   const [expanded, setExpanded] = useState(false)
   const fullText = [
@@ -134,12 +154,12 @@ export function InventoryPage() {
   const [historyBranchId, setHistoryBranchId] = useState('')
   const [historyPartId, setHistoryPartId] = useState('')
   const [historyModelId, setHistoryModelId] = useState('')
-  const [historySupplier, setHistorySupplier] = useState('')
   const [historyType, setHistoryType] = useState('')
   const [historyFrom, setHistoryFrom] = useState('')
   const [historyTo, setHistoryTo] = useState('')
 
   const [toast, setToast] = useState<string>()
+  const [excelErrorMsg, setExcelErrorMsg] = useState<string>()
   const excelInput = useRef<HTMLInputElement>(null)
 
   const branches = useQuery({ queryKey: ['admin', 'branches'], queryFn: ({ signal }) => adminApi.branches(signal) })
@@ -191,15 +211,6 @@ export function InventoryPage() {
     return pagedData.content ?? []
   }, [history.data])
 
-  const existingSuppliers = useMemo(() => {
-    const set = new Set<string>()
-    rawList.forEach(item => {
-      const sup = item.supplierName ?? item.supplier_name
-      if (sup && sup.trim()) set.add(sup.trim())
-    })
-    return Array.from(set).sort(compareText)
-  }, [rawList])
-
   const historyList = useMemo(() => {
     let list = rawList
 
@@ -213,16 +224,8 @@ export function InventoryPage() {
       })
     }
 
-    if (historySupplier) {
-      const low = historySupplier.toLowerCase()
-      list = list.filter(row => {
-        const supName = (row.supplierName ?? row.supplier_name ?? '').toLowerCase()
-        return supName.includes(low)
-      })
-    }
-
     return list
-  }, [rawList, historyModelId, historySupplier, partMap])
+  }, [rawList, historyModelId, partMap])
 
   function getPartModelsText(pId: number) {
     const part = partMap.get(pId) as (typeof partMap extends Map<number, infer T> ? T & { deviceModelIds?: number[]; deviceModelId?: number } : never) | undefined
@@ -331,23 +334,38 @@ export function InventoryPage() {
 
   const downloadTemplate = useMutation({
     mutationFn: () => adminApi.inventoryImportTemplate(),
+    onMutate: () => setExcelErrorMsg(undefined),
     onSuccess: blob => {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = 'mau-nhap-kho.xlsx'
+      anchor.download = `ton-kho-linh-kien-${new Date().toISOString().slice(0, 10)}.xlsx`
       anchor.click()
       URL.revokeObjectURL(url)
-      setToast('Đã tải file mẫu nhập kho.')
+      setToast('Đã xuất file Excel tồn kho. Chỉnh sửa cột "Số lượng mới" và tải lên lại để cập nhật.')
+    },
+    onError: (err: unknown) => {
+      setExcelErrorMsg(extractErrorMessage(err, 'Không thể xuất file Excel tồn kho.'))
     },
   })
 
   const importExcel = useMutation({
     mutationFn: (file: File) => adminApi.importInventory(file),
+    onMutate: () => setExcelErrorMsg(undefined),
     onSuccess: async result => {
-      setToast(`Đã nhập kho thành công ${result.importedRows} giao dịch.`)
-      if (excelInput.current) excelInput.current.value = ''
+      const updatedCount = result.importedRows ?? 0
+      setToast(
+        updatedCount > 0
+          ? `Đã cập nhật tồn kho thành công ${updatedCount} mục thay đổi và ghi lịch sử thao tác.`
+          : 'File hợp lệ nhưng không có dòng nào thay đổi số lượng so với tồn kho hiện tại.'
+      )
       await refresh()
+    },
+    onError: (err: unknown) => {
+      setExcelErrorMsg(extractErrorMessage(err, 'File Excel chưa hợp lệ. Vui lòng kiểm tra lại dữ liệu và thử lại.'))
+    },
+    onSettled: () => {
+      if (excelInput.current) excelInput.current.value = ''
     },
   })
 
@@ -364,26 +382,18 @@ export function InventoryPage() {
       'Linh kiện',
       'Mã linh kiện',
       'Số lượng',
-      'Đơn giá nhập (VNĐ)',
-      'Thành tiền (VNĐ)',
-      'Nhà cung cấp',
       'Thời điểm',
       'Người ghi nhận',
       'Ghi chú / Tham chiếu',
     ]
 
-    const historyData = historyList
-
-    const rows = historyData.map(row => {
+    const rows = historyList.map(row => {
       const branchStr =
         row.sourceBranchId && row.destinationBranchId
           ? `${branchMap.get(row.sourceBranchId)?.name ?? `#${row.sourceBranchId}`} -> ${branchMap.get(row.destinationBranchId)?.name ?? `#${row.destinationBranchId}`}`
           : branchMap.get(row.destinationBranchId ?? row.sourceBranchId ?? -1)?.name ?? 'Hệ thống'
 
       const part = partMap.get(row.partId)
-      const costOne = row.costPrice ?? row.cost_price ?? 0
-      const totalCost = costOne * row.quantity
-      const supplierName = row.supplierName ?? row.supplier_name ?? ''
       const recordedByName = row.recordedByName ?? row.recorded_by_name ?? ''
 
       return [
@@ -393,9 +403,6 @@ export function InventoryPage() {
         `"${(part?.name ?? '').replace(/"/g, '""')}"`,
         `"${part?.partCode ?? ''}"`,
         row.quantity,
-        costOne,
-        totalCost,
-        `"${supplierName.replace(/"/g, '""')}"`,
         `"${formatDateTime(row.createdAt)}"`,
         `"${recordedByName.replace(/"/g, '""')}"`,
         `"${(row.note ?? '').replace(/"/g, '""')}"`,
@@ -521,6 +528,7 @@ export function InventoryPage() {
     { key: 'stock', label: 'Tình trạng', value: stockFilter, onChange: setStockFilter, options: [{ value: 'available', label: 'Còn hàng' }, { value: 'empty', label: 'Hết hàng' }], matches: (row, value) => (value === 'available' ? row.quantity > 0 : row.quantity === 0) },
   ]
 
+  // Bảng lịch sử xuất nhập kho (đã bỏ 2 cột "Đơn giá / Thành tiền" và "Nhà cung cấp")
   const historyColumns: DataColumn<InventoryTransactionRecord>[] = [
     {
       key: 'code',
@@ -566,29 +574,6 @@ export function InventoryPage() {
       render: row => <strong>{row.quantity}</strong>,
     },
     {
-      key: 'price',
-      label: 'Đơn giá / Thành tiền',
-      render: row => {
-        const costOne = row.costPrice ?? row.cost_price
-        if (!costOne) return <span className="muted-text">—</span>
-        const totalCost = costOne * row.quantity
-        return (
-          <div style={{ whiteSpace: 'nowrap' }}>
-            <div>{formatVND(costOne)}</div>
-            <small className="muted-text">Tổng: {formatVND(totalCost)}</small>
-          </div>
-        )
-      },
-    },
-    {
-      key: 'supplier',
-      label: 'Nhà cung cấp',
-      render: row => {
-        const supplierName = row.supplierName ?? row.supplier_name
-        return supplierName ? <span style={{ whiteSpace: 'nowrap' }}>{supplierName}</span> : <span className="muted-text">—</span>
-      },
-    },
-    {
       key: 'createdAt',
       label: 'Thời điểm',
       render: row => <span style={{ whiteSpace: 'nowrap' }}>{formatDateTime(row.createdAt)}</span>,
@@ -617,10 +602,10 @@ export function InventoryPage() {
         </div>
         <div className="page-action-group">
           <button className="button button--quiet" disabled={downloadTemplate.isPending} onClick={() => downloadTemplate.mutate()}>
-            {downloadTemplate.isPending ? 'Đang tạo mẫu…' : 'Tải mẫu Excel'}
+            {downloadTemplate.isPending ? 'Đang xuất file…' : 'Xuất file Excel tồn kho'}
           </button>
           <button className="button button--secondary" disabled={importExcel.isPending} onClick={() => excelInput.current?.click()}>
-            {importExcel.isPending ? 'Đang kiểm tra…' : 'Nhập kho từ Excel'}
+            {importExcel.isPending ? 'Đang cập nhật…' : 'Cập nhật số lượng từ Excel'}
           </button>
           <input
             ref={excelInput}
@@ -651,8 +636,30 @@ export function InventoryPage() {
         </div>
       </header>
 
-      {(downloadTemplate.isError || importExcel.isError) && (
-        <ErrorState error={downloadTemplate.error ?? importExcel.error} description="File chưa được xử lý. Kiểm tra thông báo lỗi và thử lại." />
+      {excelErrorMsg && (
+        <div
+          role="alert"
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <div>
+            <strong style={{ display: 'block', marginBottom: '2px' }}>Cập nhật từ Excel chưa thành công</strong>
+            <span style={{ fontSize: '0.875rem' }}>{excelErrorMsg}</span>
+          </div>
+          <button type="button" className="text-action" onClick={() => setExcelErrorMsg(undefined)}>
+            Đóng
+          </button>
+        </div>
       )}
 
       <div className="metric-strip">
@@ -933,7 +940,7 @@ export function InventoryPage() {
         <div className="ops-section__title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NHẬT KÝ VẬN HÀNH</span>
-            
+
             <div className="segmented" style={{ display: 'inline-flex', width: 'fit-content', margin: '4px 0' }}>
               <button
                 type="button"
@@ -953,7 +960,7 @@ export function InventoryPage() {
 
             {activeHistoryTab === 'HISTORY' ? (
               <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
-                Tra cứu chi tiết mọi biến động kho, đơn giá nhập, nhà cung cấp và thông tin ghi nhận.
+                Tra cứu chi tiết mọi biến động nhập, xuất, chuyển kho, sử dụng linh kiện và thông tin ghi nhận.
               </p>
             ) : (
               <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>
@@ -1018,16 +1025,6 @@ export function InventoryPage() {
               </label>
 
               <label className="field">
-                <span className="field-label"><b>Nhà cung cấp</b></span>
-                <select value={historySupplier} onChange={e => setHistorySupplier(e.target.value)}>
-                  <option value="">Tất cả nhà cung cấp</option>
-                  {existingSuppliers.map(sup => (
-                    <option key={sup} value={sup}>{sup}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="field">
                 <span className="field-label"><b>Loại giao dịch</b></span>
                 <select value={historyType} onChange={e => setHistoryType(e.target.value)}>
                   <option value="">Tất cả giao dịch</option>
@@ -1060,10 +1057,9 @@ export function InventoryPage() {
                 searchPlaceholder="Tìm kiếm nhanh trong lịch sử..."
                 searchableText={row => {
                   const part = partMap.get(row.partId)
-                  const supplierName = row.supplierName ?? row.supplier_name ?? ''
                   const recordedByName = row.recordedByName ?? row.recorded_by_name ?? ''
                   const code = inventoryTransactionCode(row)
-                  return `${code} ${part?.name ?? ''} ${part?.partCode ?? ''} ${supplierName} ${recordedByName} ${row.note ?? ''}`
+                  return `${code} ${part?.name ?? ''} ${part?.partCode ?? ''} ${recordedByName} ${row.note ?? ''}`
                 }}
                 sortOptions={[
                   { value: 'date-desc', label: 'Thời gian mới nhất', compare: (a, _b) => new Date(_b.createdAt).getTime() - new Date(a.createdAt).getTime() },
