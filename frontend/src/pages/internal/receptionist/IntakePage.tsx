@@ -395,7 +395,6 @@ export function IntakePage() {
       <header>
         <span className="eyebrow">Tiếp nhận thiết bị</span>
         <h1>Tạo phiếu dịch vụ</h1>
-        <p>Ghi nhận thiết bị và tạo phiếu dịch vụ cho khách hàng. </p>
       </header>
 
       <form className="ops-form intake-form" onSubmit={submit}>
@@ -575,9 +574,7 @@ export function IntakePage() {
               />
               <span>Ưu đãi giảm giá ({discountPercent}%)</span>
             </label>
-            <small style={{ display: 'block', marginTop: '0.25rem', color: '#7a5400', marginLeft: '1.95rem' }}>
-              Tích chọn ô này để áp dụng mức giảm giá {discountPercent}% cho tất cả các dịch vụ trong phiếu tiếp nhận.
-            </small>
+            
           </div>
 
           {/* TỔNG GIÁ DỊCH VỤ & MỨC GIẢM */}
@@ -619,11 +616,11 @@ export function IntakePage() {
           </div>
           <div className="form-grid">
             <label className="field">
-              <span>Số sê-ri <i>Không bắt buộc</i></span>
+              <span>Số sê-ri</span>
               <input placeholder="Nhập số sê-ri thiết bị" maxLength={255} value={serialNumber} onChange={event => setSerialNumber(event.target.value)} />
             </label>
             <label className="field">
-              <span>Dung lượng lưu trữ <i>Không bắt buộc</i></span>
+              <span>Dung lượng lưu trữ</span>
               <input placeholder="Nhập dung lượng lưu trữ" maxLength={255} value={storage} onChange={event => setStorage(event.target.value)} />
             </label>
           </div>

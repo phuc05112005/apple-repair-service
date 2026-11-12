@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import type { ServiceTicketStatus } from '../../../api/contracts'
+import type { ServiceTicketStatus, OperationalTicketResponse } from '../../../api/contracts'
 import { technicianApi } from '../../../api/technicianApi'
 import { EmptyState, ErrorState, LoadingState } from '../../../components/AsyncState'
 import { StatusBadge } from '../../../components/StatusBadge'
@@ -9,6 +9,20 @@ import { TicketTimingSummary } from '../../../components/TicketTimingSummary'
 import { useBusinessNow } from '../../../hooks/useBusinessNow'
 import { ticketStatusLabels } from '../../../types/labels'
 import { formatDateTime } from '../../../utils/format'
+
+interface TechnicianHistoryTicket {
+  ticketId?: number
+  serviceTicketId?: number
+  id?: number
+  customerFullName?: string
+  deviceModelName?: string
+  serviceIssues?: string[]
+  requestedServices?: string[]
+  receivedAt: string
+  estimatedDurationMinutes?: number | null
+  timing?: OperationalTicketResponse['timing']
+  status: ServiceTicketStatus
+}
 
 export default function TechnicianHistoryPage() {
   const now = useBusinessNow()
@@ -27,21 +41,33 @@ export default function TechnicianHistoryPage() {
       technicianApi.history(statusFilter === 'ALL' ? undefined : (statusFilter as ServiceTicketStatus), signal),
   })
 
-  // Lọc và sắp xếp danh sách phiếu
+  // Lọc và sắp xếp danh sách phiếu (đã bổ sung lọc trùng ID)
   const historyTickets = useMemo(() => {
     if (!historyQuery.data) return []
-    let list = [...historyQuery.data]
+    let list: TechnicianHistoryTicket[] = [...historyQuery.data]
 
+    // 1. Loại bỏ các bản ghi trùng ID phiếu (Deduplicate)
+    const seen = new Set<number>()
+    list = list.filter((t: TechnicianHistoryTicket) => {
+      const id = t.ticketId ?? t.serviceTicketId ?? t.id
+      if (!id || seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+
+    // 2. Lọc theo từ khóa tìm kiếm
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim()
-      list = list.filter(t => 
-        t.ticketId.toString().includes(q) ||
-        t.customerFullName.toLowerCase().includes(q) ||
-        t.deviceModelName.toLowerCase().includes(q)
-      )
+      list = list.filter((t: TechnicianHistoryTicket) => {
+        const idStr = (t.ticketId ?? t.serviceTicketId ?? t.id ?? '').toString()
+        return idStr.includes(q) ||
+          (t.customerFullName && t.customerFullName.toLowerCase().includes(q)) ||
+          (t.deviceModelName && t.deviceModelName.toLowerCase().includes(q))
+      })
     }
 
-    list.sort((a, b) => {
+    // 3. Sắp xếp danh sách
+    list.sort((a: TechnicianHistoryTicket, b: TechnicianHistoryTicket) => {
       const timeA = new Date(a.receivedAt).getTime()
       const timeB = new Date(b.receivedAt).getTime()
       return sortOrder === 'NEWEST' ? timeB - timeA : timeA - timeB
@@ -50,14 +76,13 @@ export default function TechnicianHistoryPage() {
     return list
   }, [historyQuery.data, searchQuery, sortOrder])
 
-  // Tính toán các chỉ số phân trang đơn giản
+  // Tính toán chỉ số phân trang
   const totalItems = historyTickets.length
   const totalPages = Math.ceil(totalItems / pageSize) || 1
   const currentPage = Math.min(page, totalPages)
   const startIndex = (currentPage - 1) * pageSize
   const endIndex = Math.min(startIndex + pageSize, totalItems)
 
-  // Cắt danh sách phiếu theo trang hiện tại
   const paginatedTickets = useMemo(() => {
     return historyTickets.slice(startIndex, endIndex)
   }, [historyTickets, startIndex, endIndex])
@@ -112,8 +137,8 @@ export default function TechnicianHistoryPage() {
               }}
               style={{ height: '38px', padding: '0 12px', borderRadius: '6px', border: '1px solid #cbd5e0', background: '#fff', fontSize: '0.9rem' }}
             >
-              <option value="NEWEST">Mới nhất tiếp nhận</option>
-              <option value="OLDEST">Cũ nhất tiếp nhận</option>
+              <option value="NEWEST">Mới nhất</option>
+              <option value="OLDEST">Cũ nhất</option>
             </select>
           </div>
 
@@ -145,33 +170,41 @@ export default function TechnicianHistoryPage() {
       ) : (
         <>
           <div className="appointment-list">
-            {paginatedTickets.map(ticket => (
-              <article 
-                key={ticket.ticketId}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}
-              >
-                <div style={{ flex: '1 1 auto' }}>
-                  <span className="record-code">Phiếu #{ticket.ticketId}</span>
-                  <h3>{ticket.deviceModelName} · {ticket.customerFullName}</h3>
-                  <p>{ticket.serviceIssues.join(', ') || ticket.requestedServices.join(', ')} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}</p>
-                  <small>Thời lượng dự kiến: {ticket.estimatedDurationMinutes ?? '--'} phút kỹ thuật</small>
-                  <TicketTimingSummary timing={ticket.timing} status={ticket.status} now={now} />
-                </div>
+            {paginatedTickets.map((ticket: TechnicianHistoryTicket, index: number) => {
+              const currentTicketId = ticket.ticketId ?? ticket.serviceTicketId ?? ticket.id ?? index
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
-                  <StatusBadge 
-                    label={ticketStatusLabels[ticket.status]} 
-                    tone={ticket.status === 'HANDED_OVER' ? 'success' : ticket.status === 'CANCELLED' ? 'warning' : 'info'} 
-                  />
-                  <Link className="button button--quiet" to={`/internal/technician/tickets/${ticket.ticketId}`}>
-                    Xem chi tiết
-                  </Link>
-                </div>
-              </article>
-            ))}
+              return (
+                <article 
+                  key={`${currentTicketId}-${index}`}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}
+                >
+                  <div style={{ flex: '1 1 auto' }}>
+                    <span className="record-code">Phiếu #{currentTicketId}</span>
+                    <h3>{ticket.deviceModelName} · {ticket.customerFullName}</h3>
+                    <p>
+                      {(ticket.serviceIssues && ticket.serviceIssues.length > 0 ? ticket.serviceIssues.join(', ') : '') ||
+                       (ticket.requestedServices && ticket.requestedServices.length > 0 ? ticket.requestedServices.join(', ') : '') ||
+                       'Dịch vụ sửa chữa'} · Tiếp nhận lúc {formatDateTime(ticket.receivedAt)}
+                    </p>
+                    <small>Thời lượng dự kiến: {ticket.estimatedDurationMinutes ?? '--'} phút kỹ thuật</small>
+                    <TicketTimingSummary timing={ticket.timing} status={ticket.status} now={now} />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+                    <StatusBadge 
+                      label={ticketStatusLabels[ticket.status]} 
+                      tone={ticket.status === 'HANDED_OVER' ? 'success' : ticket.status === 'CANCELLED' ? 'warning' : 'info'} 
+                    />
+                    <Link className="button button--quiet" to={`/internal/technician/tickets/${currentTicketId}`}>
+                      Xem chi tiết
+                    </Link>
+                  </div>
+                </article>
+              )
+            })}
           </div>
 
-          {/* THANH PHÂN TRANG TINH GỌN */}
+          {/* THANH PHÂN TRANG */}
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', padding: '12px 0' }}>
               <button
@@ -181,7 +214,7 @@ export default function TechnicianHistoryPage() {
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 style={{ height: '36px', padding: '0 16px', fontSize: '0.875rem' }}
               >
-                ‹ Trước
+                ‹
               </button>
 
               <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#475569' }}>
@@ -195,7 +228,7 @@ export default function TechnicianHistoryPage() {
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 style={{ height: '36px', padding: '0 16px', fontSize: '0.875rem' }}
               >
-                Sau ›
+                ›
               </button>
             </div>
           )}

@@ -7,6 +7,10 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
+import org.hibernate.annotations.BatchSize;
+import jakarta.persistence.OneToMany;
+import java.util.List;
+import java.util.ArrayList;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -167,4 +171,8 @@ public class ServiceTicket {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "serviceTicket", fetch = FetchType.LAZY)
+    @BatchSize(size = 20)
+    private List<RepairItem> repairItems = new ArrayList<>();
 }

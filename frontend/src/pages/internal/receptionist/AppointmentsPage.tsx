@@ -101,7 +101,7 @@ export function AppointmentsPage() {
       ) : appointments.isError ? (
         <ErrorState error={appointments.error} retry={() => appointments.refetch()} />
       ) : !appointments.data?.length ? (
-        <EmptyState title="Không có lịch hẹn phù hợp">Thử đổi ngày, chi nhánh hoặc trạng thái.</EmptyState>
+        <EmptyState title="Không có lịch hẹn">Thử đổi ngày, chi nhánh hoặc trạng thái.</EmptyState>
       ) : (
         <div className="data-table-wrap">
           <table className="data-table">

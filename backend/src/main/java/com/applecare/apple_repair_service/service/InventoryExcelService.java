@@ -1,222 +1,435 @@
 package com.applecare.apple_repair_service.service;
 
+import com.applecare.apple_repair_service.dto.request.StockAdjustmentRequest;
 import com.applecare.apple_repair_service.dto.request.StockInRequest;
 import com.applecare.apple_repair_service.dto.response.InventoryImportResultResponse;
 import com.applecare.apple_repair_service.entity.Branch;
+import com.applecare.apple_repair_service.entity.BranchInventory;
 import com.applecare.apple_repair_service.entity.Part;
 import com.applecare.apple_repair_service.enums.ActiveStatus;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
-import com.applecare.apple_repair_service.repository.BranchRepository;
-import com.applecare.apple_repair_service.repository.InventoryLotRepository;
-import com.applecare.apple_repair_service.repository.PartRepository;
+import com.applecare.apple_repair_service.repository.BranchInventoryRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class InventoryExcelService {
-    static final String INPUT_SHEET = "Nhập kho";
-    private static final int MAX_FILE_BYTES = 2 * 1024 * 1024;
-    private static final int MAX_ROWS = 500;
-    private static final String[] HEADERS = {
-            "Mã nhập kho tham chiếu*", "Mã chi nhánh*", "Mã linh kiện*", "Số lượng*",
-            "Thời điểm nhận*", "Nguồn / ghi chú"
-    };
-    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
-    private final BranchRepository branches;
-    private final PartRepository parts;
-    private final InventoryLotRepository lots;
-    private final InventoryService inventory;
+    private static final String SHEET_DATA = "Tồn kho linh kiện";
+    private static final String SHEET_GUIDE = "Hướng dẫn";
+    private static final DateTimeFormatter LOT_TS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+    private final InventoryService inventoryService;
+    private final BranchInventoryRepository branchInventoryRepository;
     private final Clock clock;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional(readOnly = true)
     public byte[] createTemplate() {
-        try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
-            var input = workbook.createSheet(INPUT_SHEET);
-            var guide = workbook.createSheet("Hướng dẫn");
-            var references = workbook.createSheet("Danh mục tham chiếu");
-            workbook.setSheetHidden(workbook.getSheetIndex(references), true);
-            createStylesAndInputSheet(workbook, input);
-            createGuideSheet(workbook, guide);
-            createReferenceSheet(workbook, input, references);
-            workbook.setActiveSheet(0);
-            workbook.write(output);
-            return output.toByteArray();
-        } catch (IOException exception) {
-            throw new IllegalStateException("Không thể tạo file mẫu nhập kho.", exception);
-        }
-    }
+        List<Branch> branches = entityManager.createQuery(
+                        "SELECT b FROM Branch b WHERE b.status = :status ORDER BY b.id ASC", Branch.class)
+                .setParameter("status", ActiveStatus.ACTIVE)
+                .getResultList();
 
-    @Transactional
-    public InventoryImportResultResponse importWorkbook(MultipartFile file, Long actorId) {
-        if (file == null || file.isEmpty()) throw invalid("Vui lòng chọn file Excel .xlsx có dữ liệu.");
-        if (file.getSize() > MAX_FILE_BYTES) throw invalid("File Excel vượt quá dung lượng tối đa 2 MB.");
-        String filename = Optional.ofNullable(file.getOriginalFilename()).orElse("");
-        if (!filename.toLowerCase(Locale.ROOT).endsWith(".xlsx")) throw invalid("Chỉ chấp nhận file Excel định dạng .xlsx.");
+        List<Part> parts = entityManager.createQuery(
+                        "SELECT p FROM Part p WHERE p.status = :status ORDER BY p.brand ASC, p.name ASC, p.id ASC", Part.class)
+                .setParameter("status", ActiveStatus.ACTIVE)
+                .getResultList();
 
-        List<ImportRow> rows;
-        try {
-            rows = parse(file.getBytes());
-        } catch (IOException | RuntimeException exception) {
-            if (exception instanceof BusinessRuleViolationException business) throw business;
-            throw invalid("Không thể đọc file Excel. Vui lòng tải lại file mẫu và không đổi cấu trúc cột.");
-        }
+        Map<String, Integer> stockMap = branchInventoryRepository.findForAdmin(null, null).stream()
+                .collect(Collectors.toMap(
+                        bi -> bi.getBranch().getId() + ":" + bi.getPart().getId(),
+                        BranchInventory::getQuantity,
+                        (a, b) -> a
+                ));
 
-        validateRows(rows);
-        for (ImportRow row : rows) {
-            inventory.stockIn(new StockInRequest(row.code(), row.branchId(), row.partId(), row.quantity(),
-                    row.receivedAt(), actorId, row.note()));
-        }
-        return new InventoryImportResultResponse(rows.size(), rows.stream().map(ImportRow::code).toList());
-    }
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
-    private List<ImportRow> parse(byte[] bytes) {
-        try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
-            Sheet sheet = workbook.getSheet(INPUT_SHEET);
-            if (sheet == null) throw invalid("Không tìm thấy sheet “Nhập kho”. Vui lòng dùng đúng file mẫu của hệ thống.");
-            validateHeaders(sheet.getRow(0));
-            var formatter = new DataFormatter(Locale.forLanguageTag("vi-VN"));
-            List<ImportRow> result = new ArrayList<>();
-            List<String> errors = new ArrayList<>();
-            for (int index = 1; index <= sheet.getLastRowNum(); index++) {
-                Row row = sheet.getRow(index);
-                if (row == null || isBlank(row, formatter)) continue;
-                if (result.size() >= MAX_ROWS) {
-                    errors.add("File chỉ được chứa tối đa " + MAX_ROWS + " dòng dữ liệu.");
-                    break;
-                }
-                try {
-                    rejectFormulas(row, index + 1);
-                    result.add(new ImportRow(
-                            requiredText(row, 0, formatter, index + 1),
-                            requiredLong(row, 1, formatter, index + 1),
-                            requiredLong(row, 2, formatter, index + 1),
-                            requiredInteger(row, 3, formatter, index + 1),
-                            requiredDateTime(row, 4, formatter, index + 1),
-                            optionalText(row, 5, formatter)));
-                } catch (IllegalArgumentException exception) {
-                    errors.add(exception.getMessage());
+            Sheet sheet = workbook.createSheet(SHEET_DATA);
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            setBorders(headerStyle);
+
+            CellStyle readOnlyStyle = workbook.createCellStyle();
+            readOnlyStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            readOnlyStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            readOnlyStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            setBorders(readOnlyStyle);
+
+            CellStyle readOnlyCenterStyle = workbook.createCellStyle();
+            readOnlyCenterStyle.cloneStyleFrom(readOnlyStyle);
+            readOnlyCenterStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle editableQtyStyle = workbook.createCellStyle();
+            Font editableFont = workbook.createFont();
+            editableFont.setBold(true);
+            editableStyleSetup(editableQtyStyle, editableFont, HorizontalAlignment.CENTER);
+
+            CellStyle editableNoteStyle = workbook.createCellStyle();
+            Font noteFont = workbook.createFont();
+            editableStyleSetup(editableNoteStyle, noteFont, HorizontalAlignment.LEFT);
+
+            String[] headers = {
+                    "Mã chi nhánh (Không sửa)",
+                    "Tên chi nhánh",
+                    "Mã linh kiện (Không sửa)",
+                    "Tên linh kiện",
+                    "Hãng / Phân loại",
+                    "Tồn kho lúc xuất (Không sửa)",
+                    "Số lượng mới (Chỉnh cột này)",
+                    "Ghi chú điều chỉnh (Tùy chọn)"
+            };
+
+            Row headerRow = sheet.createRow(0);
+            headerRow.setHeightInPoints(26);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            int rowIdx = 1;
+            for (Branch branch : branches) {
+                for (Part part : parts) {
+                    int currentQty = stockMap.getOrDefault(branch.getId() + ":" + part.getId(), 0);
+                    String brandVariant = joinBrandVariant(part.getBrand(), part.getVariant());
+
+                    Row row = sheet.createRow(rowIdx++);
+                    row.setHeightInPoints(20);
+
+                    Cell c0 = row.createCell(0);
+                    c0.setCellValue(branch.getId());
+                    c0.setCellStyle(readOnlyCenterStyle);
+
+                    Cell c1 = row.createCell(1);
+                    c1.setCellValue(branch.getName());
+                    c1.setCellStyle(readOnlyStyle);
+
+                    Cell c2 = row.createCell(2);
+                    c2.setCellValue(part.getPartCode());
+                    c2.setCellStyle(readOnlyStyle);
+
+                    Cell c3 = row.createCell(3);
+                    c3.setCellValue(part.getName());
+                    c3.setCellStyle(readOnlyStyle);
+
+                    Cell c4 = row.createCell(4);
+                    c4.setCellValue(brandVariant);
+                    c4.setCellStyle(readOnlyStyle);
+
+                    Cell c5 = row.createCell(5);
+                    c5.setCellValue(currentQty);
+                    c5.setCellStyle(readOnlyCenterStyle);
+
+                    Cell c6 = row.createCell(6);
+                    c6.setCellValue(currentQty);
+                    c6.setCellStyle(editableQtyStyle);
+
+                    Cell c7 = row.createCell(7);
+                    c7.setCellValue("");
+                    c7.setCellStyle(editableNoteStyle);
                 }
             }
-            if (!errors.isEmpty()) throw invalid(String.join("; ", errors.stream().limit(30).toList()));
-            if (result.isEmpty()) throw invalid("Sheet “Nhập kho” chưa có dòng dữ liệu nào.");
-            return result;
-        } catch (IOException exception) {
-            throw invalid("File Excel bị lỗi hoặc không đúng định dạng .xlsx.");
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                sheet.setColumnWidth(i, Math.min(sheet.getColumnWidth(i) + 1024, 14000));
+            }
+            sheet.createFreezePane(0, 1);
+
+            buildGuideSheet(workbook);
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new BusinessRuleViolationException("Không thể tạo file Excel tồn kho: " + e.getMessage());
         }
     }
 
-    private void validateRows(List<ImportRow> rows) {
-        List<String> errors = new ArrayList<>();
-        Set<String> codes = new HashSet<>();
-        LocalDateTime now = LocalDateTime.now(clock);
-        for (int index = 0; index < rows.size(); index++) {
-            ImportRow row = rows.get(index);
-            int excelRow = index + 2;
-            String normalized = row.code().trim().toLowerCase(Locale.ROOT);
-            if (row.code().length() > 100 || !row.code().matches("[A-Za-z0-9._/-]+"))
-                errors.add("Dòng " + excelRow + ": mã nhập kho tham chiếu chỉ dùng chữ không dấu, số và . _ / - (tối đa 100 ký tự).");
-            if (!codes.add(normalized)) errors.add("Dòng " + excelRow + ": mã nhập kho tham chiếu bị trùng trong file.");
-            else if (lots.existsByLotCodeIgnoreCase(row.code())) errors.add("Dòng " + excelRow + ": mã nhập kho tham chiếu đã tồn tại.");
-            Branch branch = branches.findById(row.branchId()).orElse(null);
-            if (branch == null) errors.add("Dòng " + excelRow + ": không tìm thấy chi nhánh #" + row.branchId() + ".");
-            else if (branch.getStatus() != ActiveStatus.ACTIVE) errors.add("Dòng " + excelRow + ": chi nhánh đang ngừng hoạt động.");
-            Part part = parts.findById(row.partId()).orElse(null);
-            if (part == null) errors.add("Dòng " + excelRow + ": không tìm thấy linh kiện #" + row.partId() + ".");
-            else if (part.getStatus() != ActiveStatus.ACTIVE) errors.add("Dòng " + excelRow + ": linh kiện đang ngừng sử dụng.");
-            if (row.quantity() <= 0) errors.add("Dòng " + excelRow + ": số lượng phải là số nguyên lớn hơn 0.");
-            if (row.receivedAt().isAfter(now)) errors.add("Dòng " + excelRow + ": thời điểm nhận không được ở tương lai.");
-            if (row.note() != null && row.note().length() > 5000) errors.add("Dòng " + excelRow + ": ghi chú vượt quá 5.000 ký tự.");
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public InventoryImportResultResponse importWorkbook(MultipartFile file, Long actorId) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessRuleViolationException("Vui lòng chọn file Excel (.xlsx) để cập nhật tồn kho.");
         }
-        if (!errors.isEmpty()) throw invalid("File Excel có lỗi — " + String.join("; ", errors.stream().limit(30).toList()));
-    }
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || !originalName.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+            throw new BusinessRuleViolationException("Định dạng file không hợp lệ. Hệ thống chỉ hỗ trợ file .xlsx.");
+        }
 
-    private void createStylesAndInputSheet(XSSFWorkbook workbook, Sheet sheet) {
-        var headerStyle = workbook.createCellStyle();
-        headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
-        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        var headerFont = workbook.createFont();
-        headerFont.setBold(true); headerFont.setColor(IndexedColors.WHITE.getIndex());
-        headerStyle.setFont(headerFont); headerStyle.setAlignment(HorizontalAlignment.CENTER);
-        Row header = sheet.createRow(0);
-        for (int i = 0; i < HEADERS.length; i++) { Cell cell = header.createCell(i); cell.setCellValue(HEADERS[i]); cell.setCellStyle(headerStyle); }
-        sheet.createFreezePane(0, 1);
-        int[] widths = {28, 18, 18, 14, 23, 44};
-        for (int i = 0; i < widths.length; i++) sheet.setColumnWidth(i, widths[i] * 256);
-        var dateStyle = workbook.createCellStyle(); dateStyle.setDataFormat(workbook.createDataFormat().getFormat("dd/mm/yyyy hh:mm"));
-        for (int row = 1; row <= 200; row++) sheet.createRow(row).createCell(4).setCellStyle(dateStyle);
-        sheet.setAutoFilter(new org.apache.poi.ss.util.CellRangeAddress(0, 200, 0, HEADERS.length - 1));
-    }
+        Map<Long, Branch> branchMap = entityManager.createQuery("SELECT b FROM Branch b", Branch.class)
+                .getResultList().stream()
+                .collect(Collectors.toMap(Branch::getId, b -> b));
 
-    private void createGuideSheet(XSSFWorkbook workbook, Sheet sheet) {
-        String[] lines = {
-                "HƯỚNG DẪN NHẬP KHO TỪ EXCEL",
-                "1. Chỉ nhập dữ liệu trong sheet “Nhập kho”; không đổi tên sheet hoặc tiêu đề cột.",
-                "2. Mỗi mã nhập kho tham chiếu phải duy nhất. Hệ thống tự sinh mã NHAP_ cho từng dòng; file tải lên chỉ tạo dữ liệu mới, không sửa lịch sử cũ.",
-                "3. Chọn mã chi nhánh và mã linh kiện từ danh sách có sẵn trong ô.",
-                "4. Số lượng phải là số nguyên dương; thời điểm nhận không được ở tương lai.",
-                "5. Hệ thống kiểm tra toàn bộ file trước khi ghi. Có một dòng sai thì toàn bộ file sẽ không được nhập."
-        };
-        for (int i = 0; i < lines.length; i++) sheet.createRow(i).createCell(0).setCellValue(lines[i]);
-        var title = workbook.createCellStyle(); var font = workbook.createFont(); font.setBold(true); font.setFontHeightInPoints((short)14); title.setFont(font); sheet.getRow(0).getCell(0).setCellStyle(title);
-        sheet.setColumnWidth(0, 115 * 256);
-    }
+        Map<String, Part> partByCodeMap = entityManager.createQuery("SELECT p FROM Part p", Part.class)
+                .getResultList().stream()
+                .collect(Collectors.toMap(
+                        p -> p.getPartCode().trim().toUpperCase(Locale.ROOT),
+                        p -> p,
+                        (a, b) -> a
+                ));
 
-    private void createReferenceSheet(XSSFWorkbook workbook, Sheet input, Sheet sheet) {
-        sheet.createRow(0).createCell(0).setCellValue("Mã chi nhánh"); sheet.getRow(0).createCell(1).setCellValue("Tên chi nhánh");
-        List<Branch> activeBranches = branches.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE);
-        for (int i = 0; i < activeBranches.size(); i++) { Row row = sheet.createRow(i + 1); row.createCell(0).setCellValue(activeBranches.get(i).getId()); row.createCell(1).setCellValue(activeBranches.get(i).getName()); }
-        int partStart = Math.max(activeBranches.size() + 3, 4);
-        Row partHeader = sheet.createRow(partStart - 1); partHeader.createCell(0).setCellValue("Mã linh kiện"); partHeader.createCell(1).setCellValue("Mã kỹ thuật"); partHeader.createCell(2).setCellValue("Tên / hãng / phiên bản");
-        List<Part> activeParts = parts.findAllByStatusOrderByNameAsc(ActiveStatus.ACTIVE);
-        for (int i = 0; i < activeParts.size(); i++) { Part part = activeParts.get(i); Row row = sheet.createRow(partStart + i); row.createCell(0).setCellValue(part.getId()); row.createCell(1).setCellValue(part.getPartCode()); row.createCell(2).setCellValue(part.getName() + " · " + Optional.ofNullable(part.getBrand()).orElse("Chưa rõ hãng") + " · " + Optional.ofNullable(part.getVariant()).orElse("Bản tiêu chuẩn")); }
-        if (!activeBranches.isEmpty()) addListValidation(input, 1, "'Danh mục tham chiếu'!$A$2:$A$" + (activeBranches.size() + 1));
-        if (!activeParts.isEmpty()) addListValidation(input, 2, "'Danh mục tham chiếu'!$A$" + (partStart + 1) + ":$A$" + (partStart + activeParts.size()));
-    }
-
-    private void addListValidation(Sheet input, int column, String formula) {
-        DataValidationHelper helper = input.getDataValidationHelper();
-        DataValidation validation = helper.createValidation(helper.createFormulaListConstraint(formula), new CellRangeAddressList(1, 200, column, column));
-        validation.setShowErrorBox(true); validation.createErrorBox("Giá trị không hợp lệ", "Hãy chọn một mã trong danh sách.");
-        input.addValidationData(validation);
-    }
-
-    private void validateHeaders(Row row) {
-        if (row == null) throw invalid("File thiếu hàng tiêu đề.");
+        List<ExcelStockRow> changedRows = new ArrayList<>();
+        Set<String> seenPairs = new HashSet<>();
         DataFormatter formatter = new DataFormatter();
-        for (int index = 0; index < HEADERS.length; index++) if (!HEADERS[index].equals(formatter.formatCellValue(row.getCell(index)).trim()))
-            throw invalid("Cột " + (index + 1) + " phải có tiêu đề “" + HEADERS[index] + "”.");
+
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = workbook.getSheet(SHEET_DATA);
+            if (sheet == null) {
+                sheet = workbook.getNumberOfSheets() > 0 ? workbook.getSheetAt(0) : null;
+            }
+            if (sheet == null || sheet.getLastRowNum() < 1) {
+                throw new BusinessRuleViolationException("File Excel không có dữ liệu để cập nhật.");
+            }
+
+            Row header = sheet.getRow(0);
+            if (header == null || header.getLastCellNum() < 7) {
+                throw new BusinessRuleViolationException(
+                        "Cấu trúc cột không khớp với file xuất từ hệ thống. Vui lòng xuất lại file Excel mới nhất.");
+            }
+
+            // Bước 1: Kiểm tra toàn bộ file trước khi ghi DB (All-or-Nothing)
+            for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (isRowEmpty(row, formatter)) continue;
+
+                int excelRowNum = r + 1;
+
+                String branchIdStr = readCell(row, 0, formatter);
+                String partCode = readCell(row, 2, formatter);
+                String exportedQtyStr = readCell(row, 5, formatter);
+                String newQtyStr = readCell(row, 6, formatter);
+                String note = readCell(row, 7, formatter);
+
+                if (branchIdStr.isEmpty() || partCode.isEmpty()) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Thiếu Mã chi nhánh hoặc Mã linh kiện.", excelRowNum));
+                }
+
+                long branchId;
+                try {
+                    branchId = Long.parseLong(branchIdStr.replaceAll("\\.0+$", ""));
+                } catch (NumberFormatException e) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Mã chi nhánh '%s' không hợp lệ.", excelRowNum, branchIdStr));
+                }
+
+                Branch branch = branchMap.get(branchId);
+                if (branch == null) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Không tìm thấy chi nhánh mã %d.", excelRowNum, branchId));
+                }
+                if (branch.getStatus() != ActiveStatus.ACTIVE) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Chi nhánh '%s' đang ngừng hoạt động.", excelRowNum, branch.getName()));
+                }
+
+                Part part = partByCodeMap.get(partCode.toUpperCase(Locale.ROOT));
+                if (part == null) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Không tìm thấy mã linh kiện '%s'.", excelRowNum, partCode));
+                }
+                if (part.getStatus() != ActiveStatus.ACTIVE) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Linh kiện '%s' đang ngừng sử dụng.", excelRowNum, partCode));
+                }
+
+                String pairKey = branchId + ":" + part.getId();
+                if (!seenPairs.add(pairKey)) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d: Bị trùng cặp chi nhánh '%s' và linh kiện '%s' trong file.",
+                                    excelRowNum, branch.getName(), partCode));
+                }
+
+                int exportedQty = parseNonNegativeInt(exportedQtyStr, excelRowNum, partCode, "Tồn kho lúc xuất");
+                if (newQtyStr.isEmpty()) {
+                    throw new BusinessRuleViolationException(
+                            String.format("Dòng %d (%s): Cột 'Số lượng mới' không được để trống.", excelRowNum, partCode));
+                }
+                int newQty = parseNonNegativeInt(newQtyStr, excelRowNum, partCode, "Số lượng mới");
+
+                if (newQty != exportedQty) {
+                    changedRows.add(new ExcelStockRow(
+                            excelRowNum,
+                            branch.getId(),
+                            part.getId(),
+                            part.getPartCode(),
+                            newQty,
+                            note.isEmpty() ? null : note
+                    ));
+                }
+            }
+        } catch (BusinessRuleViolationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessRuleViolationException("Không thể đọc file Excel: " + e.getMessage());
+        }
+
+        // Bước 2: Thực thi cập nhật tồn kho & ghi lịch sử thông qua InventoryService chuẩn
+        LocalDateTime now = LocalDateTime.now(clock);
+        String batchTs = now.format(LOT_TS_FORMAT);
+        List<String> transactionCodes = new ArrayList<>();
+
+        for (ExcelStockRow row : changedRows) {
+            int currentDbQty = inventoryService.getInventory(row.branchId(), row.partId()).quantity();
+            int diff = row.newQty() - currentDbQty;
+
+            if (diff == 0) {
+                continue;
+            }
+
+            String baseAudit = String.format("Cập nhật tồn kho qua Excel (%d → %d)", currentDbQty, row.newQty());
+            String fullNote = row.note() != null ? baseAudit + " · " + row.note() : baseAudit;
+
+            if (diff > 0) {
+                String autoLotCode = String.format("EXCEL_NHAP_%s_%d", batchTs, row.excelRowNum());
+                inventoryService.stockIn(new StockInRequest(
+                        autoLotCode,
+                        row.branchId(),
+                        row.partId(),
+                        diff,
+                        null,
+                        null,
+                        now,
+                        actorId,
+                        fullNote
+                ));
+                transactionCodes.add(autoLotCode);
+            } else {
+                int decreaseQty = Math.abs(diff);
+                inventoryService.stockOut(new StockAdjustmentRequest(
+                        row.branchId(),
+                        row.partId(),
+                        decreaseQty,
+                        actorId,
+                        fullNote
+                ));
+                transactionCodes.add(String.format("EXCEL_XUAT_%s_%d", batchTs, row.excelRowNum()));
+            }
+        }
+
+        return new InventoryImportResultResponse(transactionCodes.size(), transactionCodes);
     }
 
-    private void rejectFormulas(Row row, int rowNumber) {
-        for (int column = 0; column < HEADERS.length; column++) if (row.getCell(column) != null && row.getCell(column).getCellType() == CellType.FORMULA)
-            throw new IllegalArgumentException("Dòng " + rowNumber + ": không dùng công thức Excel trong vùng nhập liệu.");
+    private void buildGuideSheet(XSSFWorkbook workbook) {
+        Sheet guide = workbook.createSheet(SHEET_GUIDE);
+        CellStyle titleStyle = workbook.createCellStyle();
+        Font titleFont = workbook.createFont();
+        titleFont.setBold(true);
+        titleFont.setFontHeightInPoints((short) 13);
+        titleStyle.setFont(titleFont);
+
+        String[] lines = {
+                "HƯỚNG DẪN CẬP NHẬT TỒN KHO BẰNG EXCEL",
+                "1. Mở sheet 'Tồn kho linh kiện', chỉ chỉnh sửa cột G (Số lượng mới) và cột H (Ghi chú điều chỉnh).",
+                "2. Không sửa Mã chi nhánh (cột A), Mã linh kiện (cột C), Tồn kho lúc xuất (cột F) hoặc đổi tên sheet.",
+                "3. Những dòng không thay đổi số lượng sẽ được hệ thống tự động bỏ qua (không ảnh hưởng giao dịch khác).",
+                "4. Dòng tăng số lượng sẽ tự động tạo lịch sử Nhập kho (STOCK_IN); dòng giảm số lượng sẽ tạo lịch sử Xuất kho (STOCK_OUT).",
+                "5. Số lượng mới phải là số nguyên >= 0. Nếu có bất kỳ dòng nào sai, toàn bộ file sẽ không được lưu để bảo vệ dữ liệu."
+        };
+
+        for (int i = 0; i < lines.length; i++) {
+            Row r = guide.createRow(i);
+            Cell c = r.createCell(0);
+            c.setCellValue(lines[i]);
+            if (i == 0) c.setCellStyle(titleStyle);
+        }
+        guide.autoSizeColumn(0);
     }
-    private boolean isBlank(Row row, DataFormatter formatter) { for (int i = 0; i < HEADERS.length; i++) if (!formatter.formatCellValue(row.getCell(i)).trim().isEmpty()) return false; return true; }
-    private String requiredText(Row row, int column, DataFormatter f, int number) { String value = optionalText(row, column, f); if (value == null) throw new IllegalArgumentException("Dòng " + number + ": thiếu “" + HEADERS[column].replace("*", "") + "”."); return value; }
-    private String optionalText(Row row, int column, DataFormatter f) { String value = f.formatCellValue(row.getCell(column)).trim(); return value.isEmpty() ? null : value; }
-    private long requiredLong(Row row, int column, DataFormatter f, int number) { String value = requiredText(row, column, f, number); try { return new java.math.BigDecimal(value.replace(",", "")).longValueExact(); } catch (Exception e) { throw new IllegalArgumentException("Dòng " + number + ": “" + HEADERS[column].replace("*", "") + "” phải là số nguyên hợp lệ."); } }
-    private int requiredInteger(Row row, int column, DataFormatter f, int number) { long value = requiredLong(row, column, f, number); if (value > Integer.MAX_VALUE || value < Integer.MIN_VALUE) throw new IllegalArgumentException("Dòng " + number + ": số lượng vượt giới hạn."); return (int)value; }
-    private LocalDateTime requiredDateTime(Row row, int column, DataFormatter f, int number) {
-        Cell cell = row.getCell(column); if (cell != null && cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) return cell.getLocalDateTimeCellValue();
-        String value = requiredText(row, column, f, number);
-        for (DateTimeFormatter formatter : List.of(DISPLAY_DATE_TIME, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"), DateTimeFormatter.ISO_LOCAL_DATE_TIME)) try { return LocalDateTime.parse(value, formatter); } catch (DateTimeParseException ignored) { }
-        throw new IllegalArgumentException("Dòng " + number + ": thời điểm nhận phải theo định dạng dd/MM/yyyy HH:mm.");
+
+    private static void editableStyleSetup(CellStyle style, Font font, HorizontalAlignment align) {
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(align);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        setBorders(style);
     }
-    private BusinessRuleViolationException invalid(String message) { return new BusinessRuleViolationException(message); }
-    private record ImportRow(String code, Long branchId, Long partId, Integer quantity, LocalDateTime receivedAt, String note) { }
+
+    private static void setBorders(CellStyle style) {
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+    }
+
+    private static String joinBrandVariant(String brand, String variant) {
+        String b = brand != null && !brand.isBlank() ? brand.trim() : "";
+        String v = variant != null && !variant.isBlank() ? variant.trim() : "";
+        if (!b.isEmpty() && !v.isEmpty()) return b + " · " + v;
+        return !b.isEmpty() ? b : (!v.isEmpty() ? v : "Tiêu chuẩn");
+    }
+
+    private static String readCell(Row row, int colIdx, DataFormatter formatter) {
+        if (row == null) return "";
+        Cell cell = row.getCell(colIdx, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return "";
+        return formatter.formatCellValue(cell).trim();
+    }
+
+    private static boolean isRowEmpty(Row row, DataFormatter formatter) {
+        if (row == null) return true;
+        for (int i = 0; i <= 7; i++) {
+            if (!readCell(row, i, formatter).isEmpty()) return false;
+        }
+        return true;
+    }
+
+    private static int parseNonNegativeInt(String raw, int excelRowNum, String partCode, String colLabel) {
+        try {
+            String normalized = raw.replace(",", "").trim();
+            if (normalized.contains(".")) {
+                double d = Double.parseDouble(normalized);
+                if (d != Math.floor(d)) {
+                    throw new NumberFormatException("Decimal not allowed");
+                }
+                normalized = String.valueOf((long) d);
+            }
+            int val = Integer.parseInt(normalized);
+            if (val < 0) {
+                throw new BusinessRuleViolationException(
+                        String.format("Dòng %d (%s): '%s' không được nhỏ hơn 0.", excelRowNum, partCode, colLabel));
+            }
+            return val;
+        } catch (NumberFormatException e) {
+            throw new BusinessRuleViolationException(
+                    String.format("Dòng %d (%s): Giá trị '%s' ở cột '%s' phải là số nguyên không âm.",
+                            excelRowNum, partCode, raw, colLabel));
+        }
+    }
+
+    private record ExcelStockRow(
+            int excelRowNum,
+            Long branchId,
+            Long partId,
+            String partCode,
+            int newQty,
+            String note
+    ) {}
 }

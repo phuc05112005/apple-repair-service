@@ -3,8 +3,11 @@ package com.applecare.apple_repair_service.service;
 import com.applecare.apple_repair_service.dto.command.*;
 import com.applecare.apple_repair_service.dto.request.*;
 import com.applecare.apple_repair_service.dto.response.*;
+import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.security.CurrentActor;
 import lombok.RequiredArgsConstructor;
+import com.applecare.apple_repair_service.repository.ServiceTicketRepository;
+import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -22,6 +25,12 @@ public class TechnicianOperationsService {
     private final RepairDurationService durations;
     private final WarrantyService warranties;
     private final RepairItemService repairItems;
+    private final ServiceTicketRepository serviceTicketRepository; // Thêm repository vào Service
+
+    @Transactional(readOnly = true)
+    public List<ServiceTicket> getHistory() {
+        return serviceTicketRepository.findTechnicianHistory(actor.id());
+    }
 
     public RepairItemResponse approval(Long itemId, ApprovalCommand request) {
         policy.requireItem(itemId);
