@@ -3,8 +3,10 @@ package com.applecare.apple_repair_service.service;
 import com.applecare.apple_repair_service.dto.request.AssignTechnicianRequest;
 import com.applecare.apple_repair_service.dto.response.AssignmentResponse;
 import com.applecare.apple_repair_service.entity.Assignment;
+import com.applecare.apple_repair_service.entity.RepairItem;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.entity.User;
+import com.applecare.apple_repair_service.enums.ApprovalStatus;
 import com.applecare.apple_repair_service.enums.AssignmentSource;
 import com.applecare.apple_repair_service.enums.AssignmentStatus;
 import com.applecare.apple_repair_service.enums.EstimateSource;
@@ -13,6 +15,7 @@ import com.applecare.apple_repair_service.exception.ConflictException;
 import com.applecare.apple_repair_service.exception.ResourceNotFoundException;
 import com.applecare.apple_repair_service.mapper.EntityResponses;
 import com.applecare.apple_repair_service.repository.AssignmentRepository;
+import com.applecare.apple_repair_service.repository.RepairItemRepository;
 import com.applecare.apple_repair_service.repository.ServiceTicketRepository;
 
 import java.time.Clock;
@@ -31,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AssignmentService {
     private final ServiceTicketRepository tickets;
     private final AssignmentRepository repository;
+    private final RepairItemRepository repairItems;
     private final DomainAccess access;
     private final BusinessRules rules;
     private final TechnicianEligibility eligibility;
@@ -67,20 +71,55 @@ public class AssignmentService {
 
         ticket.setEstimatedDurationMinutes(duration);
 
-        // Kiểm tra nếu thời gian dự đoán đến từ Fallback hay ML chuẩn
         if (r.predictedDurationMinutes() != null && r.predictedDurationMinutes() == mlCandidateEstimateService.standardDuration(ticketId)) {
             ticket.setEstimateSource(EstimateSource.STANDARD);
         } else {
             ticket.setEstimateSource(EstimateSource.ML);
         }
 
-        // Không set gán cứng estimatedStartAt và estimatedCompletionAt tại đây.
-        // Cần để ServiceTimingService.statusChanged() tự động xếp lịch hàng đợi chính xác.
+        allocateInitialItemDurations(ticketId, duration);
+
         tickets.save(ticket);
 
         statuses.changeStatus(ticket, ServiceTicketStatus.ASSIGNED, actor, "Technician assigned");
 
         return mapper.map(assignment);
+    }
+
+    private void allocateInitialItemDurations(Long ticketId, long totalDuration) {
+        var approved = repairItems.findAllByServiceTicket_Id(ticketId).stream()
+                .filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
+                .toList();
+        if (approved.isEmpty()) return;
+        if (approved.size() == 1) {
+            approved.get(0).setEstimatedDurationMinutes(totalDuration);
+            repairItems.save(approved.get(0));
+            return;
+        }
+        long totalStd = approved.stream()
+                .mapToLong(this::itemStandardMinutes)
+                .sum();
+        long allocated = 0;
+        for (int i = 0; i < approved.size(); i++) {
+            RepairItem item = approved.get(i);
+            long share = (i == approved.size() - 1)
+                    ? Math.max(1L, totalDuration - allocated)
+                    : (totalStd > 0
+                    ? Math.max(1L, Math.round((double) totalDuration * itemStandardMinutes(item) / totalStd))
+                    : Math.max(1L, totalDuration / approved.size()));
+            item.setEstimatedDurationMinutes(share);
+            allocated += share;
+        }
+        repairItems.saveAll(approved);
+    }
+
+    private long itemStandardMinutes(RepairItem item) {
+        var cat = item.getWarrantyReplacementCatalog() != null
+                ? item.getWarrantyReplacementCatalog()
+                : item.getServiceCatalogItem();
+        return (cat != null && cat.getStandardDurationMinutes() != null && cat.getStandardDurationMinutes() > 0)
+                ? cat.getStandardDurationMinutes()
+                : 30L;
     }
 
     public List<AssignmentResponse> getHistory(Long ticketId) {

@@ -1,5 +1,3 @@
-"""Bước 6: dịch vụ tích hợp DB. Lấy đặc trưng (CÙNG định nghĩa với lúc train) -> dự đoán -> ETA -> ghi DB.
-Giữ nguyên tên hàm cũ (predict_for_technician, process_and_update_ticket) để app.py/Spring Boot không vỡ."""
 import os
 import sys
 from datetime import datetime, timedelta
@@ -47,9 +45,41 @@ FEATURE_QUERY = text(f"""
 """)
 
 
-def fetch_ticket_features(ticket_id: int) -> pd.DataFrame:
+def fetch_ticket_features(ticket_id: int, service_catalog_item_ids: list[int] | None = None) -> pd.DataFrame:
     with get_engine().connect() as conn:
-        return pd.read_sql(FEATURE_QUERY, conn, params={"ticket_id": ticket_id})
+        if not service_catalog_item_ids:
+            return pd.read_sql(FEATURE_QUERY, conn, params={"ticket_id": ticket_id})
+
+        ticket_query = text("""
+            SELECT
+                st.id AS ticket_id,
+                st.branch_id,
+                cd.device_model_id,
+                COALESCE(a.technician_id, 0) AS technician_id
+            FROM service_tickets st
+            JOIN customer_devices cd ON st.customer_device_id = cd.id
+            LEFT JOIN assignments a ON st.id = a.service_ticket_id AND a.status = 'ACTIVE'
+            WHERE st.id = :ticket_id
+        """)
+        df_ticket = pd.read_sql(ticket_query, conn, params={"ticket_id": ticket_id})
+        if df_ticket.empty:
+            return df_ticket
+
+        placeholders = ", ".join(f":cid_{i}" for i in range(len(service_catalog_item_ids)))
+        cid_params = {f"cid_{i}": int(cid) for i, cid in enumerate(service_catalog_item_ids)}
+        catalog_query = text(f"""
+            SELECT
+                COUNT(*) AS total_services_count,
+                GROUP_CONCAT(sci.service_issue_id ORDER BY sci.id SEPARATOR ',') AS service_issue_ids_list,
+                COALESCE(SUM(sci.standard_duration_minutes), 0) AS total_catalog_standard_duration_minutes
+            FROM service_catalog_items sci
+            WHERE sci.id IN ({placeholders})
+        """)
+        df_sv = pd.read_sql(catalog_query, conn, params=cid_params)
+        df_ticket["total_services_count"] = int(df_sv["total_services_count"].iloc[0])
+        df_ticket["service_issue_ids_list"] = df_sv["service_issue_ids_list"].iloc[0]
+        df_ticket["total_catalog_standard_duration_minutes"] = float(df_sv["total_catalog_standard_duration_minutes"].iloc[0])
+        return df_ticket
 
 
 def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list[str]:
@@ -59,10 +89,8 @@ def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list
 
     if total_services == 0:
         w.append("NO_REPAIR_ITEMS")
-    # Kiểm tra ca ngoài khoảng ngoại suy CatBoost [30, 225]
     if total_catalog < 30 or total_catalog > 225:
         w.append("CATALOG_OUT_OF_BOUNDS")
-    # Kiểm tra ca quá nhiều dịch vụ ghép
     if total_services >= 4:
         w.append("TOO_MANY_SERVICES")
 
@@ -78,28 +106,27 @@ def _warnings(features: pd.DataFrame, bundle, technician_id: int | None) -> list
     return w
 
 
-def predict_candidates(ticket_id: int, candidate_ids: list[int]) -> list[dict]:
-    features = fetch_ticket_features(ticket_id)
+def predict_candidates(ticket_id: int, candidate_ids: list[int], service_catalog_item_ids: list[int] | None = None) -> list[dict]:
+    features = fetch_ticket_features(ticket_id, service_catalog_item_ids)
     if features.empty:
         raise LookupError(f"Không tìm thấy phiếu #{ticket_id}")
     bundle = load_bundle()
-    
+
     if int(features["total_services_count"].iloc[0]) == 0:
         return [{"technician_id": int(t), "predicted_minutes": DEFAULT_ESTIMATE_MINUTES, "lower_minutes": None,
                  "upper_minutes": None, "warnings": ["NO_REPAIR_ITEMS"]} for t in candidate_ids]
-                 
+
     res = predict_for_technician_ids(features, [int(t) for t in candidate_ids], bundle)
     out = []
     for _, r in res.iterrows():
         t_id = int(r["technician_id"])
-        # GỌI HÀM _WARNINGS CHO TỪNG KTV ỨNG VIÊN
         tech_warnings = _warnings(features, bundle, t_id)
         out.append({
-            "technician_id": t_id, 
+            "technician_id": t_id,
             "predicted_minutes": float(r["predicted_minutes"]),
-            "lower_minutes": float(r["lower_minutes"]), 
+            "lower_minutes": float(r["lower_minutes"]),
             "upper_minutes": float(r["upper_minutes"]),
-            "warnings": tech_warnings  # Trả về cảnh báo thực tế thay vì mảng rỗng []
+            "warnings": tech_warnings
         })
     return out
 

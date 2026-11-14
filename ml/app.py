@@ -47,13 +47,15 @@ def predict_candidates(payload: Dict[str, Any]):
     try:
         ticket_id = _first(payload, "ticketId", "serviceTicketId", "service_ticket_id")
         candidates = _first(payload, "candidateTechnicianIds", "technicianIds", "candidates", default=[])
+        catalog_item_ids = _first(payload, "serviceCatalogItemIds", "service_catalog_item_ids", default=None)
         if not ticket_id:
             raise HTTPException(status_code=400, detail="Thiếu ticketId trong request body")
         if not candidates:
             raise HTTPException(status_code=400, detail="Thiếu danh sách KTV ứng viên")
 
+        parsed_catalog_ids = [int(c) for c in catalog_item_ids] if catalog_item_ids else None
         preds = []
-        for p in db_service.predict_candidates(int(ticket_id), [int(t) for t in candidates]):
+        for p in db_service.predict_candidates(int(ticket_id), [int(t) for t in candidates], parsed_catalog_ids):
             m = float(p["predicted_minutes"])
             preds.append({
                 "technicianId": p["technician_id"], "technician_id": p["technician_id"],
@@ -68,8 +70,8 @@ def predict_candidates(payload: Dict[str, Any]):
             "model": {
                 "name": md["model_name"], "version": md["model_version"], "status": "ACTIVE",
                 "featureContractVersion": FEATURE_CONTRACT_VERSION,
-                "syntheticData": md["synthetic_data"],        # nói thật: dữ liệu hiện là mô phỏng
-                "productionValidated": False,                 # chưa đối chiếu với dữ liệu vận hành thật
+                "syntheticData": md["synthetic_data"],
+                "productionValidated": False,
                 "testMaeMinutes": round(md["test_metrics"]["MAE"], 2),
                 "intervalHalfWidthMinutes": round(md["interval_halfwidth_minutes"], 1),
             },

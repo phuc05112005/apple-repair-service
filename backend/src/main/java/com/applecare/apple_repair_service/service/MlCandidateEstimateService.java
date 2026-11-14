@@ -29,14 +29,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class MlCandidateEstimateService {
     private final MlPredictionClient client;
     private final RepairItemRepository items;
+    private final DomainAccess access;
 
     public Map<Long, TechnicalEstimate> estimate(ServiceTicket ticket, List<Long> candidateIds,
                                                  OffsetDateTime evaluationTimestamp) {
-        long fallbackMinutes = standardDuration(ticket.getId());
-        if (!supported(ticket))
+        return estimateForCatalogItems(ticket, candidateIds, null, evaluationTimestamp);
+    }
+
+    public Map<Long, TechnicalEstimate> estimateForCatalogItems(ServiceTicket ticket, List<Long> candidateIds,
+                                                                List<Long> serviceCatalogItemIds,
+                                                                OffsetDateTime evaluationTimestamp) {
+        boolean hasOverride = serviceCatalogItemIds != null && !serviceCatalogItemIds.isEmpty();
+        long fallbackMinutes = hasOverride
+                ? standardDurationForCatalogItems(serviceCatalogItemIds)
+                : standardDuration(ticket.getId());
+        if (!supported(ticket, hasOverride))
             return fallback(candidateIds, fallbackMinutes, "UNSUPPORTED_PREDICTION_CONTEXT");
         try {
-            var response = client.predictCandidates(ticket.getId(), candidateIds, evaluationTimestamp);
+            var response = client.predictCandidates(ticket.getId(), candidateIds, serviceCatalogItemIds, evaluationTimestamp);
             var byTechnician = response.predictions().stream().collect(Collectors.toMap(
                     MlPredictionClient.CandidatePrediction::technicianId, Function.identity()));
             var result = new LinkedHashMap<Long, TechnicalEstimate>();
@@ -48,7 +58,6 @@ public class MlCandidateEstimateService {
                 }
 
                 var warnings = safeWarnings(prediction.warnings());
-                // Kiểm tra nếu KTV mới hoặc định mức nằm ngoài khoảng học của ML
                 boolean isColdStartOrOutOfBounds = warnings.contains("UNKNOWN_TECHNICIAN")
                         || warnings.contains("UNKNOWN_SERVICE_ISSUE")
                         || warnings.contains("UNKNOWN_DEVICE_MODEL")
@@ -57,7 +66,6 @@ public class MlCandidateEstimateService {
                         || warnings.contains("NO_REPAIR_ITEMS");
 
                 if (isColdStartOrOutOfBounds) {
-                    // Fallback sang Định mức chuẩn (STANDARD)
                     result.put(candidateId, new TechnicalEstimate(candidateId,
                             (double) fallbackMinutes, fallbackMinutes,
                             PredictionSource.STANDARD_DURATION_FALLBACK, warnings, response.model().name(),
@@ -65,7 +73,6 @@ public class MlCandidateEstimateService {
                             Boolean.TRUE.equals(response.model().syntheticData()),
                             Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
                 } else {
-                    // Giữ nguyên nguồn ML
                     result.put(candidateId, new TechnicalEstimate(candidateId,
                             prediction.predictedTechnicalMinutes(), rounded(prediction.predictedTechnicalMinutes()),
                             PredictionSource.ML, warnings, response.model().name(),
@@ -74,14 +81,26 @@ public class MlCandidateEstimateService {
                             Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
                 }
             }
-            log.info("Candidate duration estimates ready ticketId={} candidateCount={} predictionSource=ML modelVersion={}",
-                    ticket.getId(), candidateIds.size(), response.model().version());
+            log.info("Candidate duration estimates ready ticketId={} candidateCount={} catalogOverrideCount={} predictionSource=ML modelVersion={}",
+                    ticket.getId(), candidateIds.size(), hasOverride ? serviceCatalogItemIds.size() : 0, response.model().version());
             return java.util.Collections.unmodifiableMap(result);
         } catch (MlServiceUnavailableException exception) {
             log.warn("Candidate duration fallback ticketId={} candidateCount={} predictionSource=STANDARD_DURATION_FALLBACK reason={}",
                     ticket.getId(), candidateIds.size(), exception.reasonCode());
             return fallback(candidateIds, fallbackMinutes, exception.reasonCode());
         }
+    }
+
+    public long standardDurationForCatalogItems(List<Long> catalogItemIds) {
+        long total = catalogItemIds.stream()
+                .map(id -> access.get(ServiceCatalogItem.class, id))
+                .filter(catalog -> catalog != null && catalog.getStatus() == ActiveStatus.ACTIVE)
+                .map(ServiceCatalogItem::getStandardDurationMinutes)
+                .filter(minutes -> minutes != null && minutes > 0)
+                .mapToLong(Integer::longValue)
+                .sum();
+        BusinessRules.require(total > 0, "Dịch vụ được chọn chưa có thời lượng tiêu chuẩn hợp lệ.");
+        return total;
     }
 
     public long standardDuration(Long ticketId) {
@@ -94,11 +113,11 @@ public class MlCandidateEstimateService {
         return total;
     }
 
-    private boolean supported(ServiceTicket ticket) {
-        // Chỉ loại trừ phiếu đã hủy (CANCELLED) hoặc đã hoàn tất bàn giao (HANDED_OVER)
+    private boolean supported(ServiceTicket ticket, boolean hasCatalogOverride) {
         if (ticket.getStatus() == ServiceTicketStatus.CANCELLED || ticket.getStatus() == ServiceTicketStatus.HANDED_OVER) {
             return false;
         }
+        if (hasCatalogOverride) return true;
         var approved = items.findAllByServiceTicket_Id(ticket.getId()).stream()
                 .filter(item -> item.getApprovalStatus() == ApprovalStatus.APPROVED).toList();
         return !approved.isEmpty() && approved.stream().allMatch(item -> effectiveCatalog(item) != null);

@@ -93,7 +93,6 @@ public class RepairItem {
     @JoinColumn(name = "warranty_replacement_catalog_id", foreignKey = @ForeignKey(name = "fk_repair_items_warranty_replacement_catalog"))
     private ServiceCatalogItem warrantyReplacementCatalog;
 
-
     @Column(name = "warranty_start_date")
     private LocalDate warrantyStartDate;
 
@@ -111,6 +110,9 @@ public class RepairItem {
 
     @Column(name = "warranty_decision_note", columnDefinition = "TEXT")
     private String warrantyDecisionNote;
+
+    @Column(name = "estimated_duration_minutes")
+    private Long estimatedDurationMinutes;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

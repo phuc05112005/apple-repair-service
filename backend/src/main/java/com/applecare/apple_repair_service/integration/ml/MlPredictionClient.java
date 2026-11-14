@@ -24,14 +24,19 @@ public class MlPredictionClient {
     }
 
     public BatchResponse predictCandidates(long ticketId, List<Long> technicianIds, OffsetDateTime evaluationTimestamp) {
+        return predictCandidates(ticketId, technicianIds, null, evaluationTimestamp);
+    }
+
+    public BatchResponse predictCandidates(long ticketId, List<Long> technicianIds, List<Long> serviceCatalogItemIds, OffsetDateTime evaluationTimestamp) {
         if (!properties.isEnabled()) throw new MlServiceUnavailableException("ML_DISABLED", "ML integration is disabled");
         var started = System.nanoTime();
         try {
             var response = client.post().uri("/api/v1/repair-duration/predict-candidates")
-                    .body(new BatchRequest(ticketId, technicianIds, evaluationTimestamp)).retrieve().body(BatchResponse.class);
+                    .body(new BatchRequest(ticketId, technicianIds, serviceCatalogItemIds, evaluationTimestamp)).retrieve().body(BatchResponse.class);
             validate(ticketId, technicianIds, response);
-            log.info("ML prediction succeeded ticketId={} candidateCount={} latencyMs={} modelVersion={}",
-                    ticketId, technicianIds.size(), elapsedMillis(started), response.model().version());
+            log.info("ML prediction succeeded ticketId={} candidateCount={} catalogOverrideCount={} latencyMs={} modelVersion={}",
+                    ticketId, technicianIds.size(), serviceCatalogItemIds == null ? 0 : serviceCatalogItemIds.size(),
+                    elapsedMillis(started), response.model().version());
             return response;
         } catch (MlServiceUnavailableException exception) {
             throw exception;
@@ -65,7 +70,7 @@ public class MlPredictionClient {
         return (System.nanoTime() - started) / 1_000_000;
     }
 
-    public record BatchRequest(long ticketId, List<Long> candidateTechnicianIds, OffsetDateTime evaluationTimestamp) {}
+    public record BatchRequest(long ticketId, List<Long> candidateTechnicianIds, List<Long> serviceCatalogItemIds, OffsetDateTime evaluationTimestamp) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record BatchResponse(Long ticketId, OffsetDateTime evaluationTimestamp,
