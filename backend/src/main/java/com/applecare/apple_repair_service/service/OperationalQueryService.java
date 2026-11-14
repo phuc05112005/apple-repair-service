@@ -64,7 +64,13 @@ public class OperationalQueryService {
     @PreAuthorize("hasRole('TECHNICIAN')")
     public List<OperationalTicketResponse> myWork(ServiceTicketStatus status) {
         var selected = assignments.findAllByTechnician_IdAndStatusOrderByAssignedAtAsc(actor.id(), AssignmentStatus.ACTIVE).stream()
-                .filter(a -> status == null || a.getServiceTicket().getStatus() == status)
+                .filter(a -> {
+                    var ticketStatus = a.getServiceTicket().getStatus();
+                    if (ticketStatus == ServiceTicketStatus.HANDED_OVER || ticketStatus == ServiceTicketStatus.CANCELLED) {
+                        return false;
+                    }
+                    return status == null || ticketStatus == status;
+                })
                 .sorted(java.util.Comparator.comparingInt((Assignment a) -> a.getServiceTicket().getStatus() == ServiceTicketStatus.REPAIRING ? 0 : 1)
                         .thenComparing(Assignment::getAssignedAt).thenComparing(Assignment::getId)).toList();
         var itemMap = batchedItems(selected.stream().map(a -> a.getServiceTicket().getId()).toList());

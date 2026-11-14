@@ -22,6 +22,7 @@ public class ServiceTimingService {
  private final ServiceStatusHistoryRepository statusHistory;
  private final ServiceTimeEstimateHistoryRepository estimates;
  private final TimingSettings settings;
+ private final MlCandidateEstimateService mlEstimates;
  private final Clock clock;
 
  public void created(ServiceTicket ticket, User actor) {
@@ -91,11 +92,18 @@ public class ServiceTimingService {
   var cursors = new HashMap<Long, LocalDateTime>();
   var blocked = new HashSet<Long>();
   var byWorker = active.stream().collect(Collectors.groupingBy(a -> a.getTechnician().getId()));
+  var activeTechByTicket = active.stream().collect(Collectors.toMap(
+          a -> a.getServiceTicket().getId(),
+          a -> a.getTechnician().getId(),
+          (a, b) -> a
+  ));
   var durationMap = new HashMap<Long, Long>();
 
   for (var t : all.values()) {
+   boolean isPlanChange = t.getId().equals(trigger.getId()) && "SERVICE_PLAN_CHANGE".equals(reason);
    durationMap.put(t.getId(), t.getId().equals(trigger.getId()) && triggerDurationOverride != null
-           ? triggerDurationOverride : estimate(t, itemMap.getOrDefault(t.getId(), List.of()), t == trigger && reason.equals("SERVICE_PLAN_CHANGE")));
+           ? triggerDurationOverride
+           : estimate(t, itemMap.getOrDefault(t.getId(), List.of()), isPlanChange, activeTechByTicket.get(t.getId())));
   }
 
   for (var worker : byWorker.entrySet()) {
@@ -197,25 +205,98 @@ public class ServiceTimingService {
           .map(s -> new WorkCalendar.Window(s.getWorkDate().atTime(s.getStartTime()), s.getWorkDate().atTime(s.getEndTime()))).toList();
  }
 
- private long estimate(ServiceTicket t, List<RepairItem> selected, boolean changedPlan) {
+ private long estimate(ServiceTicket t, List<RepairItem> selected, boolean changedPlan, Long assignedTechnicianId) {
   if (!changedPlan && t.getEstimatedDurationMinutes() != null && t.getEstimatedDurationMinutes() > 0) {
    return t.getEstimatedDurationMinutes();
   }
 
-  long total = selected.stream()
-          .filter(i -> i.getApprovalStatus() != ApprovalStatus.REJECTED)
-          .map(i -> i.getWarrantyReplacementCatalog() != null ? i.getWarrantyReplacementCatalog() : i.getServiceCatalogItem())
-          .filter(c -> c.getStatus() == ActiveStatus.ACTIVE)
-          .map(ServiceCatalogItem::getStandardDurationMinutes)
-          .filter(Objects::nonNull)
-          .filter(n -> n > 0)
-          .mapToLong(Integer::longValue)
+  var approved = selected.stream()
+          .filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
+          .toList();
+
+  if (changedPlan && !approved.isEmpty()) {
+   var unestimated = approved.stream()
+           .filter(i -> i.getEstimatedDurationMinutes() == null || i.getEstimatedDurationMinutes() <= 0)
+           .toList();
+
+   // Tương thích ngược cho phiếu cũ chưa lưu estimatedDurationMinutes trên các hạng mục ban đầu
+   if (unestimated.size() == approved.size()
+           && approved.size() > 1
+           && t.getEstimatedDurationMinutes() != null
+           && t.getEstimatedDurationMinutes() > 0) {
+    var sortedById = approved.stream().sorted(Comparator.comparing(RepairItem::getId)).toList();
+    var legacyExisting = sortedById.subList(0, sortedById.size() - 1);
+    long legacySum = t.getEstimatedDurationMinutes();
+    long legacyStd = legacyExisting.stream().mapToLong(this::catalogStandardMinutes).sum();
+    long allocated = 0;
+    for (int i = 0; i < legacyExisting.size(); i++) {
+     var li = legacyExisting.get(i);
+     long share = (i == legacyExisting.size() - 1)
+             ? Math.max(1L, legacySum - allocated)
+             : (legacyStd > 0
+             ? Math.max(1L, Math.round((double) legacySum * catalogStandardMinutes(li) / legacyStd))
+             : Math.max(1L, legacySum / legacyExisting.size()));
+     li.setEstimatedDurationMinutes(share);
+     allocated += share;
+    }
+    unestimated = List.of(sortedById.get(sortedById.size() - 1));
+   }
+
+   boolean anyMlPredicted = t.getEstimateSource() == EstimateSource.ML;
+   if (!unestimated.isEmpty()) {
+    var evalAt = OffsetDateTime.ofInstant(clock.instant(), clock.getZone());
+    for (var newItem : unestimated) {
+     var catalog = effectiveCatalog(newItem);
+     if (catalog == null) continue;
+     long itemMinutes = catalogStandardMinutes(newItem);
+     if (assignedTechnicianId != null) {
+      var prediction = mlEstimates
+              .estimateForCatalogItems(t, List.of(assignedTechnicianId), List.of(catalog.getId()), evalAt)
+              .get(assignedTechnicianId);
+      if (prediction != null && prediction.durationMinutes() > 0) {
+       itemMinutes = prediction.durationMinutes();
+       if (prediction.source() == PredictionSource.ML) {
+        anyMlPredicted = true;
+       }
+      }
+     }
+     newItem.setEstimatedDurationMinutes(itemMinutes);
+    }
+   }
+
+   long totalApprovedMinutes = approved.stream()
+           .map(RepairItem::getEstimatedDurationMinutes)
+           .filter(Objects::nonNull)
+           .mapToLong(Long::longValue)
+           .sum();
+
+   if (totalApprovedMinutes > 0) {
+    t.setEstimateSource(anyMlPredicted ? EstimateSource.ML : EstimateSource.STANDARD);
+    return totalApprovedMinutes;
+   }
+  }
+
+  long approvedStandard = approved.stream()
+          .mapToLong(this::catalogStandardMinutes)
           .sum();
 
   if (changedPlan) t.setEstimateSource(EstimateSource.STANDARD);
-  if (total > 0) return total;
+  if (approvedStandard > 0) return approvedStandard;
 
   return t.getEstimatedDurationMinutes() != null ? t.getEstimatedDurationMinutes() : 30L;
+ }
+
+ private ServiceCatalogItem effectiveCatalog(RepairItem item) {
+  return item.getWarrantyReplacementCatalog() != null
+          ? item.getWarrantyReplacementCatalog()
+          : item.getServiceCatalogItem();
+ }
+
+ private long catalogStandardMinutes(RepairItem item) {
+  var c = effectiveCatalog(item);
+  return (c != null && c.getStatus() == ActiveStatus.ACTIVE && c.getStandardDurationMinutes() != null && c.getStandardDurationMinutes() > 0)
+          ? c.getStandardDurationMinutes()
+          : 0L;
  }
 
  private long elapsed(List<ServiceStatusHistory> history, LocalDateTime now) {

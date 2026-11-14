@@ -25,9 +25,14 @@ public class TicketAccessPolicy {
         return assignment;
     }
 
-    // Bổ sung phương thức này để phục vụ OperationalQueryService (dòng 73, 81)
+    // Kiểm tra quyền đọc cho KTV đang giữ phiếu (không dùng FOR UPDATE để tương thích @Transactional(readOnly = true))
     public Assignment requireActiveTechnicianRead(Long ticketId) {
-        return requireActiveTechnician(ticketId);
+        if (actor.principal().role() != UserRole.TECHNICIAN) denied();
+        access.get(ServiceTicket.class, ticketId);
+        var assignment = assignments.findFirstByServiceTicket_IdAndStatus(ticketId, AssignmentStatus.ACTIVE)
+                .orElseThrow(() -> new AccessDeniedException("An active assignment is required"));
+        if (!assignment.getTechnician().getId().equals(actor.id())) denied();
+        return assignment;
     }
 
     public Assignment activeAssignment(Long ticketId) {
