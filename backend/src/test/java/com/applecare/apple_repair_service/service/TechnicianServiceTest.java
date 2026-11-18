@@ -43,6 +43,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class TechnicianServiceTest {
@@ -54,7 +58,9 @@ class TechnicianServiceTest {
     final User tech = TestData.user(2);
     final TechnicianEligibility eligibility = new TechnicianEligibility(access, schedules, TestData.CLOCK);
     final BusinessRules rules = new BusinessRules(Validation.buildDefaultValidatorFactory().getValidator());
-    final AssignmentService service = new AssignmentService(tickets, assignments, access, rules, eligibility, statuses, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ApplicationEventPublisher.class), mock(MlCandidateEstimateService.class));
+    final AssignmentService service = new AssignmentService(tickets, assignments, mock(RepairItemRepository.class),
+            access, rules, eligibility, statuses, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK,
+            mock(ApplicationEventPublisher.class), mock(MlCandidateEstimateService.class));
     final ServiceTicket ticket = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
 
     TechnicianSchedule shift(User user) {
@@ -72,7 +78,8 @@ class TechnicianServiceTest {
         when(tickets.findByIdForUpdate(1L)).thenReturn(Optional.of(ticket));
         when(access.get(User.class, 2L)).thenReturn(tech);
         when(access.get(User.class, 1L)).thenReturn(TestData.user(1));
-        when(schedules.findAllByTechnician_IdAndWorkDate(2L, LocalDate.now(TestData.CLOCK))).thenReturn(List.of(shift(tech)));
+        when(schedules.findAllByTechnician_IdAndWorkDate(2L, LocalDate.now(TestData.CLOCK)))
+                .thenReturn(List.of(shift(tech)));
         when(assignments.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
     }
 
@@ -100,7 +107,8 @@ class TechnicianServiceTest {
 
     @Test
     void rejectsDuplicateAssignment() {
-        when(assignments.findFirstByServiceTicket_IdAndStatus(1L, AssignmentStatus.ACTIVE)).thenReturn(Optional.of(new Assignment()));
+        when(assignments.findFirstByServiceTicket_IdAndStatus(1L, AssignmentStatus.ACTIVE))
+                .thenReturn(Optional.of(new Assignment()));
         assertThrows(ConflictException.class, () -> service.assignTechnician(1L, request()));
     }
 
@@ -121,7 +129,8 @@ class TechnicianServiceTest {
         var repairs = mock(RepairItemRepository.class);
         var second = TestData.user(3);
         when(access.get(ServiceTicket.class, 1L)).thenReturn(ticket);
-        when(schedules.findAllByBranch_IdAndWorkDateAndStatus(any(), any(), any())).thenReturn(List.of(shift(tech), shift(second)));
+        when(schedules.findAllByBranch_IdAndWorkDateAndStatus(any(), any(), any()))
+                .thenReturn(List.of(shift(tech), shift(second)));
         var activeJobPrediction = new MlPrediction();
         activeJobPrediction.setPredictedDurationMinutes(90);
         when(predictions.findFirstByServiceTicket_IdAndTechnician_IdAndPredictionTypeOrderByPredictedAtDescIdDesc(
@@ -140,7 +149,8 @@ class TechnicianServiceTest {
         a.setServiceTicket(old);
         a.setAssignedAt(java.time.LocalDateTime.now(TestData.CLOCK).minusMinutes(30));
         when(assignments.findAllByTechnician_IdAndStatus(2L, AssignmentStatus.ACTIVE)).thenReturn(List.of(a));
-        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(TestData.item(1, ticket, ApprovalStatus.APPROVED), TestData.item(2, ticket, ApprovalStatus.APPROVED)));
+        when(repairs.findAllByServiceTicket_Id(1L)).thenReturn(List.of(
+                TestData.item(1, ticket, ApprovalStatus.APPROVED), TestData.item(2, ticket, ApprovalStatus.APPROVED)));
         var candidateEstimates = mock(MlCandidateEstimateService.class);
         var timingSettings = mock(TimingSettings.class);
         when(timingSettings.values()).thenReturn(new TimingSettings.Values(10, 15));
@@ -166,7 +176,8 @@ class TechnicianServiceTest {
         assertNotNull(result.getFirst().estimatedCompletionAt());
         assertEquals(List.of("ML_DISABLED"), result.getFirst().predictionWarnings());
         verify(candidateEstimates).estimate(eq(ticket), eq(List.of(2L, 3L)), any());
-        when(access.get(ServiceTicket.class, 99L)).thenThrow(new com.applecare.apple_repair_service.exception.ResourceNotFoundException("not found"));
+        when(access.get(ServiceTicket.class, 99L))
+                .thenThrow(new com.applecare.apple_repair_service.exception.ResourceNotFoundException("not found"));
         assertThrows(com.applecare.apple_repair_service.exception.ResourceNotFoundException.class,
                 () -> recommendations.recommend(99L));
         assertThrows(BusinessRuleViolationException.class, () -> recommendations.estimate(99L));
@@ -180,9 +191,13 @@ class TechnicianServiceTest {
         when(schedules.findAllByTechnician_IdAndWorkDate(any(), any())).thenReturn(List.of(old));
         when(access.get(Branch.class, 1L)).thenReturn(ticket.getBranch());
         when(schedules.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
-        var service = new TechnicianScheduleService(schedules, access, rules, new EntityResponses(mock(AssignmentRepository.class)));
-        assertNotNull(service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(10, 0), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
-        assertThrows(BusinessRuleViolationException.class, () -> service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK), LocalTime.of(9, 59), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
+        var service = new TechnicianScheduleService(schedules, access, rules,
+                new EntityResponses(mock(AssignmentRepository.class)));
+        assertNotNull(service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK),
+                LocalTime.of(10, 0), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
+        assertThrows(BusinessRuleViolationException.class,
+                () -> service.create(new CreateTechnicianScheduleRequest(2L, 1L, LocalDate.now(TestData.CLOCK),
+                        LocalTime.of(9, 59), LocalTime.NOON, TechnicianScheduleStatus.WORKING)));
     }
 
     @Test
@@ -215,18 +230,22 @@ class TechnicianServiceTest {
             when(access.lock(Transfer.class, 9L)).thenReturn(t);
             return t;
         });
-        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility, new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK, mock(ServiceTimingService.class));
+        var service = new TransferService(repo, assignments, tickets, access, rules, eligibility,
+                new EntityResponses(mock(AssignmentRepository.class)), TestData.CLOCK,
+                mock(ServiceTimingService.class));
         var request = new CreateTransferRequest(5L, 2L, 1L, direct ? TransferMode.DIRECT : TransferMode.REQUEST,
                 "Need transfer", "Inspection completed", "Device is stable");
         var result = direct ? service.directTransfer(request) : service.requestTransfer(request);
         if (!direct) {
             assertEquals(TransferStatus.PENDING, result.status());
-            result = accept ? service.acceptTransfer(9L, new TransferDecisionRequest(1L, null)) : service.rejectTransfer(9L, new TransferDecisionRequest(1L, null));
+            result = accept ? service.acceptTransfer(9L, new TransferDecisionRequest(1L, null))
+                    : service.rejectTransfer(9L, new TransferDecisionRequest(1L, null));
         }
         assertEquals(accept ? AssignmentStatus.ENDED : AssignmentStatus.ACTIVE, old.getStatus());
         assertEquals(accept ? TransferStatus.ACCEPTED : TransferStatus.REJECTED, result.status());
         assertEquals(ServiceTicketStatus.WAITING_ASSIGNMENT, ticket.getStatus());
         if (accept)
-            verify(assignments).save(argThat(a -> a.getStatus() == AssignmentStatus.ACTIVE && a.getSource() == AssignmentSource.TRANSFER));
+            verify(assignments).save(argThat(
+                    a -> a.getStatus() == AssignmentStatus.ACTIVE && a.getSource() == AssignmentSource.TRANSFER));
     }
 }
