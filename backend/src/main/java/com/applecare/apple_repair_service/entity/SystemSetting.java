@@ -35,7 +35,7 @@ public class SystemSetting {
     private String settingKey;
 
     @NotNull
-    @Column(name = "setting_value", nullable = false)
+    @Column(name = "setting_value", nullable = false, columnDefinition = "TEXT")
     private String settingValue;
 
     @CreationTimestamp

@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   email: 'support@taocare.vn',
   workingHours: '08:00 - 21:00 (Tất cả các ngày)',
   footerDesc: 'Hệ thống kỹ thuật & bảo hành thiết bị Apple chuyên nghiệp, minh bạch từ khâu tiếp nhận, chẩn đoán đến bàn giao.',
-  logoUrl: '/assets/logo.png',
+  logoUrl: '/logo.png',
   branches: [
     {
       id: 'branch-1',
@@ -43,14 +43,34 @@ const DEFAULT_SETTINGS: SystemSettings = {
   ],
 }
 
-// Đổi đường dẫn này khớp với cấu hình base URL gọi API của dự án bạn (ví dụ: '/api/settings')
-const API_URL = '/api/settings'
+const API_URL = '/api/v1/settings'
+
+function getAuthToken(): string | null {
+  const knownKeys = ['token', 'accessToken', 'access_token', 'authToken', 'jwt', 'taocare_token']
+
+  for (const storage of [localStorage, sessionStorage]) {
+    for (const key of knownKeys) {
+      const val = storage.getItem(key)
+      if (val && val.startsWith('eyJ')) return val
+    }
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i)
+      if (!key) continue
+      const raw = storage.getItem(key) || ''
+      if (raw.startsWith('eyJ')) return raw
+      if (raw.includes('eyJ')) {
+        const match = raw.match(/(eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+)/)
+        if (match) return match[1]
+      }
+    }
+  }
+  return null
+}
 
 export function useSystemSettings() {
   const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState<boolean>(true)
 
-  // 1. Mọi trình duyệt khi mở web đều gọi GET lên server EC2 để lấy dữ liệu mới nhất
   useEffect(() => {
     let isMounted = true
 
@@ -86,19 +106,22 @@ export function useSystemSettings() {
     }
   }, [])
 
-  // 2. Khi Admin bấm Lưu, gửi PUT lên server EC2 để lưu thẳng vào Database
   const updateSettings = async (newSettings: SystemSettings) => {
-    // Đổi tên key 'token' bên dưới cho khớp với tên key lưu JWT trong localStorage của bạn
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken')
+    const token = getAuthToken()
 
     const res = await fetch(API_URL, {
       method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(newSettings),
     })
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Phiên đăng nhập đã hết hạn hoặc thiếu quyền Admin (401). Vui lòng đăng xuất và đăng nhập lại!')
+    }
 
     if (!res.ok) {
       throw new Error(`Lưu thất bại (Mã lỗi: ${res.status})`)

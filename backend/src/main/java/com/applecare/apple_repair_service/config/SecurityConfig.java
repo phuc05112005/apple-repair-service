@@ -58,6 +58,7 @@ public class SecurityConfig {
                                     "/api/v1/service-tickets/*/feedback"
                             ).permitAll()
                             .requestMatchers(HttpMethod.GET,
+                                    "/api/v1/settings",
                                     "/api/v1/device-types","/api/v1/device-models","/api/v1/service-issues",
                                     "/api/v1/service-catalog-items","/api/v1/branches","/api/v1/appointment-slots",
                                     "/api/v1/appointments/lookup","/api/v1/service-tickets/lookup","/api/v1/warranties/eligibility").permitAll()

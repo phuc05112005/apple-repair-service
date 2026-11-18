@@ -23,6 +23,10 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
@@ -31,8 +35,10 @@ class MlSpringIntegrationTest {
     static final OffsetDateTime AT = OffsetDateTime.of(2026, 10, 6, 14, 10, 0, 0, ZoneOffset.ofHours(7));
     final MlPredictionClient client = mock(MlPredictionClient.class);
     final RepairItemRepository items = mock(RepairItemRepository.class);
-    final MlCandidateEstimateService estimates = new MlCandidateEstimateService(client, items);
-    final com.applecare.apple_repair_service.entity.ServiceTicket ticket = TestData.ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
+    final MlCandidateEstimateService estimates = new MlCandidateEstimateService(client, items,
+            mock(DomainAccess.class));
+    final com.applecare.apple_repair_service.entity.ServiceTicket ticket = TestData
+            .ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
 
     @BeforeEach
     void setup() {
@@ -84,7 +90,7 @@ class MlSpringIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ML_TIMEOUT", "CONNECTION_REFUSED", "ML_HTTP_503", "MALFORMED_JSON", "MODEL_NOT_READY"})
+    @ValueSource(strings = { "ML_TIMEOUT", "CONNECTION_REFUSED", "ML_HTTP_503", "MALFORMED_JSON", "MODEL_NOT_READY" })
     void mlFailuresUseStandardDurationFallback(String reason) {
         when(client.predictCandidates(anyLong(), anyList(), any()))
                 .thenThrow(new MlServiceUnavailableException(reason, "safe"));
@@ -135,8 +141,10 @@ class MlSpringIntegrationTest {
         var assigned = new AssignmentResponse(9L, 1L, 2L, "Tech", 1L, AssignmentSource.MANUAL_OVERRIDE,
                 AssignmentStatus.ACTIVE, AT.toLocalDateTime(), null, null);
         when(assignmentService.assignTechnician(1L, request)).thenReturn(assigned);
-        var orchestration = new AssignmentOrchestrationService(preparation, assignmentService, refinement, TestData.CLOCK);
-        // TestData clock represents exactly 10:00 +07, not AT; match the generated shared instant.
+        var orchestration = new AssignmentOrchestrationService(preparation, assignmentService, refinement,
+                TestData.CLOCK);
+        // TestData clock represents exactly 10:00 +07, not AT; match the generated
+        // shared instant.
         when(preparation.prepare(eq(1L), eq(2L), any())).thenReturn(estimate);
         assertSame(assigned, orchestration.assign(1L, request));
         var order = inOrder(assignmentService, refinement);
@@ -156,7 +164,8 @@ class MlSpringIntegrationTest {
         var request = new AssignTechnicianRequest(2L, 1L, AssignmentSource.MANUAL_OVERRIDE);
         var assigned = mock(AssignmentResponse.class);
         when(assignmentService.assignTechnician(1L, request)).thenReturn(assigned);
-        var orchestration = new AssignmentOrchestrationService(preparation, assignmentService, refinement, TestData.CLOCK);
+        var orchestration = new AssignmentOrchestrationService(preparation, assignmentService, refinement,
+                TestData.CLOCK);
         assertSame(assigned, orchestration.assign(1L, request));
         verifyNoInteractions(refinement);
     }
@@ -172,9 +181,11 @@ class MlSpringIntegrationTest {
         var request = new AssignTechnicianRequest(2L, 1L, AssignmentSource.MANUAL_OVERRIDE);
         var assigned = mock(AssignmentResponse.class);
         when(assignmentService.assignTechnician(1L, request)).thenReturn(assigned);
-        doThrow(new IllegalStateException("audit down")).when(refinement).refine(anyLong(), anyLong(), anyLong(), any());
-        assertSame(assigned, new AssignmentOrchestrationService(preparation, assignmentService, refinement, TestData.CLOCK)
-                .assign(1L, request));
+        doThrow(new IllegalStateException("audit down")).when(refinement).refine(anyLong(), anyLong(), anyLong(),
+                any());
+        assertSame(assigned,
+                new AssignmentOrchestrationService(preparation, assignmentService, refinement, TestData.CLOCK)
+                        .assign(1L, request));
     }
 
     @Test
@@ -185,15 +196,17 @@ class MlSpringIntegrationTest {
         var actual = new MlPredictionClient(builder.build(), properties);
         server.expect(requestTo("/api/v1/repair-duration/predict-candidates"))
                 .andExpect(content().json("""
-                    {"ticketId":1,"candidateTechnicianIds":[2,3],"evaluationTimestamp":"2026-10-06T14:10:00+07:00"}
-                    """))
-                .andRespond(withSuccess("""
-                    {"ticketId":1,"evaluationTimestamp":"2026-10-06T14:10:00+07:00",
-                     "predictions":[{"technicianId":2,"predictedTechnicalMinutes":55.4,"warnings":[]},
-                                    {"technicianId":3,"predictedTechnicalMinutes":70.0,"warnings":["UNSEEN_CATALOG_CATEGORY"]}],
-                     "model":{"name":"CatBoostRegressor","version":"v1","status":"EXPERIMENTAL_DEMO",
-                              "featureContractVersion":"repair-duration-features-v1.1","syntheticData":true,"productionValidated":false}}
-                    """, org.springframework.http.MediaType.APPLICATION_JSON));
+                        {"ticketId":1,"candidateTechnicianIds":[2,3],"evaluationTimestamp":"2026-10-06T14:10:00+07:00"}
+                        """))
+                .andRespond(withSuccess(
+                        """
+                                {"ticketId":1,"evaluationTimestamp":"2026-10-06T14:10:00+07:00",
+                                 "predictions":[{"technicianId":2,"predictedTechnicalMinutes":55.4,"warnings":[]},
+                                                {"technicianId":3,"predictedTechnicalMinutes":70.0,"warnings":["UNSEEN_CATALOG_CATEGORY"]}],
+                                 "model":{"name":"CatBoostRegressor","version":"v1","status":"EXPERIMENTAL_DEMO",
+                                          "featureContractVersion":"repair-duration-features-v1.1","syntheticData":true,"productionValidated":false}}
+                                """,
+                        org.springframework.http.MediaType.APPLICATION_JSON));
         var result = actual.predictCandidates(1L, List.of(2L, 3L), AT);
         assertEquals(2, result.predictions().size());
         assertEquals("EXPERIMENTAL_DEMO", result.model().status());
