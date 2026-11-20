@@ -178,14 +178,14 @@ class AdminApiIntegrationTest {
                         .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString())
                         .param("transactionType", "STOCK_IN").param("code", command.lotCode())
                         .param("from", LocalDate.now(clock).minusDays(1).toString()).param("to", LocalDate.now(clock).toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$[0].lotCode").value(command.lotCode()));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.content[0].lotCode").value(command.lotCode()));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
-                        .param("partId", part.getId().toString()).param("code", "NHAP_"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
+                        .param("partId", part.getId().toString()).param("code", command.lotCode()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(1)));
         mvc.perform(get("/api/v1/admin/inventory/transactions").header("Authorization","Bearer "+token)
                         .param("branchId", f.branch.getId().toString()).param("partId", part.getId().toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(1)));
         mvc.perform(get("/api/v1/admin/inventory/import-template").header("Authorization","Bearer "+token))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", containsString("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")));

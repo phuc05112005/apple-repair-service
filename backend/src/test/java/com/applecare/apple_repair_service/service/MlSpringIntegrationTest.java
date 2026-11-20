@@ -57,7 +57,7 @@ class MlSpringIntegrationTest {
 
     @Test
     void mlSuccessMapsOneCandidateAndTruthfulMetadata() {
-        when(client.predictCandidates(1L, List.of(2L), AT)).thenReturn(response(
+        when(client.predictCandidates(1L, List.of(2L), null, AT)).thenReturn(response(
                 new MlPredictionClient.CandidatePrediction(2L, 55.4, List.of())));
         var result = estimates.estimate(ticket, List.of(2L), AT).get(2L);
         assertEquals(PredictionSource.ML, result.source());
@@ -70,7 +70,7 @@ class MlSpringIntegrationTest {
 
     @Test
     void mlSuccessMapsMultipleCandidatesWithoutRanking() {
-        when(client.predictCandidates(1L, List.of(2L, 3L), AT)).thenReturn(response(
+        when(client.predictCandidates(1L, List.of(2L, 3L), null, AT)).thenReturn(response(
                 new MlPredictionClient.CandidatePrediction(2L, 55.0, List.of()),
                 new MlPredictionClient.CandidatePrediction(3L, 70.0, List.of())));
         var result = estimates.estimate(ticket, List.of(2L, 3L), AT);
@@ -81,7 +81,7 @@ class MlSpringIntegrationTest {
 
     @Test
     void warningsIncludingUnseenCatalogArePreservedAndNonFatal() {
-        when(client.predictCandidates(anyLong(), anyList(), any())).thenReturn(response(
+        when(client.predictCandidates(anyLong(), anyList(), any(), any())).thenReturn(response(
                 new MlPredictionClient.CandidatePrediction(2L, 45.5,
                         List.of("COLD_START_TECHNICIAN", "UNSEEN_CATALOG_CATEGORY"))));
         var result = estimates.estimate(ticket, List.of(2L), AT).get(2L);
@@ -92,7 +92,7 @@ class MlSpringIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = { "ML_TIMEOUT", "CONNECTION_REFUSED", "ML_HTTP_503", "MALFORMED_JSON", "MODEL_NOT_READY" })
     void mlFailuresUseStandardDurationFallback(String reason) {
-        when(client.predictCandidates(anyLong(), anyList(), any()))
+        when(client.predictCandidates(anyLong(), anyList(), any(), any()))
                 .thenThrow(new MlServiceUnavailableException(reason, "safe"));
         var result = estimates.estimate(ticket, List.of(2L), AT).get(2L);
         assertEquals(PredictionSource.STANDARD_DURATION_FALLBACK, result.source());
@@ -102,7 +102,7 @@ class MlSpringIntegrationTest {
 
     @Test
     void partialCandidateResponseFallsBackOnlyForMissingCandidate() {
-        when(client.predictCandidates(anyLong(), anyList(), any())).thenReturn(response(
+        when(client.predictCandidates(anyLong(), anyList(), any(), any())).thenReturn(response(
                 new MlPredictionClient.CandidatePrediction(2L, 40.0, List.of())));
         var result = estimates.estimate(ticket, List.of(2L, 3L), AT);
         assertEquals(PredictionSource.ML, result.get(2L).source());
@@ -113,17 +113,16 @@ class MlSpringIntegrationTest {
     @Test
     void unsupportedMultiItemContextDoesNotCallMl() {
         when(items.findAllByServiceTicket_Id(1L)).thenReturn(List.of(
-                TestData.item(1, ticket, com.applecare.apple_repair_service.enums.ApprovalStatus.APPROVED),
-                TestData.item(2, ticket, com.applecare.apple_repair_service.enums.ApprovalStatus.APPROVED)));
+                TestData.item(1, ticket, com.applecare.apple_repair_service.enums.ApprovalStatus.PENDING)));
         var result = estimates.estimate(ticket, List.of(2L), AT).get(2L);
         assertEquals(PredictionSource.STANDARD_DURATION_FALLBACK, result.source());
-        assertEquals(60, result.durationMinutes());
+        assertEquals(30, result.durationMinutes());
         verifyNoInteractions(client);
     }
 
     @Test
     void invalidTicketStateDoesNotCallMl() {
-        ticket.setStatus(ServiceTicketStatus.ASSIGNED);
+        ticket.setStatus(ServiceTicketStatus.CANCELLED);
         assertEquals(PredictionSource.STANDARD_DURATION_FALLBACK,
                 estimates.estimate(ticket, List.of(2L), AT).get(2L).source());
         verifyNoInteractions(client);

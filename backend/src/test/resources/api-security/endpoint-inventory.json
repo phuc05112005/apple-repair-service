@@ -592,6 +592,14 @@
   "response" : "com.applecare.apple_repair_service.dto.response.FeedbackStatisticsResponse"
 }, {
   "method" : "GET",
+  "path" : "/api/v1/admin/statistics/feedbacks/list",
+  "controller" : "AdminConfigurationController",
+  "handler" : "feedbackList",
+  "access" : "hasRole('ADMIN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.CustomerFeedbackResponse>"
+}, {
+  "method" : "GET",
   "path" : "/api/v1/admin/statistics/overview",
   "controller" : "AdminConfigurationController",
   "handler" : "statistics",
@@ -1143,6 +1151,14 @@
   "request" : "TransferCommand",
   "response" : "com.applecare.apple_repair_service.dto.response.TransferResponse"
 }, {
+  "method" : "GET",
+  "path" : "/api/v1/internal/technician/history",
+  "controller" : "TechnicianController",
+  "handler" : "history",
+  "access" : "hasRole('TECHNICIAN')",
+  "request" : "none",
+  "response" : "java.util.List<com.applecare.apple_repair_service.dto.response.OperationalTicketResponse>"
+}, {
   "method" : "POST",
   "path" : "/api/v1/internal/technician/repair-items/{id}/approval",
   "controller" : "TechnicianController",
@@ -1262,6 +1278,22 @@
   "access" : "public",
   "request" : "PublicFeedbackRequest",
   "response" : "com.applecare.apple_repair_service.dto.publicapi.PublicFeedbackResponse"
+}, {
+  "method" : "GET",
+  "path" : "/api/v1/settings",
+  "controller" : "SystemSettingPublicController",
+  "handler" : "getPublicSettings",
+  "access" : "public",
+  "request" : "none",
+  "response" : "org.springframework.http.ResponseEntity<java.lang.String>"
+}, {
+  "method" : "PUT",
+  "path" : "/api/v1/settings",
+  "controller" : "SystemSettingPublicController",
+  "handler" : "updatePublicSettings",
+  "access" : "public",
+  "request" : "String",
+  "response" : "org.springframework.http.ResponseEntity<java.lang.String>"
 }, {
   "method" : "GET",
   "path" : "/api/v1/warranties/eligibility",

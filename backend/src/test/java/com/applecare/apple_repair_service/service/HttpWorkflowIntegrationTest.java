@@ -164,7 +164,7 @@ class HttpWorkflowIntegrationTest {
         mvc.perform(get(path+"/technician-recommendations").header("Authorization",technician)).andExpect(status().isForbidden());
         mvc.perform(get(path+"/technician-recommendations")).andExpect(status().isUnauthorized());
         assign(ticketId,reception);
-        postJson(path+"/inspection/start",technician,null,200);
+        postJson(path+"/start-processing",technician,null,200);
         var inspected=postJson(path+"/inspection",technician,new InspectionCommand("Same repair",false,
                 List.of(new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("90.00"),null))),200);
         assertEquals("REPAIRING",inspected.get("ticket").get("status").asString());
@@ -191,10 +191,10 @@ class HttpWorkflowIntegrationTest {
             assertEquals(AppointmentStatus.ARRIVED,t.getAppointmentDevice().getAppointment().getStatus());
             var histories=em.createQuery("select h from ServiceStatusHistory h where h.serviceTicket.id=:id order by h.changedAt,h.id",ServiceStatusHistory.class)
                     .setParameter("id",ticketId).getResultList();
-            assertEquals(List.of(ServiceTicketStatus.WAITING_ASSIGNMENT,ServiceTicketStatus.ASSIGNED,ServiceTicketStatus.INSPECTING,
+            assertEquals(List.of(ServiceTicketStatus.WAITING_ASSIGNMENT,ServiceTicketStatus.ASSIGNED,
                             ServiceTicketStatus.REPAIRING,ServiceTicketStatus.WAITING_HANDOVER,ServiceTicketStatus.HANDED_OVER),
                     histories.stream().map(ServiceStatusHistory::getToStatus).toList());
-            assertEquals(List.of(f.receptionist.getId(),f.receptionist.getId(),f.technician.getId(),f.technician.getId(),f.technician.getId(),f.receptionist.getId()),
+            assertEquals(List.of(f.receptionist.getId(),f.receptionist.getId(),f.technician.getId(),f.technician.getId(),f.receptionist.getId()),
                     histories.stream().map(h->h.getChangedBy().getId()).toList());
             var repair=em.find(RepairItem.class,itemId);assertEquals(new BigDecimal("90.00"),repair.getFinalPrice());assertNotNull(repair.getWarrantyEndDate());
             var assignment=em.createQuery("select a from Assignment a where a.serviceTicket.id=:id",Assignment.class).setParameter("id",ticketId).getSingleResult();
@@ -228,13 +228,13 @@ class HttpWorkflowIntegrationTest {
         var technicianExecutor=Executors.newSingleThreadExecutor(r->new Thread(r,"technician-http"));
         var transferExecutor=Executors.newSingleThreadExecutor(r->new Thread(r,"transfer-http"));
         try {
-            var mutation=technicianExecutor.submit(()->postJson(path+"/inspection/start",a,null,200));
+            var mutation=technicianExecutor.submit(()->postJson(path+"/start-processing",a,null,200));
             assertTrue(checked.await(10,TimeUnit.SECONDS));
             var transfer=transferExecutor.submit(()->postJson(path+"/transfers/direct",reception,new TransferCommand(f.otherTechnician.getId(),"Concurrent","Inspected","Ready for next technician"),200));
             assertTrue(transferAttempt.await(10,TimeUnit.SECONDS));
             assertThrows(TimeoutException.class,()->transfer.get(300,TimeUnit.MILLISECONDS),"Transfer must wait while the authorized transaction holds the ticket lock");
             release.countDown();mutation.get(15,TimeUnit.SECONDS);transfer.get(15,TimeUnit.SECONDS);
-            assertEquals("ACCESS_DENIED",postJson(path+"/inspection/start",a,null,403).get("code").asString());
+            assertEquals("ACCESS_DENIED",postJson(path+"/start-processing",a,null,403).get("code").asString());
             postJson(path+"/inspection",b,new InspectionCommand("Same repair",false,List.of(
                     new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("90.00"),null))),200);
             tx(()-> {

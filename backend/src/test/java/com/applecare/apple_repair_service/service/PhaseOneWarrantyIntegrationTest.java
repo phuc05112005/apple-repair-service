@@ -92,6 +92,13 @@ class PhaseOneWarrantyIntegrationTest {
                 i.setItemNameSnapshot(i.getServiceCatalogItem().getName());
                 i.setWarrantySourceItem(original);
                 i.setFinalPrice(null);
+                var assignment = new Assignment();
+                assignment.setServiceTicket(t);
+                assignment.setTechnician(f.technician);
+                assignment.setAssignedBy(f.receptionist);
+                assignment.setSource(AssignmentSource.MANUAL_OVERRIDE);
+                assignment.setAssignedAt(LocalDateTime.now(clock));
+                em.persist(assignment);
                 em.flush();
                 return i;
         }
@@ -103,7 +110,7 @@ class PhaseOneWarrantyIntegrationTest {
         }
 
         void addPaidItem(RepairItem warranty, ServiceCatalogItem paid) {
-                warranty.getServiceTicket().setStatus(ServiceTicketStatus.INSPECTING);
+                warranty.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
                 em.flush();
                 tickets.recordInspection(warranty.getServiceTicket().getId(), f.technician.getId(),
                                 new RecordInspectionRequest("Phát hiện thêm pin chai", false,
@@ -207,7 +214,7 @@ class PhaseOneWarrantyIntegrationTest {
                 warranties.recordWarrantyDecision(free.getId(),
                                 new WarrantyDecisionRequest(WarrantyDecision.REJECTED, "Vỡ do rơi"));
                 var paid = catalog(ServiceTypeCode.REPLACEMENT, f.issue, "screen-paid");
-                free.getServiceTicket().setStatus(ServiceTicketStatus.INSPECTING);
+                free.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
                 em.flush();
                 tickets.recordInspection(free.getServiceTicket().getId(), f.technician.getId(),
                                 new RecordInspectionRequest("Thay màn hình trả phí", false,
@@ -242,7 +249,7 @@ class PhaseOneWarrantyIntegrationTest {
                 assignments.assignTechnician(created.ticket().id(), new AssignTechnicianRequest(
                                 f.technician.getId(), f.receptionist.getId(), AssignmentSource.MANUAL_OVERRIDE));
                 var t = em.find(ServiceTicket.class, created.ticket().id());
-                t.setStatus(ServiceTicketStatus.INSPECTING);
+                t.setStatus(ServiceTicketStatus.REPAIRING);
                 em.flush();
                 var result = tickets.recordInspection(t.getId(), f.technician.getId(),
                                 new RecordInspectionRequest("Sửa nguồn", false,
@@ -256,7 +263,7 @@ class PhaseOneWarrantyIntegrationTest {
                 assertEquals(f.technician.getId(), result.repairItems().getFirst().approvalRecordedById());
                 assertNotNull(result.repairItems().getFirst().approvalDecisionAt());
                 var replacement = catalog(ServiceTypeCode.REPLACEMENT, f.issue, "preauthorized-replacement");
-                t.setStatus(ServiceTicketStatus.INSPECTING);
+                t.setStatus(ServiceTicketStatus.REPAIRING);
                 em.flush();
                 var changed = tickets.recordInspection(t.getId(), f.technician.getId(),
                                 new RecordInspectionRequest("Không sửa được, thay trong phạm vi cho phép", false,
@@ -273,7 +280,7 @@ class PhaseOneWarrantyIntegrationTest {
 
         @Test
         void newWorkWithoutConsentCannotSilentlyProceedOrPretendPreauthorization() {
-                var t = f.ticket(ServiceTicketStatus.INSPECTING);
+                var t = f.ticket(ServiceTicketStatus.REPAIRING);
                 var draft = List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.TEN, BigDecimal.TEN,
                                 null));
                 assertThrows(BusinessRuleViolationException.class,
@@ -283,7 +290,7 @@ class PhaseOneWarrantyIntegrationTest {
                                 () -> tickets.recordInspection(t.getId(), f.technician.getId(),
                                                 new RecordInspectionRequest("Lỗi nguồn", false, draft,
                                                                 ConfirmationMethod.PRE_AUTHORIZED, "Tự ghi")));
-                assertEquals(ServiceTicketStatus.INSPECTING, t.getStatus());
+                assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
         }
 
         @Test
@@ -308,7 +315,7 @@ class PhaseOneWarrantyIntegrationTest {
                 assertEquals(originalStart, claim.getWarrantyStartDate());
                 assertEquals(originalEnd, claim.getWarrantyEndDate());
 
-                claim.getServiceTicket().setStatus(ServiceTicketStatus.INSPECTING);
+                claim.getServiceTicket().setStatus(ServiceTicketStatus.REPAIRING);
                 var assignment = new Assignment();
                 assignment.setServiceTicket(claim.getServiceTicket());
                 assignment.setTechnician(f.technician);

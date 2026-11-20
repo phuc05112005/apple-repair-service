@@ -102,6 +102,7 @@ class TicketCoreServiceTest {
         when(histories.findAllByServiceTicket_IdOrderByChangedAtAsc(any())).thenAnswer(i -> history);
         when(histories.findFirstByServiceTicket_IdOrderByChangedAtDescIdDesc(any())).thenAnswer(i -> history.isEmpty() ? Optional.empty() : Optional.of(history.getLast()));
         when(repairs.findAllByServiceTicket_Id(any())).thenAnswer(i -> items);
+        when(repairs.findByServiceTicket_IdWithDetails(any())).thenAnswer(i -> items);
         when(repairs.save(any())).thenAnswer(i -> {
             RepairItem r = i.getArgument(0);
             if (!items.contains(r)) items.add(r);
@@ -142,19 +143,22 @@ class TicketCoreServiceTest {
         var t = ticket(ServiceTicketStatus.WAITING_ASSIGNMENT);
         status.initialize(t, TestData.user(1));
         status.changeStatus(t, ServiceTicketStatus.ASSIGNED, TestData.user(1), null);
-        status.changeStatus(t, ServiceTicketStatus.INSPECTING, TestData.user(1), null);
-        assertEquals(ServiceTicketStatus.INSPECTING, t.getStatus());
+        assertEquals(ServiceTicketStatus.ASSIGNED, t.getStatus());
+        status.changeStatus(t, ServiceTicketStatus.REPAIRING, TestData.user(1), null);
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
         assertEquals(3, history.size());
         assertNull(history.getFirst().getFromStatus());
         assertEquals(ServiceTicketStatus.ASSIGNED, history.getLast().getFromStatus());
-        assertThrows(InvalidStateTransitionException.class, () -> service.waitForPart(1L, 1L, null));
+        assertThrows(InvalidStateTransitionException.class,
+                () -> status.changeStatus(t, ServiceTicketStatus.WAITING_ASSIGNMENT, TestData.user(1), null));
         assertEquals(3, history.size());
     }
 
     @Test
     void inspectionWithoutApprovalStartsRepair() {
-        inspect(false);
-        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
+        var t = inspect(false);
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertTrue(history.isEmpty());
         assertEquals(ApprovalStatus.APPROVED, items.getFirst().getApprovalStatus());
     }
 
@@ -167,7 +171,7 @@ class TicketCoreServiceTest {
 
     @Test
     void revisedQuoteForSameCatalogRetainsHistoricalSnapshotWithoutDoubleCharging() {
-        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var t = ticket(ServiceTicketStatus.REPAIRING);
         var old = TestData.item(2, t, ApprovalStatus.APPROVED);
         old.setItemNameSnapshot("Original quote");
         old.setBasePrice(new BigDecimal("100.00"));
@@ -202,35 +206,37 @@ class TicketCoreServiceTest {
 
     @Test
     void higherPriceWithPhoneConsentProceedsWithoutWaiting() {
-        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var t = ticket(ServiceTicketStatus.REPAIRING);
         var old = TestData.item(2, t, ApprovalStatus.APPROVED);
         old.setItemNameSnapshot("Repair"); old.setBasePrice(BigDecimal.TEN);
         items.add(old);
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(old.getServiceCatalogItem());
         service.recordInspection(1L, 1L, new RecordInspectionRequest("Phát sinh chi phí", false,
                 List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, new BigDecimal("20.00"), null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.PHONE, "Khách đồng ý báo giá"));
-        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertTrue(history.isEmpty());
         assertEquals(ApprovalStatus.REJECTED, old.getApprovalStatus());
         assertEquals(ApprovalStatus.APPROVED, items.getLast().getApprovalStatus());
     }
 
     @Test
     void removingAgreedServiceWithDirectConsentDoesNotForceWaiting() {
-        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var t = ticket(ServiceTicketStatus.REPAIRING);
         var retained = TestData.item(2, t, ApprovalStatus.APPROVED);
         var removed = TestData.item(3, t, ApprovalStatus.APPROVED);
         items.addAll(List.of(retained, removed));
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(retained.getServiceCatalogItem());
         service.recordInspection(1L, 1L, new RecordInspectionRequest("Đổi phương án", false,
                 List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null)), com.applecare.apple_repair_service.enums.ConfirmationMethod.DIRECT, "Khách đổi phương án"));
-        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertTrue(history.isEmpty());
         assertEquals(ApprovalStatus.REJECTED, removed.getApprovalStatus());
         assertTrue(items.stream().anyMatch(item -> item.getApprovalStatus() == ApprovalStatus.APPROVED));
     }
 
     @Test
     void unchangedInspectionReusesExistingItem() {
-        var t = ticket(ServiceTicketStatus.INSPECTING);
+        var t = ticket(ServiceTicketStatus.REPAIRING);
         var old = TestData.item(2, t, ApprovalStatus.APPROVED);
         items.add(old);
         var catalog = old.getServiceCatalogItem();
@@ -241,17 +247,19 @@ class TicketCoreServiceTest {
         assertEquals(1, items.size());
         assertSame(old, items.getFirst());
         assertEquals(ApprovalStatus.APPROVED, old.getApprovalStatus());
-        assertEquals(ServiceTicketStatus.REPAIRING, history.getLast().getToStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING, t.getStatus());
+        assertTrue(history.isEmpty());
     }
 
-    void inspect(boolean required) {
-        var t = ticket(ServiceTicketStatus.INSPECTING);
+    ServiceTicket inspect(boolean required) {
+        var t = ticket(ServiceTicketStatus.REPAIRING);
         var agreed = TestData.item(2, t, ApprovalStatus.APPROVED);
         agreed.setItemNameSnapshot("Repair");
         agreed.setBasePrice(BigDecimal.TEN);
         if (!required) items.add(agreed);
         when(access.get(ServiceCatalogItem.class, 2L)).thenReturn(TestData.catalog(2));
         service.recordInspection(1L, 1L, new RecordInspectionRequest("Inspected", required, List.of(new InspectionRepairItemRequest(2L, BigDecimal.TEN, BigDecimal.TEN, null)), null, null));
+        return t;
     }
 
     @Test
@@ -394,7 +402,7 @@ class TicketCoreServiceTest {
         var records = new ArrayList<ServiceStatusHistory>();
         ServiceTicketStatus previous = null;
         int[] minutes = {0, 0, 0, 0, 60, 120, 180, 210};
-        var states = new ServiceTicketStatus[]{ServiceTicketStatus.WAITING_ASSIGNMENT, ServiceTicketStatus.ASSIGNED, ServiceTicketStatus.INSPECTING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_PART, ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_HANDOVER};
+        var states = new ServiceTicketStatus[]{ServiceTicketStatus.WAITING_ASSIGNMENT, ServiceTicketStatus.ASSIGNED, ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_APPROVAL, ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_PART, ServiceTicketStatus.REPAIRING, ServiceTicketStatus.WAITING_HANDOVER};
         var start = LocalDateTime.of(2026, 9, 11, 6, 0);
         for (int i = 0; i < states.length; i++) {
             var h = new ServiceStatusHistory();

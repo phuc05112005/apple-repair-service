@@ -79,38 +79,39 @@ class TechnicianAuthorizationIntegrationTest {
         assertEquals(1,active.size());assertEquals(user.getId(),active.getFirst().getTechnician().getId());
     }
     @Test void onlyActiveAssigneeCanInspectAndReadTicket() throws Exception {
-        denied(command(ticketPath("inspection/start"),b,null));
+        denied(command(ticketPath("start-processing"),b,null));
         denied(mvc.perform(get("/api/v1/internal/service-tickets/"+ticket.getId()).header("Authorization",b)));
-        command(ticketPath("inspection/start"),a,null).andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("INSPECTING"));
+        command(ticketPath("start-processing"),a,null).andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
         var inspection=new InspectionCommand("Same repair",false,List.of(new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("100.00"),null)));
         denied(command(ticketPath("inspection"),b,inspection));
         command(ticketPath("inspection"),a,inspection).andExpect(status().isOk())
-                .andExpect(jsonPath("$.ticket.inspectedById").value(f.technician.getId())).andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
+                .andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
         em.flush();assertEquals(ServiceTicketStatus.REPAIRING,em.find(ServiceTicket.class,ticket.getId()).getStatus());
         denied(command(ticketPath("wait-for-part"),b,new NoteCommand("wait")));
         denied(command(ticketPath("finish-repair"),b,null));
     }
     @Test void directTransferRevokesOldTechnicianWithoutChangingBusinessStatus() throws Exception {
-        command(ticketPath("inspection/start"),a,null).andExpect(status().isOk());
+        command(ticketPath("start-processing"),a,null).andExpect(status().isOk());
         denied(command("service-tickets/"+ticket.getId()+"/transfers/direct",a,new TransferCommand(f.otherTechnician.getId(),"Direct","Inspection completed","Device is stable")));
         command("service-tickets/"+ticket.getId()+"/transfers/direct",reception,new TransferCommand(f.otherTechnician.getId(),"Direct","Inspection completed","Device is stable"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACCEPTED"));
         em.flush();assertEquals(AssignmentStatus.ENDED,initial.getStatus());assertOwner(f.otherTechnician);
-        assertEquals(ServiceTicketStatus.INSPECTING,ticket.getStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING,ticket.getStatus());
         var inspection=new InspectionCommand("Same repair",false,List.of(new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("100.00"),null)));
         denied(command(ticketPath("inspection"),a,inspection));
-        command(ticketPath("inspection"),b,inspection).andExpect(status().isOk()).andExpect(jsonPath("$.ticket.inspectedById").value(f.otherTechnician.getId()));
+        command(ticketPath("inspection"),b,inspection).andExpect(status().isOk())
+                .andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
     }
     @Test void pendingRequestPreservesSourceAccessAndOnlyTargetCanAccept() throws Exception {
         denied(command("service-tickets/"+ticket.getId()+"/transfers/request",b,new TransferCommand(f.technician.getId(),"Unauthorized","None","Unchanged")));
         long transfer=requestTransfer();assertOwner(f.technician);
-        denied(command(ticketPath("inspection/start"),b,null));
-        command(ticketPath("inspection/start"),a,null).andExpect(status().isOk());
+        denied(command(ticketPath("start-processing"),b,null));
+        command(ticketPath("start-processing"),a,null).andExpect(status().isOk());
         denied(command("transfers/"+transfer+"/accept",a,new NoteCommand(null)));
         command("transfers/"+transfer+"/accept",b,new NoteCommand("Accepted")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.respondedById").value(f.otherTechnician.getId()));
         assertOwner(f.otherTechnician);assertEquals(AssignmentStatus.ENDED,initial.getStatus());
-        assertEquals(ServiceTicketStatus.INSPECTING,ticket.getStatus());
+        assertEquals(ServiceTicketStatus.REPAIRING,ticket.getStatus());
         var inspection=new InspectionCommand("Same",false,List.of(new InspectionRepairItemRequest(f.catalog.getId(),new BigDecimal("100.00"),new BigDecimal("100.00"),null)));
         denied(command(ticketPath("inspection"),a,inspection));
         command(ticketPath("inspection"),b,inspection).andExpect(status().isOk());
@@ -120,8 +121,8 @@ class TechnicianAuthorizationIntegrationTest {
         denied(command("transfers/"+transfer+"/reject",a,new NoteCommand("No")));
         command("transfers/"+transfer+"/reject",b,new NoteCommand("No")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("REJECTED"));
         assertOwner(f.technician);assertEquals(AssignmentStatus.ACTIVE,initial.getStatus());
-        denied(command(ticketPath("inspection/start"),b,null));
-        command(ticketPath("inspection/start"),a,null).andExpect(status().isOk());
+        denied(command(ticketPath("start-processing"),b,null));
+        command(ticketPath("start-processing"),a,null).andExpect(status().isOk());
     }
     @Test void cancellationRequiresRequesterOrReceptionist() throws Exception {
         long transfer=requestTransfer();
@@ -134,7 +135,7 @@ class TechnicianAuthorizationIntegrationTest {
     @Test void partUsageAndReversalRequireAssigneeAndReverseOnlyOnce() throws Exception {
         ticket.setStatus(ServiceTicketStatus.REPAIRING);
         var part=new Part();part.setPartCode(f.prefix);part.setName(f.prefix);part.setSalePrice(BigDecimal.TEN);em.persist(part);
-        var stock=new BranchInventory();stock.setBranch(f.branch);stock.setQuantity(5);em.persist(stock);em.flush();
+        var stock=new BranchInventory();stock.setBranch(f.branch);stock.setPart(part);stock.setQuantity(5);em.persist(stock);em.flush();
         String use="repair-items/"+item.getId()+"/part-usages";
         denied(command(use,b,new PartUsageCommand(part.getId(),2)));
         var result=command(use,a,new PartUsageCommand(part.getId(),2)).andExpect(status().isCreated())
@@ -149,7 +150,7 @@ class TechnicianAuthorizationIntegrationTest {
     @Test void operationalReadModelsAreActorScopedAndExposeRealTicketContext() throws Exception {
         var part=new Part();part.setPartCode(f.prefix);part.setName("Battery");part.setBrand("Apple");
         part.setVariant("Original");part.setSalePrice(BigDecimal.TEN);em.persist(part);
-        var stock=new BranchInventory();stock.setBranch(f.branch);stock.setQuantity(5);em.persist(stock);em.flush();
+        var stock=new BranchInventory();stock.setBranch(f.branch);stock.setPart(part);stock.setQuantity(5);em.persist(stock);em.flush();
 
         mvc.perform(get("/api/v1/internal/technician/work").header("Authorization",a))
                 .andExpect(status().isOk()).andExpect(jsonPath("$",org.hamcrest.Matchers.hasSize(1)))
