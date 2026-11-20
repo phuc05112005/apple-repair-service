@@ -20,7 +20,8 @@ class StatisticsIntegrationTest {
     @Autowired EntityManager em;
     @org.springframework.beans.factory.annotation.Value("${spring.datasource.url}") String datasourceUrl;
     @Autowired StatisticsService statistics;
-    final LocalDate day=LocalDate.of(2026,9,11);
+    final LocalDate day = LocalDate.of(2035, 1, 1)
+            .plusDays(java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 15000));
     String prefix;
     Branch first,second;
     DeviceType firstType,secondType;
@@ -37,7 +38,10 @@ class StatisticsIntegrationTest {
         firstModel=model(firstType,"a");secondModel=model(secondType,"b");
         actor=TestData.user(1);actor.setId(null);actor.setUsername(prefix);actor.setPasswordHash("TEST-ONLY-NON-AUTHENTICATING-HASH");em.persist(actor);
         customer=new Customer();customer.setFullName(prefix);customer.setPhone(prefix);em.persist(customer);
-        var existing=em.createQuery("select s from ServiceType s where s.code=:code",ServiceType.class).setParameter("code",ServiceTypeCode.REPAIR).getResultList();
+        var existing = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
+                .setParameter("code", ServiceTypeCode.REPAIR)
+                .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+                .getResultList();
         if(existing.isEmpty()){serviceType=new ServiceType();serviceType.setName(prefix);serviceType.setCode(ServiceTypeCode.REPAIR);em.persist(serviceType);}
         else serviceType=existing.getFirst();
         issue=new ServiceIssue();issue.setName(prefix);em.persist(issue);

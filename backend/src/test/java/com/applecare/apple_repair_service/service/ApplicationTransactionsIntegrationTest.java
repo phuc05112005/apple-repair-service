@@ -32,15 +32,7 @@ import com.applecare.apple_repair_service.entity.ServiceIssue;
 import com.applecare.apple_repair_service.entity.ServiceTicket;
 import com.applecare.apple_repair_service.entity.ServiceType;
 import com.applecare.apple_repair_service.entity.TechnicianSchedule;
-import com.applecare.apple_repair_service.enums.AppointmentStatus;
-import com.applecare.apple_repair_service.enums.ApprovalStatus;
-import com.applecare.apple_repair_service.enums.AssignmentSource;
-import com.applecare.apple_repair_service.enums.AssignmentStatus;
-import com.applecare.apple_repair_service.enums.PaymentMethod;
-import com.applecare.apple_repair_service.enums.PredictionType;
-import com.applecare.apple_repair_service.enums.ServiceTicketStatus;
-import com.applecare.apple_repair_service.enums.ServiceTypeCode;
-import com.applecare.apple_repair_service.enums.TransferMode;
+import com.applecare.apple_repair_service.enums.*;
 import com.applecare.apple_repair_service.exception.BusinessException;
 import com.applecare.apple_repair_service.exception.BusinessRuleViolationException;
 import com.applecare.apple_repair_service.exception.ConflictException;
@@ -494,7 +486,8 @@ class ApplicationTransactionsIntegrationTest {
 
         var revised = tickets.recordInspection(id, userId, new RecordInspectionRequest("Confirmed plan", false,
                 List.of(new InspectionRepairItemRequest(catalogId, new BigDecimal("100"), new BigDecimal("90"),
-                        null))));
+                        null)),
+                ConfirmationMethod.DIRECT, "Khách đồng ý tại quầy"));
         assertEquals(ServiceTicketStatus.REPAIRING, revised.ticket().status());
         inventory.usePart(new UsePartRequest(tickets.getById(id).repairItems().stream()
                 .filter(i -> i.approvalStatus() == ApprovalStatus.APPROVED).findFirst().orElseThrow().id(), partId, 1,
@@ -504,7 +497,7 @@ class ApplicationTransactionsIntegrationTest {
         payments.recordPayment(id, new RecordPaymentRequest(PaymentMethod.CASH));
         var handed = tickets.handover(id, new HandoverRequest(userId));
         assertEquals(ServiceTicketStatus.HANDED_OVER, handed.ticket().status());
-        assertEquals(6, handed.history().size());
+        assertEquals(5, handed.history().size());
         assertEquals("Test customer", customers.getById(booking.appointment().customerId()).fullName());
         feedback.createFeedback(new CreateServiceFeedbackRequest(id, true, "OK"));
         predictions.savePrediction(

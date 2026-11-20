@@ -74,8 +74,8 @@ class PhaseOneWorkflowIntegrationTest {
                 .content(json.writeValueAsString(new AssignTechnicianCommand(f.technician.getId(), AssignmentSource.MANUAL_OVERRIDE))))
                 .andExpect(status().isCreated());
         mvc.perform(get(path).header("Authorization", technician)).andExpect(status().isOk()).andExpect(jsonPath("$.repairItems.length()").value(1));
-        mvc.perform(post(path + "/inspection/start").header("Authorization", technician))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("INSPECTING"));
+        mvc.perform(post(path + "/start-processing").header("Authorization", technician))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.ticket.status").value("REPAIRING"));
         var inspection = new InspectionCommand("Lỗi nguồn đã xác định, phát sinh công việc ngoài báo giá ban đầu", true,
                 List.of(new InspectionRepairItemRequest(f.catalog.getId(), BigDecimal.valueOf(120), BigDecimal.valueOf(120), null)));
         var inspected = mvc.perform(post(path + "/inspection").header("Authorization", technician).contentType("application/json")

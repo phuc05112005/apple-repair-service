@@ -43,8 +43,11 @@ class OpenApiIntegrationTest {
             if(rule==null) rule=AnnotatedElementUtils.findMergedAnnotation(handler.getBeanType(),PreAuthorize.class);
             String access=rule==null?"authenticated":rule.value();
             if(handler.getBeanType().getSimpleName().equals("PublicController")
+                    || handler.getBeanType().getSimpleName().equals("SystemSettingPublicController")
                     || (handler.getBeanType().getSimpleName().equals("AuthController") && handler.getMethod().getName().equals("login"))) access="public";
-            if(!handler.getBeanType().getSimpleName().equals("PublicController") && !handler.getBeanType().getSimpleName().equals("AuthController"))
+            if(!handler.getBeanType().getSimpleName().equals("PublicController")
+                    && !handler.getBeanType().getSimpleName().equals("SystemSettingPublicController")
+                    && !handler.getBeanType().getSimpleName().equals("AuthController"))
                 assertNotNull(rule,"Missing explicit role: "+handler);
             String request="none";
             for(var parameter:handler.getMethodParameters()) {

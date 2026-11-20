@@ -28,10 +28,14 @@ final class ApiFixture {
         deviceType = new DeviceType(); deviceType.setName(prefix); em.persist(deviceType);
         model = new DeviceModel(); model.setName(prefix); model.setDeviceType(deviceType); em.persist(model);
         var existing = em.createQuery("select s from ServiceType s where s.code=:code", ServiceType.class)
-                .setParameter("code", ServiceTypeCode.REPAIR).getResultList();
+                .setParameter("code", ServiceTypeCode.REPAIR)
+                .setLockMode(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+                .getResultList();
         if (existing.isEmpty()) {
             serviceType = new ServiceType(); serviceType.setName(prefix); serviceType.setCode(ServiceTypeCode.REPAIR); em.persist(serviceType);
-        } else serviceType = existing.getFirst();
+        } else {
+            serviceType = existing.getFirst();
+        }
         issue = new ServiceIssue(); issue.setName(prefix); issue.getDeviceTypes().add(deviceType); issue.setMappingInitialized(true); em.persist(issue);
         catalog = new ServiceCatalogItem(); catalog.setName(prefix); catalog.setDeviceModel(model);
         catalog.setServiceType(serviceType); catalog.setServiceIssue(issue); catalog.setConfiguredPrice(new BigDecimal("100.00"));

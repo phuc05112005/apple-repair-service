@@ -71,14 +71,17 @@ jobs:
             -p123456 \
             apple_repair_service_test < database/schema.sql
 
-      - name: Build & Package backend
+      - name: Test & Package backend
         working-directory: backend
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3307/apple_repair_service_test
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3307/apple_repair_service_test
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: 123456
+          TEST_DATABASE_URL: jdbc:mysql://127.0.0.1:3307/apple_repair_service_test
+          TEST_DATABASE_USERNAME: root
+          TEST_DATABASE_PASSWORD: 123456
           JWT_SECRET: ci-test-secret-key-ci-test-secret-key
-        run: mvn --batch-mode package -Dmaven.test.skip=true
+        run: mvn --batch-mode package
 
   frontend:
     name: Frontend - React
