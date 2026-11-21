@@ -4,13 +4,16 @@ import com.applecare.apple_repair_service.entity.*;
 import com.applecare.apple_repair_service.enums.*;
 import com.applecare.apple_repair_service.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
+
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
@@ -101,9 +104,15 @@ public class ServiceTimingService {
 
   for (var t : all.values()) {
    boolean isPlanChange = t.getId().equals(trigger.getId()) && "SERVICE_PLAN_CHANGE".equals(reason);
+   Long techId = activeTechByTicket.get(t.getId());
+   if (techId == null && isPlanChange) {
+    techId = assignments.findFirstByServiceTicket_IdAndStatus(t.getId(), AssignmentStatus.ACTIVE)
+            .map(a -> a.getTechnician().getId())
+            .orElse(null);
+   }
    durationMap.put(t.getId(), t.getId().equals(trigger.getId()) && triggerDurationOverride != null
            ? triggerDurationOverride
-           : estimate(t, itemMap.getOrDefault(t.getId(), List.of()), isPlanChange, activeTechByTicket.get(t.getId())));
+           : estimate(t, itemMap.getOrDefault(t.getId(), List.of()), isPlanChange, techId));
   }
 
   for (var worker : byWorker.entrySet()) {
@@ -129,8 +138,13 @@ public class ServiceTimingService {
     if (terminal(t) || waiting(t)) continue;
 
     long minutes = durationMap.get(t.getId());
-    long elapsed = elapsed(historyMap.getOrDefault(t.getId(), List.of()), now);
-    long remaining = Math.max(0, minutes - elapsed);
+    long remaining = remainingMinutes(
+            t,
+            itemMap.getOrDefault(t.getId(), List.of()),
+            historyMap.getOrDefault(t.getId(), List.of()),
+            minutes,
+            now
+    );
 
     boolean isTrigger = t.getId().equals(trigger.getId());
 
@@ -196,6 +210,87 @@ public class ServiceTimingService {
   }
  }
 
+ private long remainingMinutes(ServiceTicket t,
+                               List<RepairItem> ticketItems,
+                               List<ServiceStatusHistory> history,
+                               long totalDurationMinutes,
+                               LocalDateTime now) {
+  if (totalDurationMinutes <= 0) return 0L;
+
+  long totalTicketElapsed = elapsed(history, now);
+  if (totalTicketElapsed <= 0) return totalDurationMinutes;
+
+  var approved = ticketItems.stream()
+          .filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
+          .sorted(Comparator
+                  .comparingLong((RepairItem i) -> itemBaselineElapsed(t, i, history, now))
+                  .thenComparing(RepairItem::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+          .toList();
+
+  if (approved.isEmpty()) {
+   return Math.max(0L, totalDurationMinutes - totalTicketElapsed);
+  }
+
+  long rawSum = approved.stream()
+          .mapToLong(this::effectiveItemDuration)
+          .sum();
+
+  long consumedTicketElapsed = 0L;
+  long totalRemaining = 0L;
+  long allocatedDuration = 0L;
+
+  for (int idx = 0; idx < approved.size(); idx++) {
+   RepairItem item = approved.get(idx);
+   long rawDur = effectiveItemDuration(item);
+   long itemDur = (rawSum <= 0 || rawSum == totalDurationMinutes)
+           ? rawDur
+           : (idx == approved.size() - 1
+           ? Math.max(0L, totalDurationMinutes - allocatedDuration)
+           : Math.round((double) totalDurationMinutes * rawDur / rawSum));
+   allocatedDuration += itemDur;
+
+   long baselineElapsed = itemBaselineElapsed(t, item, history, now);
+   long itemElapsed = Math.max(0L, (totalTicketElapsed - baselineElapsed) - consumedTicketElapsed);
+   long usedOnItem = Math.min(itemDur, itemElapsed);
+
+   consumedTicketElapsed += usedOnItem;
+   totalRemaining += (itemDur - usedOnItem);
+  }
+
+  return Math.max(0L, totalRemaining);
+ }
+
+ private long effectiveItemDuration(RepairItem item) {
+  if (item.getEstimatedDurationMinutes() != null && item.getEstimatedDurationMinutes() > 0) {
+   return item.getEstimatedDurationMinutes();
+  }
+  return catalogStandardMinutes(item);
+ }
+
+ private long itemBaselineElapsed(ServiceTicket t,
+                                  RepairItem item,
+                                  List<ServiceStatusHistory> history,
+                                  LocalDateTime now) {
+  LocalDateTime start = item.getApprovalDecisionAt();
+  if (start == null) {
+   LocalDateTime created = item.getCreatedAt();
+   if (created == null
+           || created.isAfter(now)
+           || (t.getReceivedAt() != null && !created.isAfter(t.getReceivedAt()))) {
+    return 0L;
+   }
+   start = created;
+  }
+
+  if (t.getActualRepairStartedAt() != null && !start.isAfter(t.getActualRepairStartedAt())) {
+   return 0L;
+  }
+  if (start.isAfter(now)) {
+   return 0L;
+  }
+  return elapsed(history, start);
+ }
+
  private User assignedUser(List<Assignment> active, Long id) {
   return active.stream().filter(a -> a.getServiceTicket().getId().equals(id)).map(Assignment::getTechnician).findFirst().orElse(null);
  }
@@ -214,41 +309,28 @@ public class ServiceTimingService {
           .filter(i -> i.getApprovalStatus() == ApprovalStatus.APPROVED)
           .toList();
 
-  if (changedPlan && !approved.isEmpty()) {
+  if (changedPlan && approved.isEmpty()) {
+   t.setEstimatedDurationMinutes(0L);
+   t.setEstimateSource(EstimateSource.STANDARD);
+   return 0L;
+  }
+
+  if (changedPlan) {
    var unestimated = approved.stream()
            .filter(i -> i.getEstimatedDurationMinutes() == null || i.getEstimatedDurationMinutes() <= 0)
            .toList();
 
-   // Tương thích ngược cho phiếu cũ chưa lưu estimatedDurationMinutes trên các hạng mục ban đầu
-   if (unestimated.size() == approved.size()
-           && approved.size() > 1
-           && t.getEstimatedDurationMinutes() != null
-           && t.getEstimatedDurationMinutes() > 0) {
-    var sortedById = approved.stream().sorted(Comparator.comparing(RepairItem::getId)).toList();
-    var legacyExisting = sortedById.subList(0, sortedById.size() - 1);
-    long legacySum = t.getEstimatedDurationMinutes();
-    long legacyStd = legacyExisting.stream().mapToLong(this::catalogStandardMinutes).sum();
-    long allocated = 0;
-    for (int i = 0; i < legacyExisting.size(); i++) {
-     var li = legacyExisting.get(i);
-     long share = (i == legacyExisting.size() - 1)
-             ? Math.max(1L, legacySum - allocated)
-             : (legacyStd > 0
-             ? Math.max(1L, Math.round((double) legacySum * catalogStandardMinutes(li) / legacyStd))
-             : Math.max(1L, legacySum / legacyExisting.size()));
-     li.setEstimatedDurationMinutes(share);
-     allocated += share;
-    }
-    unestimated = List.of(sortedById.get(sortedById.size() - 1));
-   }
-
-   boolean anyMlPredicted = t.getEstimateSource() == EstimateSource.ML;
+   boolean anyMlPredicted = false;
    if (!unestimated.isEmpty()) {
     var evalAt = OffsetDateTime.ofInstant(clock.instant(), clock.getZone());
     for (var newItem : unestimated) {
      var catalog = effectiveCatalog(newItem);
      if (catalog == null) continue;
-     long itemMinutes = catalogStandardMinutes(newItem);
+
+     long stdMinutes = catalogStandardMinutes(newItem);
+     long itemMinutes = stdMinutes;
+     String sourceReason = "NO_ASSIGNED_TECH";
+
      if (assignedTechnicianId != null) {
       var prediction = mlEstimates
               .estimateForCatalogItems(t, List.of(assignedTechnicianId), List.of(catalog.getId()), evalAt)
@@ -257,10 +339,25 @@ public class ServiceTimingService {
        itemMinutes = prediction.durationMinutes();
        if (prediction.source() == PredictionSource.ML) {
         anyMlPredicted = true;
+        sourceReason = "ML";
+       } else {
+        sourceReason = "ML_FALLBACK:" + prediction.warnings();
        }
+      } else {
+       sourceReason = "EMPTY_PREDICTION";
       }
      }
+
+     log.info("[ItemDuration] ticketId={} itemId={} catalogId={} minutes={} stdMinutes={} reason={}",
+             t.getId(), newItem.getId(), catalog.getId(), itemMinutes, stdMinutes, sourceReason);
      newItem.setEstimatedDurationMinutes(itemMinutes);
+    }
+   }
+
+   for (var item : approved) {
+    if (item.getEstimatedDurationMinutes() != null
+            && item.getEstimatedDurationMinutes() != catalogStandardMinutes(item)) {
+     anyMlPredicted = true;
     }
    }
 
