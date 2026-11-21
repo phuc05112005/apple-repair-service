@@ -63,7 +63,7 @@ public class MlCandidateEstimateService {
                         || warnings.contains("UNKNOWN_DEVICE_MODEL")
                         || warnings.contains("TOO_MANY_SERVICES")
                         || warnings.contains("CATALOG_OUT_OF_BOUNDS")
-                        || warnings.contains("NO_REPAIR_ITEMS");
+                        || (!hasOverride && warnings.contains("NO_REPAIR_ITEMS"));
 
                 if (isColdStartOrOutOfBounds) {
                     result.put(candidateId, new TechnicalEstimate(candidateId,
@@ -81,8 +81,20 @@ public class MlCandidateEstimateService {
                             Boolean.TRUE.equals(response.model().productionValidated()), evaluationTimestamp));
                 }
             }
-            log.info("Candidate duration estimates ready ticketId={} candidateCount={} catalogOverrideCount={} predictionSource=ML modelVersion={}",
-                    ticket.getId(), candidateIds.size(), hasOverride ? serviceCatalogItemIds.size() : 0, response.model().version());
+
+            boolean anyFallback = result.values().stream()
+                    .anyMatch(est -> est.source() == PredictionSource.STANDARD_DURATION_FALLBACK);
+            var distinctWarnings = result.values().stream()
+                    .flatMap(est -> est.warnings().stream())
+                    .distinct()
+                    .toList();
+            log.info("Candidate duration estimates ready ticketId={} candidateCount={} catalogOverrideCount={} predictionSource={} warnings={} modelVersion={}",
+                    ticket.getId(),
+                    candidateIds.size(),
+                    hasOverride ? serviceCatalogItemIds.size() : 0,
+                    anyFallback ? PredictionSource.STANDARD_DURATION_FALLBACK : PredictionSource.ML,
+                    distinctWarnings,
+                    response.model().version());
             return java.util.Collections.unmodifiableMap(result);
         } catch (MlServiceUnavailableException exception) {
             log.warn("Candidate duration fallback ticketId={} candidateCount={} predictionSource=STANDARD_DURATION_FALLBACK reason={}",

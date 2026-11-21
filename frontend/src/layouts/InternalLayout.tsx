@@ -27,7 +27,7 @@ const roleConfig: Record<UserRole, { title: string; groups: NavGroup[] }> = {
   ] },
   RECEPTIONIST: { title: 'Nhân viên tiếp nhận', groups: [{ label: 'Công việc', links: [['', 'Tổng quan', '⌂'], ['appointments', 'Lịch hẹn', '◫'], ['intake', 'Tiếp nhận', '↳'], ['warranty-history', 'Lịch sử & bảo hành', '◇'], ['tickets', 'Phiếu dịch vụ', '▤']] }] },
   TECHNICIAN: { title: 'Kỹ thuật viên', groups: [{ label: 'Công việc', links: [['', 'Công việc', '▤'],
-        ['history', 'Lịch sử sửa chữa', '◷']] }] },
+        ['history', 'Lịch sử', '◷']] }] },
 }
 
 export function InternalLayout({ role }: { role: UserRole }) {
