@@ -1,53 +1,122 @@
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { UserRole } from '../api/contracts'
 import { useAuth } from '../auth/useAuth'
 import { UserProfileModal } from '../components/UserProfileModal'
 
 interface NavGroup { label: string; links: [string, string, string][] }
 const roleConfig: Record<UserRole, { title: string; groups: NavGroup[] }> = {
-  ADMIN: { title: 'Quản trị hệ thống', groups: [
-    { 
-      label: 'Tổng quan', 
-      links: [
-        ['', 'Tổng quan', '⌂'], 
-        ['statistics', 'Thống kê & Báo cáo', '⌁']
-        // Đã xóa tab Giám sát ML tại đây
-      ] 
-    },
-    { 
-      label: 'Vận hành', 
-      links: [
-        ['settings', 'Thời gian & cấu hình', '◷'],
-        ['footer-settings', 'Thông tin hệ thống', '☎'] // Bổ sung tab cấu hình Footer & Hotline
-      ] 
-    },
-    { label: 'Nhân sự', links: [['users', 'Tài khoản', '◎'], ['schedules', 'Lịch làm việc', '◷']] },
-    { label: 'Danh mục', links: [['catalog', 'Dịch vụ', '◇'], ['parts', 'Linh kiện', '▣'], ['inventory', 'Tồn kho linh kiện', '▤'], ['branches', 'Chi nhánh', '⌖'], ['slots', 'Khung giờ & lịch hẹn', '◫']] },
-  ] },
-  RECEPTIONIST: { title: 'Nhân viên tiếp nhận', groups: [{ label: 'Công việc', links: [['', 'Tổng quan', '⌂'], ['appointments', 'Lịch hẹn', '◫'], ['intake', 'Tiếp nhận', '↳'], ['warranty-history', 'Lịch sử & bảo hành', '◇'], ['tickets', 'Phiếu dịch vụ', '▤']] }] },
-  TECHNICIAN: { title: 'Kỹ thuật viên', groups: [{ label: 'Công việc', links: [['', 'Công việc', '▤'],
-        ['history', 'Lịch sử', '◷']] }] },
+  ADMIN: {
+    title: 'Quản trị hệ thống',
+    groups: [
+      {
+        label: 'Tổng quan',
+        links: [
+          ['', 'Tổng quan', '⌂'],
+          ['statistics', 'Thống kê & Báo cáo', '⌁'],
+        ],
+      },
+      {
+        label: 'Vận hành',
+        links: [
+          ['settings', 'Thời gian & cấu hình', '◷'],
+          ['footer-settings', 'Thông tin hệ thống', '☎'],
+        ],
+      },
+      {
+        label: 'Nhân sự',
+        links: [
+          ['users', 'Tài khoản', '◎'],
+          ['schedules', 'Lịch làm việc', '◷'],
+        ],
+      },
+      {
+        label: 'Danh mục',
+        links: [
+          ['catalog', 'Dịch vụ', '◇'],
+          ['parts', 'Linh kiện', '▣'],
+          ['inventory', 'Tồn kho linh kiện', '▤'],
+          ['branches', 'Chi nhánh', '⌖'],
+          ['slots', 'Khung giờ & lịch hẹn', '◫'],
+        ],
+      },
+    ],
+  },
+  RECEPTIONIST: {
+    title: 'Nhân viên tiếp nhận',
+    groups: [
+      {
+        label: 'Công việc',
+        links: [
+          ['', 'Tổng quan', '⌂'],
+          ['appointments', 'Lịch hẹn', '◫'],
+          ['intake', 'Tiếp nhận', '↳'],
+          ['warranty-history', 'Lịch sử & bảo hành', '◇'],
+          ['tickets', 'Phiếu dịch vụ', '▤'],
+        ],
+      },
+    ],
+  },
+  TECHNICIAN: {
+    title: 'Kỹ thuật viên',
+    groups: [
+      {
+        label: 'Công việc',
+        links: [
+          ['', 'Công việc', '▤'],
+          ['history', 'Lịch sử', '◷'],
+        ],
+      },
+    ],
+  },
 }
 
 export function InternalLayout({ role }: { role: UserRole }) {
   const { user, logout } = useAuth()
+  const { pathname } = useLocation()
   const config = roleConfig[role]
   const base = `/internal/${role.toLowerCase()}`
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [openPath, setOpenPath] = useState<string | null>(null)
   const [profileModalTab, setProfileModalTab] = useState<'profile' | 'password' | null>(null)
+
+  const menuOpen = openPath === pathname
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenPath(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [menuOpen])
 
   return (
     <div className="internal-shell">
-          
-      
+      {menuOpen && (
+        <button
+          type="button"
+          className="sidebar-scrim"
+          aria-label="Đóng menu điều hướng"
+          onClick={() => setOpenPath(null)}
+        />
+      )}
 
       {/* Sidebar bên trái */}
       <aside className={`internal-sidebar ${menuOpen ? 'is-open' : ''}`}>
-        <NavLink className="brand brand--internal" to={base} onClick={() => setMenuOpen(false)}>
-          <span className="brand-mark">T</span>
-          <span>TáoCare <small>OPS</small></span>
-        </NavLink>
+        <div className="internal-sidebar__head">
+          <NavLink className="brand brand--internal" to={base} onClick={() => setOpenPath(null)}>
+            <span className="brand-mark">T</span>
+            <span>TáoCare <small>OPS</small></span>
+          </NavLink>
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            aria-label="Đóng menu"
+            onClick={() => setOpenPath(null)}
+          >
+            ×
+          </button>
+        </div>
 
         <div className="workspace-label">{config.title}</div>
 
@@ -60,7 +129,7 @@ export function InternalLayout({ role }: { role: UserRole }) {
                   key={path}
                   end={!path}
                   to={path ? `${base}/${path}` : base}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => setOpenPath(null)}
                 >
                   <span aria-hidden="true">{icon}</span>
                   {label}
@@ -74,21 +143,11 @@ export function InternalLayout({ role }: { role: UserRole }) {
         <button
           type="button"
           className="sidebar-user"
-          onClick={() => setProfileModalTab('profile')}
-          title="Bấm để xem & chỉnh sửa hồ sơ cá nhân"
-          style={{
-            width: '100%',
-            textAlign: 'left',
-            background: 'transparent',
-            border: 'none',
-            borderTop: '1px solid #29302c',
-            cursor: 'pointer',
-            padding: '0.85rem 0.5rem',
-            borderRadius: '8px',
-            transition: 'background 0.2s ease',
+          onClick={() => {
+            setOpenPath(null)
+            setProfileModalTab('profile')
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#25302a')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          title="Bấm để xem & chỉnh sửa hồ sơ cá nhân"
         >
           <span>{user?.fullName?.slice(0, 1).toLocaleUpperCase('vi') || 'U'}</span>
           <div>
@@ -107,15 +166,32 @@ export function InternalLayout({ role }: { role: UserRole }) {
       {/* Nội dung chính bên phải */}
       <div className="internal-main">
         <header className="internal-topbar">
-          <div>
-            <span className="eyebrow">Không gian làm việc</span>
-            <strong>{config.title}</strong>
-          </div>
-
-          <div className="page-action-group">
+          <div className="internal-topbar__left">
             <button
               type="button"
-              className="button button--secondary"
+              className="mobile-menu-button"
+              aria-expanded={menuOpen}
+              aria-label="Mở menu điều hướng"
+              onClick={() => setOpenPath(pathname)}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+              <span>Menu</span>
+            </button>
+
+            <div className="internal-topbar__title">
+              <span className="eyebrow">Không gian làm việc</span>
+              <strong>{config.title}</strong>
+            </div>
+          </div>
+
+          <div className="internal-topbar__actions">
+            <button
+              type="button"
+              className="button button--secondary topbar-profile-btn"
               onClick={() => setProfileModalTab('profile')}
             >
               Hồ sơ cá nhân
