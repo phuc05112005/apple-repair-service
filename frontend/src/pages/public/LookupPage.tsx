@@ -287,7 +287,16 @@ function TicketCard({ ticket, phone }: { ticket: PublicTicketResponse; phone?: s
           <div className="ticket-meta" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
             <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Thanh toán</span><br /><strong style={{ color: '#0f172a' }}>{paymentStatusLabels[ticket.paymentStatus]}</strong></div>
             <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Giá dịch vụ</span><br /><strong style={{ color: '#0f172a' }}>{formatMoney(ticket.approvedTotal)}</strong></div>
-            <div><span style={{ color: '#64748b', fontSize: '0.85rem' }}>Dự kiến hoàn thành</span><br /><strong style={{ color: '#0f172a' }}>{displayEstimatedCompletion}</strong></div>
+            <div>
+              <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Dự kiến hoàn thành</span><br />
+              <strong style={{ color: '#0f172a' }}>{displayEstimatedCompletion}</strong>
+              {!['WAITING_ASSIGNMENT', 'WAITING_HANDOVER', 'HANDED_OVER', 'CANCELLED'].includes(ticket.status) &&
+                displayEstimatedCompletion !== 'Chưa có thời gian dự kiến' && (
+                  <small style={{ display: 'block', color: '#64748b', fontSize: '0.78rem', marginTop: '4px', lineHeight: 1.35 }}>
+                    Thời gian dự kiến có thể chênh lệch tùy vào tiến độ thực tế.
+                  </small>
+                )}
+            </div>
           </div>
 
           {/* Khối hiển thị Kỹ thuật viên phụ trách & Chuyển giao ca */}
